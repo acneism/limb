@@ -73,3 +73,42 @@ jobs:
         with:
           go-version-input: "1.27.x"
           repo-checkout: false
+
+  integration-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ["15", "18"]
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: limb
+          POSTGRES_PASSWORD: limb
+          POSTGRES_DB: limb_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U limb -d limb_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      LIMB_TEST_POSTGRES_DSN: postgres://limb:limb@localhost:5432/limb_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.x"
+      - name: Test against PostgreSQL ${{ matrix.postgres }}
+        shell: bash
+        run: |
+          go test -race -count=1 -v . ./sqlstore/... 2>&1 | tee integration.log
+          if grep -E -e '--- SKIP' integration.log; then
+            echo "integration tests must not be skipped"
+            exit 1
+          fi
