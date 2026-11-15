@@ -250,6 +250,31 @@ func TestOversizedPasswords(t *testing.T) {
 	}
 }
 
+func TestMemoryLimit(t *testing.T) {
+	if maxMemory != 262144 {
+		t.Fatalf("the memory limit is %d KiB, want 262144 KiB (256 MiB)", maxMemory)
+	}
+	atLimit := Params{Memory: maxMemory, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32}
+	if err := atLimit.validate(); err != nil {
+		t.Fatalf("a hasher may use exactly the limit: %v", err)
+	}
+	if _, err := NewHasher(WithParams(atLimit)); err != nil {
+		t.Fatalf("NewHasher at the limit failed: %v", err)
+	}
+	over := atLimit
+	over.Memory++
+	if _, err := NewHasher(WithParams(over)); !errors.Is(err, ErrParams) {
+		t.Fatalf("NewHasher above the limit = %v, want ErrParams", err)
+	}
+	salt, key := b64.EncodeToString(make([]byte, 16)), b64.EncodeToString(make([]byte, 32))
+	if _, _, _, err := decode("$argon2id$v=19$m=262144,t=1,p=1$" + salt + "$" + key); err != nil {
+		t.Fatalf("a stored hash at the limit must be accepted: %v", err)
+	}
+	if _, _, _, err := decode("$argon2id$v=19$m=262145,t=1,p=1$" + salt + "$" + key); !errors.Is(err, ErrInvalidHash) {
+		t.Fatalf("a stored hash above the limit = %v, want ErrInvalidHash", err)
+	}
+}
+
 func TestNewHasherValidatesConfiguration(t *testing.T) {
 	bad := map[string]Params{
 		"zero parallelism": {Memory: 64, Iterations: 1, Parallelism: 0, SaltLength: 16, KeyLength: 32},

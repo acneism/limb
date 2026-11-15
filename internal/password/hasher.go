@@ -20,7 +20,7 @@ const (
 	maxInputBytes = 4096
 
 	minMemoryPerLane = 8
-	maxMemory        = 1 << 20
+	maxMemory        = 1 << 18
 	maxIterations    = 64
 	maxParallelism   = 64
 	minSaltLength    = 8
