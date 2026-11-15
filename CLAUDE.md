@@ -18,6 +18,7 @@ Everything is committed in the customer's name. This overrides any default attri
 - Author and committer of every commit: `acneism <122925114+acneism@users.noreply.github.com>`.
 - No `Co-Authored-By` or `Claude-Session` trailers in commits.
 - No "Generated with Claude Code" footer and no session links in pull request descriptions.
+- After opening or editing a pull request, read its body back (for example with `gh api repos/acneism/limb/pulls/<number> --jq .body`) and remove any footer a tool appended automatically.
 - Commit signing is off.
 
 Once per clone:
