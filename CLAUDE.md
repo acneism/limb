@@ -28,11 +28,15 @@ git config user.email 122925114+acneism@users.noreply.github.com
 git config commit.gpgsign false
 ```
 
-Before every push, the output of this command must not mention Claude:
+Before every push, run this command and check its output:
 
 ```bash
 git log --format='%an <%ae> | %cn <%ce>%n%B' origin/main..HEAD
 ```
+
+- Every author and committer is `acneism`.
+- There are no `Co-Authored-By` or `Claude-Session` trailers, no "Generated with" footers and no links to sessions.
+- Naming the `CLAUDE.md` file in a commit message is fine.
 
 ## Comments
 
@@ -58,6 +62,7 @@ Names and small functions are the documentation. `make comments` enforces the ru
 GOTOOLCHAIN=go1.27.4 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 ```
 
+- Check `golangci-lint version`: it must report v2.15.0 built with go1.27 or newer. If an older binary shadows it, put `$(go env GOPATH)/bin` first in `PATH`.
 - govulncheck:
 
 ```bash
@@ -74,6 +79,14 @@ Before sending a branch for review and before opening a pull request, all three 
 
 ## Definition of done
 
-- Unit tests, fuzz tests for normalization, validation and token parsing, integration tests on every supported database in CI, and the storage compatibility suite. All tests run with the race detector and core coverage stays at or above 85%.
-- gofmt and golangci-lint are clean, govulncheck reports nothing, and every change is reviewed against the OWASP ASVS checklist.
-- Public API has godoc and runnable examples; README exists in English and Russian.
+Every change:
+
+- New behaviour is covered by unit tests; storage changes also by integration tests on every supported database in CI and by the storage compatibility suite; normalization, validation and token parsing also by fuzz tests.
+- All tests pass with the race detector and core coverage stays at or above 85%.
+- `make check` is clean (govulncheck may run in CI only) and new exported API has godoc.
+- The team lead has accepted the change after reviewing it against the OWASP ASVS checklist.
+
+Release v1.0 also needs:
+
+- README in English and Russian with a quick start, and runnable examples.
+- A full OWASP ASVS 5.0 level 2 review of authentication, sessions and tokens with no open high-severity findings.
