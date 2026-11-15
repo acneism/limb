@@ -59,6 +59,7 @@ func TestPolicyValidate(t *testing.T) {
 
 func TestPolicyLength(t *testing.T) {
 	p := DefaultPolicy()
+	p.AllowCommon = true
 	cases := []struct {
 		name     string
 		password string
@@ -196,7 +197,7 @@ func TestPolicyReportsEveryViolatedRule(t *testing.T) {
 	p := Policy{MinLength: 12, MaxLength: 128, Custom: []func(context.Context, string) error{
 		func(context.Context, string) error { return errors.New("custom rule") },
 	}}
-	got := p.Check(t.Context(), "qwerty", []string{"qwerty"})
+	got := p.Check(t.Context(), "password", []string{"password"})
 	want := []string{RuleMinLength, RuleCommon, RuleLogin, "custom rule"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
