@@ -101,7 +101,7 @@ func TestNumberValidatorSeesE164Value(t *testing.T) {
 }
 
 func TestNumberReportsUnsupportedRegion(t *testing.T) {
-	for _, region := range []string{"XX", "RUS", "1", " ", "R", "r u"} {
+	for _, region := range []string{"XX", "RUS", "1", " ", "R", "r u", "\u017fe", "\u0131t", "\u212a\u212a"} {
 		typ := phone.Number(region)
 		if err := typ.Err(); err == nil || !strings.Contains(err.Error(), "unsupported region") {
 			t.Fatalf("Number(%q).Err() = %v, want an unsupported region error", region, err)

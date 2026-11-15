@@ -31,7 +31,7 @@ var (
 // defaultRegion that is not supported makes Type.Err of the result report an
 // error.
 func Number(defaultRegion string, opts ...identifier.Option) identifier.Type {
-	region := strings.ToUpper(defaultRegion)
+	region := upperASCII(defaultRegion)
 	base := []identifier.Option{
 		identifier.Normalize(normalizer(region)),
 		identifier.LoginAllowed(),
@@ -41,6 +41,15 @@ func Number(defaultRegion string, opts ...identifier.Option) identifier.Type {
 		base = append(base, identifier.Invalid(fmt.Errorf("unsupported region %q", defaultRegion)))
 	}
 	return identifier.Custom(typeName, append(base, opts...)...)
+}
+
+func upperASCII(text string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' {
+			return r - 'a' + 'A'
+		}
+		return r
+	}, text)
 }
 
 func normalizer(region string) func(string) (string, error) {
