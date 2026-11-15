@@ -1,0 +1,174 @@
+// Package sqlstore implements store.Store on top of database/sql. It does not
+// import any database driver: the application opens the *sql.DB with the
+// driver it prefers and tells the store which Dialect the database speaks.
+//
+// The tables are created by the migrations embedded in the package, in tables
+// whose names start with a configurable prefix, limb_ by default. All times
+// are written in UTC with microsecond precision and the database never decides
+// a time or an identifier on its own.
+package sqlstore
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"regexp"
+	"time"
+
+	"github.com/acneism/limb/store"
+)
+
+const (
+	defaultPrefix = "limb_"
+	prefixPattern = `^[a-z][a-z0-9_]{0,15}$`
+)
+
+var prefixRegexp = regexp.MustCompile(prefixPattern)
+
+type config struct {
+	prefix string
+	err    error
+}
+
+// Option customizes a Store.
+type Option func(*config)
+
+// WithTablePrefix sets the prefix of the table names. It starts with a lower
+// case letter, continues with lower case letters, digits and underscores, and
+// is at most 16 characters long. The default is limb_. An invalid prefix makes
+// New return an error.
+func WithTablePrefix(prefix string) Option {
+	return func(c *config) {
+		if c.err != nil {
+			return
+		}
+		if !prefixRegexp.MatchString(prefix) {
+			c.err = fmt.Errorf("sqlstore: invalid table prefix %q: it must match %s", prefix, prefixPattern)
+			return
+		}
+		c.prefix = prefix
+	}
+}
+
+type executor interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// Store is a store.Store that keeps its records in a SQL database.
+type Store struct {
+	db        *sql.DB
+	dialect   Dialect
+	prefix    string
+	q         queries
+	bootstrap []string
+	versions  []migration
+	latest    int
+	now       func() time.Time
+}
+
+var _ store.Store = (*Store)(nil)
+
+// New creates a store that works on db and speaks the given dialect. It reads
+// the embedded migrations of the dialect but does not touch the database:
+// call Migrate to create or update the schema.
+func New(db *sql.DB, dialect Dialect, opts ...Option) (*Store, error) {
+	if db == nil {
+		return nil, errors.New("sqlstore: the database is nil")
+	}
+	if dialect == nil {
+		return nil, errors.New("sqlstore: the dialect is nil")
+	}
+	cfg := config{prefix: defaultPrefix}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&cfg)
+		}
+	}
+	if cfg.err != nil {
+		return nil, cfg.err
+	}
+	bootstrap, versions, err := loadMigrations(dialect.Migrations(), cfg.prefix)
+	if err != nil {
+		return nil, err
+	}
+	s := &Store{
+		db:        db,
+		dialect:   dialect,
+		prefix:    cfg.prefix,
+		bootstrap: bootstrap,
+		versions:  versions,
+		latest:    versions[len(versions)-1].version,
+		now:       time.Now,
+	}
+	s.q = newQueries(s.prefix, dialect)
+	return s, nil
+}
+
+// Users returns the repository of user accounts.
+func (s *Store) Users() store.Users {
+	return users{s: s, x: s.db}
+}
+
+// Identifiers returns the repository of login identifiers.
+func (s *Store) Identifiers() store.Identifiers {
+	return identifiers{s: s, x: s.db}
+}
+
+type repositories struct {
+	s *Store
+	x executor
+}
+
+func (r repositories) Users() store.Users {
+	return users(r)
+}
+
+func (r repositories) Identifiers() store.Identifiers {
+	return identifiers(r)
+}
+
+// InTx runs fn in a database transaction with the default isolation level. The
+// transaction is committed if fn returns nil and rolled back if fn returns an
+// error or panics.
+func (s *Store) InTx(ctx context.Context, fn func(ctx context.Context, tx store.Repositories) error) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("sqlstore: begin transaction: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if err = fn(ctx, repositories{s: s, x: tx}); err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("sqlstore: commit transaction: %w", err)
+	}
+	committed = true
+	return nil
+}
+
+// SchemaVersion returns the version recorded in the database, 0 if the schema
+// does not exist, together with an error that wraps store.ErrSchemaOutdated if
+// it is older than the latest embedded migration.
+func (s *Store) SchemaVersion(ctx context.Context) (int, error) {
+	var version int
+	err := s.db.QueryRowContext(ctx, s.q.schemaVersion).Scan(&version)
+	switch {
+	case err == nil:
+	case errors.Is(err, sql.ErrNoRows), s.dialect.IsMissingTable(err):
+		version = 0
+	default:
+		return 0, fmt.Errorf("sqlstore: read schema version: %w", err)
+	}
+	if version < s.latest {
+		return version, fmt.Errorf("%w: the database has version %d, version %d is needed", store.ErrSchemaOutdated, version, s.latest)
+	}
+	return version, nil
+}
