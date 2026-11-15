@@ -39,16 +39,6 @@ func runNormalizeCases(t *testing.T, typ identifier.Type, cases []normalizeCase)
 	}
 }
 
-func mustPanic(t *testing.T, name string, fn func()) {
-	t.Helper()
-	defer func() {
-		if recover() == nil {
-			t.Fatalf("%s did not panic", name)
-		}
-	}()
-	fn()
-}
-
 func TestEmailNormalize(t *testing.T) {
 	longLabels := strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63)
 	runNormalizeCases(t, identifier.Email(), []normalizeCase{
@@ -213,6 +203,9 @@ func TestNormalizeRejectsNonIdempotentSteps(t *testing.T) {
 
 func TestZeroTypeIsRejected(t *testing.T) {
 	var typ identifier.Type
+	if typ.Err() == nil {
+		t.Fatal("zero Type must report a configuration error")
+	}
 	if _, err := typ.Normalize("value"); err == nil {
 		t.Fatal("zero Type must not normalize anything")
 	}
@@ -221,15 +214,100 @@ func TestZeroTypeIsRejected(t *testing.T) {
 	}
 }
 
-func TestOptionsPanicOnInvalidArguments(t *testing.T) {
-	mustPanic(t, "Pattern with an invalid expression", func() { identifier.Pattern("[") })
-	mustPanic(t, "Length with a negative minimum", func() { identifier.Length(-1, 5) })
-	mustPanic(t, "Length with maximum below minimum", func() { identifier.Length(5, 4) })
-	mustPanic(t, "Length with a zero maximum", func() { identifier.Length(0, 0) })
-	mustPanic(t, "Validate with nil", func() { identifier.Validate(nil) })
-	mustPanic(t, "Normalize with nil", func() { identifier.Normalize(nil) })
-	for _, name := range []string{"", "Upper", "1abc", "with space", "with-dash", strings.Repeat("a", 33)} {
-		mustPanic(t, "Custom("+name+")", func() { identifier.Custom(name) })
+func TestInvalidConfigurationIsReportedByErr(t *testing.T) {
+	cases := []struct {
+		name string
+		typ  identifier.Type
+		want string
+	}{
+		{"pattern that does not compile", identifier.Custom("a", identifier.Pattern("[")), `invalid pattern "["`},
+		{"negative minimum", identifier.Custom("a", identifier.Length(-1, 5)), "invalid length range -1..5"},
+		{"maximum below minimum", identifier.Custom("a", identifier.Length(5, 4)), "invalid length range 5..4"},
+		{"zero maximum", identifier.Custom("a", identifier.Length(0, 0)), "invalid length range 0..0"},
+		{"nil validator", identifier.Custom("a", identifier.Validate(nil)), "Validate is nil"},
+		{"nil normalizer", identifier.Custom("a", identifier.Normalize(nil)), "Normalize is nil"},
+		{"empty name", identifier.Custom(""), `invalid type name ""`},
+		{"upper case name", identifier.Custom("Upper"), `invalid type name "Upper"`},
+		{"name starting with a digit", identifier.Custom("1abc"), `invalid type name "1abc"`},
+		{"name with a space", identifier.Custom("with space"), `invalid type name "with space"`},
+		{"name with a dash", identifier.Custom("with-dash"), `invalid type name "with-dash"`},
+		{"name of 33 characters", identifier.Custom(strings.Repeat("a", 33)), "invalid type name"},
+		{"bad option on the e-mail type", identifier.Email(identifier.Pattern("[")), "invalid pattern"},
+		{"bad option on the nickname type", identifier.Username(identifier.Length(9, 3)), "invalid length range 9..3"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.typ.Err()
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Err() = %v, want an error containing %q", err, tc.want)
+			}
+			value, normalizeErr := tc.typ.Normalize("abc")
+			if !errors.Is(normalizeErr, err) || value != "" {
+				t.Fatalf("Normalize must fail with the configuration error, got %q, %v", value, normalizeErr)
+			}
+		})
+	}
+}
+
+func TestFirstConfigurationErrorWins(t *testing.T) {
+	first := errors.New("first problem")
+	second := errors.New("second problem")
+	typ := identifier.Custom("a", identifier.Invalid(first), identifier.Invalid(second), identifier.Pattern("["))
+	if err := typ.Err(); !errors.Is(err, first) || errors.Is(err, second) {
+		t.Fatalf("Err() = %v, want only the first problem", err)
+	}
+	typ = identifier.Custom("a", identifier.Pattern("["), identifier.Length(5, 4))
+	if err := typ.Err(); err == nil || !strings.Contains(err.Error(), "invalid pattern") {
+		t.Fatalf("Err() = %v, want the pattern problem", err)
+	}
+	typ = identifier.Custom("Bad", identifier.Pattern("["))
+	if err := typ.Err(); err == nil || !strings.Contains(err.Error(), "invalid type name") {
+		t.Fatalf("Err() = %v, want the name problem to come first", err)
+	}
+}
+
+func TestInvalidOption(t *testing.T) {
+	failing := errors.New("bad configuration")
+	typ := identifier.Custom("a", identifier.Invalid(failing))
+	if err := typ.Err(); !errors.Is(err, failing) {
+		t.Fatalf("Err() = %v, want %v", err, failing)
+	}
+	if _, err := typ.Normalize("abc"); !errors.Is(err, failing) {
+		t.Fatalf("Normalize = %v, want %v", err, failing)
+	}
+	if err := identifier.Custom("a", identifier.Invalid(nil)).Err(); err != nil {
+		t.Fatalf("Invalid(nil) must change nothing, got %v", err)
+	}
+}
+
+func TestNilOptionIsIgnored(t *testing.T) {
+	typ := identifier.Custom("a", nil, identifier.LoginAllowed(), nil)
+	if err := typ.Err(); err != nil || !typ.IsLogin() {
+		t.Fatalf("a nil option must be skipped: err=%v login=%v", err, typ.IsLogin())
+	}
+}
+
+func TestValidTypesReportNoError(t *testing.T) {
+	for _, typ := range []identifier.Type{
+		identifier.Email(),
+		identifier.Username(),
+		identifier.Custom("badge"),
+		identifier.Custom("a_1", identifier.Pattern(`\d+`), identifier.Length(0, 10), identifier.Required()),
+	} {
+		if err := typ.Err(); err != nil {
+			t.Errorf("%s: unexpected error %v", typ.Name(), err)
+		}
+	}
+}
+
+func TestResolveSkipsMisconfiguredTypes(t *testing.T) {
+	types := []identifier.Type{
+		identifier.Custom("broken", identifier.LoginAllowed(), identifier.Pattern("[")),
+		identifier.Username(),
+	}
+	typ, value, err := identifier.Resolve(types, "Alice")
+	if err != nil || typ.Name() != "username" || value != "alice" {
+		t.Fatalf("got %q %q %v", typ.Name(), value, err)
 	}
 }
 

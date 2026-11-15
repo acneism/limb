@@ -1,6 +1,7 @@
 package identifier
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -16,9 +17,18 @@ type settings struct {
 	pattern    *regexp.Regexp
 	steps      []step
 	validators []check
+	err        error
 }
 
-// Option customizes an identifier Type.
+func (s *settings) fail(err error) {
+	if s.err == nil {
+		s.err = err
+	}
+}
+
+// Option customizes an identifier Type. An option that is given an invalid
+// argument does not panic: the first such error is kept by the Type and is
+// reported by Type.Err and by Type.Normalize.
 type Option func(*settings)
 
 // Required makes the type mandatory: every user must have a value of it.
@@ -44,53 +54,77 @@ func Delivery() Option {
 }
 
 // Pattern requires the whole normalized value to match the regular expression
-// expr. It replaces any pattern the type has by default. Pattern panics if
-// expr is not a valid regular expression.
+// expr. It replaces any pattern the type has by default. An expression that
+// does not compile makes Type.Err report an error.
 func Pattern(expr string) Option {
-	compiled, err := regexp.Compile("^(?:" + expr + ")$")
-	if err != nil {
-		panic(fmt.Sprintf("identifier: invalid pattern %q: %v", expr, err))
-	}
+	anchored, err := compileAnchored(expr)
 	return func(s *settings) {
-		s.pattern = compiled
+		if err != nil {
+			s.fail(fmt.Errorf("invalid pattern %q: %w", expr, err))
+			return
+		}
+		s.pattern = anchored
 	}
+}
+
+func compileAnchored(expr string) (*regexp.Regexp, error) {
+	if _, err := regexp.Compile(expr); err != nil {
+		return nil, err
+	}
+	return regexp.Compile("^(?:" + expr + ")$")
 }
 
 // Length requires the normalized value to be between minChars and maxChars
 // characters long, both inclusive. It replaces any length limits the type has
-// by default. Length panics if minChars is negative or maxChars is smaller than
-// minChars or than one.
+// by default. A negative minChars, a maxChars below one or a maxChars below
+// minChars makes Type.Err report an error.
 func Length(minChars, maxChars int) Option {
-	if minChars < 0 || maxChars < 1 || maxChars < minChars {
-		panic(fmt.Sprintf("identifier: invalid length range %d..%d", minChars, maxChars))
-	}
 	return func(s *settings) {
+		if minChars < 0 || maxChars < 1 || maxChars < minChars {
+			s.fail(fmt.Errorf("invalid length range %d..%d", minChars, maxChars))
+			return
+		}
 		s.minLength = minChars
 		s.maxLength = maxChars
 	}
 }
 
 // Validate adds a check that runs on the normalized value. A non-nil error
-// rejects the value and its text is reported as the reason. Validate panics if
-// fn is nil.
+// rejects the value and its text is reported as the reason. A nil fn makes
+// Type.Err report an error.
 func Validate(fn func(string) error) Option {
-	if fn == nil {
-		panic("identifier: Validate requires a function")
-	}
 	return func(s *settings) {
+		if fn == nil {
+			s.fail(errors.New("the function given to Validate is nil"))
+			return
+		}
 		s.validators = append(s.validators, fn)
 	}
 }
 
 // Normalize adds a normalization step that runs after the built-in ones of the
 // type, in the order the options are given. The function returns the converted
-// value or an error that rejects the input. Normalize panics if fn is nil.
+// value or an error that rejects the input. A nil fn makes Type.Err report an
+// error.
 func Normalize(fn func(string) (string, error)) Option {
-	if fn == nil {
-		panic("identifier: Normalize requires a function")
-	}
 	return func(s *settings) {
+		if fn == nil {
+			s.fail(errors.New("the function given to Normalize is nil"))
+			return
+		}
 		s.steps = append(s.steps, fn)
+	}
+}
+
+// Invalid makes Type.Err report err. It is meant for constructors that
+// validate their own arguments, such as the ones in subpackages, so that a bad
+// configuration is returned as an error instead of causing a panic. A nil err
+// changes nothing.
+func Invalid(err error) Option {
+	return func(s *settings) {
+		if err != nil {
+			s.fail(err)
+		}
 	}
 }
 
@@ -99,18 +133,23 @@ type spec struct {
 	base     step
 	rules    []check
 	defaults settings
+	err      error
 }
 
 func build(sp spec, opts []Option) Type {
 	cfg := sp.defaults
+	cfg.err = sp.err
 	for _, opt := range opts {
-		opt(&cfg)
+		if opt != nil {
+			opt(&cfg)
+		}
 	}
 	t := Type{
 		name:     sp.name,
 		login:    cfg.login,
 		delivery: cfg.delivery,
 		required: cfg.required,
+		err:      cfg.err,
 		steps:    make([]step, 0, len(cfg.steps)+1),
 		checks:   append([]check(nil), sp.rules...),
 	}
@@ -152,15 +191,16 @@ func patternCheck(re *regexp.Regexp) check {
 
 // Custom creates a type with the given name. The name starts with a lower case
 // letter, continues with lower case letters, digits and underscores, and is at
-// most 32 characters long; Custom panics otherwise. Surrounding white space is
-// removed from values; add more rules with Pattern, Length, Validate and
-// Normalize. A custom type is neither a login nor a delivery type unless
-// LoginAllowed or Delivery says so.
+// most 32 characters long; any other name makes Type.Err report an error.
+// Surrounding white space is removed from values; add more rules with Pattern,
+// Length, Validate and Normalize. A custom type is neither a login nor a
+// delivery type unless LoginAllowed or Delivery says so.
 func Custom(name string, opts ...Option) Type {
+	sp := spec{name: name, base: trimSpace}
 	if !nameRegexp.MatchString(name) {
-		panic(fmt.Sprintf("identifier: invalid type name %q", name))
+		sp.err = fmt.Errorf("invalid type name %q", name)
 	}
-	return build(spec{name: name, base: trimSpace}, opts)
+	return build(sp, opts)
 }
 
 func trimSpace(value string) (string, error) {

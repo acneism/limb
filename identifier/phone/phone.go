@@ -27,16 +27,16 @@ var (
 // defaultRegion is the ISO 3166-1 alpha-2 code of the country assumed for
 // numbers written without a country code; with an empty defaultRegion only
 // numbers that start with + are accepted. Letters are never accepted, so
-// vanity numbers and text around a number are rejected. Number panics if
-// defaultRegion is not a supported region.
+// vanity numbers and text around a number are rejected. A defaultRegion that
+// is not supported makes Type.Err of the result report an error.
 func Number(defaultRegion string, opts ...identifier.Option) identifier.Type {
-	if defaultRegion != "" && !phonenumbers.GetSupportedRegions()[defaultRegion] {
-		panic(fmt.Sprintf("phone: unsupported region %q", defaultRegion))
-	}
 	base := []identifier.Option{
 		identifier.Normalize(normalizer(defaultRegion)),
 		identifier.LoginAllowed(),
 		identifier.Delivery(),
+	}
+	if defaultRegion != "" && !phonenumbers.GetSupportedRegions()[defaultRegion] {
+		base = append(base, identifier.Invalid(fmt.Errorf("unsupported region %q", defaultRegion)))
 	}
 	return identifier.Custom(typeName, append(base, opts...)...)
 }

@@ -40,8 +40,24 @@ type Type struct {
 	login    bool
 	delivery bool
 	required bool
+	err      error
 	steps    []step
 	checks   []check
+}
+
+// Err reports a problem with the configuration of the type: an invalid name,
+// a pattern that does not compile, an impossible length range or a nil
+// function. It returns the first problem found, in the order the options were
+// given, and nil for a usable type. The zero Type is not usable. A Type that
+// reports an error rejects every value with that same error.
+func (t Type) Err() error {
+	switch {
+	case t.err != nil:
+		return t.err
+	case t.name == "":
+		return errZeroType
+	}
+	return nil
 }
 
 // Name returns the name of the type. It is stored with every value and is the
@@ -72,8 +88,8 @@ func (t Type) IsRequired() bool {
 // again returns the same value, and a value for which that does not hold is
 // rejected.
 func (t Type) Normalize(raw string) (string, error) {
-	if t.name == "" {
-		return "", errZeroType
+	if err := t.Err(); err != nil {
+		return "", err
 	}
 	if len(raw) > maxRawLength {
 		return "", errTooLong

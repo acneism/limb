@@ -100,16 +100,29 @@ func TestNumberValidatorSeesE164Value(t *testing.T) {
 	}
 }
 
-func TestNumberPanicsOnUnsupportedRegion(t *testing.T) {
+func TestNumberReportsUnsupportedRegion(t *testing.T) {
 	for _, region := range []string{"XX", "ru", "RUS", "1", " "} {
-		func() {
-			defer func() {
-				if recover() == nil {
-					t.Fatalf("Number(%q) did not panic", region)
-				}
-			}()
-			phone.Number(region)
-		}()
+		typ := phone.Number(region)
+		if err := typ.Err(); err == nil || !strings.Contains(err.Error(), "unsupported region") {
+			t.Fatalf("Number(%q).Err() = %v, want an unsupported region error", region, err)
+		}
+		if got, err := typ.Normalize("+79261234567"); err == nil {
+			t.Fatalf("a misconfigured type must reject everything, got %q", got)
+		}
+	}
+	for _, region := range []string{"", "RU", "US", "GB"} {
+		if err := phone.Number(region).Err(); err != nil {
+			t.Fatalf("Number(%q).Err() = %v", region, err)
+		}
+	}
+}
+
+func TestNumberKeepsErrorsOfItsOptions(t *testing.T) {
+	if err := phone.Number("RU", identifier.Pattern("[")).Err(); err == nil || !strings.Contains(err.Error(), "invalid pattern") {
+		t.Fatalf("Err() = %v, want the option problem", err)
+	}
+	if err := phone.Number("XX", identifier.Pattern("[")).Err(); err == nil || !strings.Contains(err.Error(), "unsupported region") {
+		t.Fatalf("Err() = %v, want the region problem first", err)
 	}
 }
 
