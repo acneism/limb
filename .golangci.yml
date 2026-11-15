@@ -1,0 +1,63 @@
+version: "2"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/acneism/limb
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - gosec
+    - revive
+    - errorlint
+    - bodyclose
+    - noctx
+    - sqlclosecheck
+    - rowserrcheck
+    - nilerr
+    - unconvert
+    - unparam
+    - misspell
+    - gocritic
+    - nolintlint
+    - copyloopvar
+    - intrange
+    - usestdlibvars
+    - errname
+    - contextcheck
+    - forcetypeassert
+    - durationcheck
+    - makezero
+    - predeclared
+    - wastedassign
+    - perfsprint
+    - exhaustive
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+    nolintlint:
+      require-explanation: false
+      require-specific: true
+    revive:
+      enable-default-rules: true
+      rules:
+        - name: exported
+          exclude:
+            - "**/internal/**"
+            - "TEST"
+        - name: package-comments
+          exclude:
+            - "**/internal/**"
+            - "TEST"
