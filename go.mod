@@ -5,6 +5,7 @@ go 1.26.0
 toolchain go1.27.4
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/nyaruka/phonenumbers v1.8.1
 	golang.org/x/crypto v0.59.0
