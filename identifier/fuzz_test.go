@@ -1,0 +1,54 @@
+package identifier_test
+
+import (
+	"strings"
+	"testing"
+	"unicode/utf8"
+
+	"github.com/acneism/limb/identifier"
+)
+
+func fuzzType(f *testing.F, typ identifier.Type, seeds []string) {
+	for _, seed := range seeds {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, raw string) {
+		got, err := typ.Normalize(raw)
+		if err != nil {
+			return
+		}
+		if got == "" || !utf8.ValidString(got) || strings.IndexFunc(got, func(r rune) bool { return r < ' ' || r == 0x7f }) >= 0 {
+			t.Fatalf("Normalize(%q) = %q is not a clean non-empty string", raw, got)
+		}
+		again, err := typ.Normalize(got)
+		if err != nil || again != got {
+			t.Fatalf("Normalize is not idempotent: %q -> %q -> %q (%v)", raw, got, again, err)
+		}
+	})
+}
+
+func FuzzEmail(f *testing.F) {
+	fuzzType(f, identifier.Email(), []string{
+		"", "a@b.co", "Alice@Example.COM", "user@пример.рф", "user@xn--e1afmkfd.xn--p1ai",
+		"Name <a@b.co>", "a@b", "a@@b.co", "a@b.co.", "user@ｅｘａｍｐｌｅ.ｃｏｍ", "ß@straße.de",
+		"a@xn--", "a@xn--a.co", "a@b.c\u200do", "a@١.co", "\x00@a.co", "a@b.co。",
+	})
+}
+
+func FuzzUsername(f *testing.F) {
+	fuzzType(f, identifier.Username(), []string{
+		"", "alice", "Alice_01", "ＢＯＢ", "ﬁsh", "123456", "+alice", "a@b", "ß", "İstanbul", "ǅ", "ᾈ", "\u0345",
+	})
+}
+
+func FuzzUsernameUnicode(f *testing.F) {
+	fuzzType(f, identifier.Username(identifier.Pattern(`.+`), identifier.Length(1, 64)), []string{
+		"", "alice", "ＢＯＢ", "ﬁsh", "ß", "İstanbul", "ǅ", "ᾈ", "\u0345", "Σίσυφος", "ﷺ", "ŉ", "ǰ",
+	})
+}
+
+func FuzzCustom(f *testing.F) {
+	fuzzType(f, identifier.Custom("badge", identifier.Pattern(`[a-z0-9]+`), identifier.Length(2, 12)), []string{
+		"", "ab", "a1b2c3", " ab ", "AB", "a b", "\u00a0ab\u00a0",
+	})
+}
