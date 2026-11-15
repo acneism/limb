@@ -101,7 +101,7 @@ func TestNumberValidatorSeesE164Value(t *testing.T) {
 }
 
 func TestNumberReportsUnsupportedRegion(t *testing.T) {
-	for _, region := range []string{"XX", "ru", "RUS", "1", " "} {
+	for _, region := range []string{"XX", "RUS", "1", " ", "R", "r u"} {
 		typ := phone.Number(region)
 		if err := typ.Err(); err == nil || !strings.Contains(err.Error(), "unsupported region") {
 			t.Fatalf("Number(%q).Err() = %v, want an unsupported region error", region, err)
@@ -114,6 +114,21 @@ func TestNumberReportsUnsupportedRegion(t *testing.T) {
 		if err := phone.Number(region).Err(); err != nil {
 			t.Fatalf("Number(%q).Err() = %v", region, err)
 		}
+	}
+}
+
+func TestNumberAcceptsTheRegionInAnyCase(t *testing.T) {
+	for _, region := range []string{"RU", "ru", "Ru", "rU"} {
+		typ := phone.Number(region)
+		if err := typ.Err(); err != nil {
+			t.Fatalf("Number(%q).Err() = %v", region, err)
+		}
+		if got, err := typ.Normalize("8 926 123 45 67"); err != nil || got != "+79261234567" {
+			t.Fatalf("Number(%q) normalized to %q, %v", region, got, err)
+		}
+	}
+	if err := phone.Number("zz").Err(); err == nil || !strings.Contains(err.Error(), `"zz"`) {
+		t.Fatalf("the error must show the region as given, got %v", err)
 	}
 }
 
