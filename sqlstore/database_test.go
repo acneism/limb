@@ -7,6 +7,8 @@ import (
 	"io/fs"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -236,6 +238,32 @@ func TestMigrateDetectsALostLease(t *testing.T) {
 	})
 }
 
+func TestRenewingTheLeaseAtTheSameTime(t *testing.T) {
+	eachDatabase(t, func(t *testing.T, d *database) {
+		s := d.newStore(t)
+		ctx := t.Context()
+		if err := s.createSchemaTable(ctx); err != nil {
+			t.Fatal(err)
+		}
+		moment := time.Now()
+		s.now = func() time.Time { return moment }
+		if err := s.acquire(ctx, "frozen"); err != nil {
+			t.Fatal(err)
+		}
+		for n := range 3 {
+			if err := s.extendLease(ctx, "frozen"); err != nil {
+				t.Fatalf("renewal %d at the very time of the last one = %v, want nil", n+1, err)
+			}
+		}
+		if err := s.extendLease(ctx, "stranger"); err == nil {
+			t.Fatal("a process that does not hold the lease renewed it")
+		}
+		if holder := d.lockHolder(t, s.prefix); holder.String != "frozen" {
+			t.Fatalf("the holder of the lease is %q, want it untouched", holder.String)
+		}
+	})
+}
+
 func TestMigrationsCanBeAppliedTwice(t *testing.T) {
 	eachDatabase(t, func(t *testing.T, d *database) {
 		s := d.newStore(t)
@@ -274,6 +302,144 @@ func TestStatusIsCheckedByTheDatabase(t *testing.T) {
 		got, err := s.Users().Get(t.Context(), store.DefaultTenant, "x")
 		if err != nil || got.Version != 1 || got.MustChangePassword {
 			t.Fatalf("column defaults are wrong: %+v, %v", got, err)
+		}
+	})
+}
+
+type verdict struct {
+	unique, foreignKey, missingTable, exists, retryable bool
+}
+
+func TestTheDialectRecognizesTheErrorsOfTheDriver(t *testing.T) {
+	eachDatabase(t, func(t *testing.T, d *database) {
+		prefix := d.Prefix(t)
+		parent, child := prefix+"parent", prefix+"child"
+		d.exec(t,
+			"CREATE TABLE "+parent+" (id INTEGER NOT NULL PRIMARY KEY)",
+			"CREATE TABLE "+child+" (id INTEGER NOT NULL PRIMARY KEY, parent_id INTEGER NOT NULL, CONSTRAINT "+prefix+
+				"child_fk FOREIGN KEY (parent_id) REFERENCES "+parent+" (id))",
+			"CREATE INDEX "+prefix+"child_idx ON "+child+" (parent_id)",
+			"INSERT INTO "+parent+" (id) VALUES (1)",
+		)
+		probes := []struct {
+			name, statement string
+			want            verdict
+		}{
+			{"a duplicate key", "INSERT INTO " + parent + " (id) VALUES (1)", verdict{unique: true}},
+			{"a missing parent", "INSERT INTO " + child + " (id, parent_id) VALUES (1, 2)", verdict{foreignKey: true}},
+			{"a missing table", "SELECT 1 FROM " + prefix + "missing", verdict{missingTable: true}},
+			{"an existing table", "CREATE TABLE " + parent + " (id INTEGER NOT NULL PRIMARY KEY)", verdict{exists: true}},
+			{"an existing index", "CREATE INDEX " + prefix + "child_idx ON " + child + " (parent_id)", verdict{exists: true}},
+			{"a syntax error", "SELEKT 1", verdict{}},
+		}
+		for _, probe := range probes {
+			var err error
+			if strings.HasPrefix(probe.statement, "SELECT") {
+				var one int
+				err = d.DB.QueryRowContext(t.Context(), probe.statement).Scan(&one)
+			} else {
+				_, err = d.DB.ExecContext(t.Context(), probe.statement)
+			}
+			if err == nil {
+				t.Fatalf("%s: the statement succeeded\n%s", probe.name, probe.statement)
+			}
+			got := verdict{
+				unique: d.dialect.IsUniqueViolation(err), foreignKey: d.dialect.IsForeignKeyViolation(err),
+				missingTable: d.dialect.IsMissingTable(err), exists: d.dialect.IsAlreadyExists(err), retryable: d.dialect.IsRetryable(err),
+			}
+			if got != probe.want {
+				t.Errorf("%s: the dialect recognized %+v, want %+v, for the error %v", probe.name, got, probe.want, err)
+			}
+		}
+	})
+}
+
+func TestTheDialectRecognizesADeadlock(t *testing.T) {
+	eachDatabase(t, func(t *testing.T, d *database) {
+		ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+		defer cancel()
+		prefix := d.Prefix(t)
+		tables := [2]string{prefix + "first", prefix + "second"}
+		var txs [2]*sql.Tx
+		for i, table := range tables {
+			d.exec(t, "CREATE TABLE "+table+" (n INTEGER NOT NULL)", "INSERT INTO "+table+" (n) VALUES (0)")
+			tx, err := d.DB.BeginTx(ctx, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = tx.Rollback() })
+			if _, err = tx.ExecContext(ctx, "UPDATE "+table+" SET n = n + 1"); err != nil { //nolint:gosec
+				t.Fatal(err)
+			}
+			txs[i] = tx
+		}
+		outcomes := make(chan error, len(txs))
+		for i := range txs {
+			go func() {
+				_, err := txs[i].ExecContext(ctx, "UPDATE "+tables[1-i]+" SET n = n + 1")
+				if err != nil {
+					_ = txs[i].Rollback()
+				}
+				outcomes <- err
+			}()
+		}
+		victims := 0
+		for range txs {
+			select {
+			case err := <-outcomes:
+				if err == nil {
+					continue
+				}
+				victims++
+				if !d.dialect.IsRetryable(err) {
+					t.Errorf("the dialect does not take the error of a deadlock for one that can be repeated: %v", err)
+				}
+			case <-ctx.Done():
+				t.Fatal("the database detected no deadlock")
+			}
+		}
+		if victims != 1 {
+			t.Fatalf("%d transactions were chosen as the victim of the deadlock, want one", victims)
+		}
+	})
+}
+
+func TestInsertIgnoringStoresTheRowOnce(t *testing.T) {
+	eachDatabase(t, func(t *testing.T, d *database) {
+		s := d.newStore(t)
+		ctx := t.Context()
+		if err := s.Migrate(ctx); err != nil {
+			t.Fatal(err)
+		}
+		at := storedTime(time.Now())
+		insert := func(key string) (int64, error) {
+			result, err := d.DB.ExecContext(ctx, s.q.insertAttempt, key, at)
+			if err != nil {
+				return 0, err
+			}
+			return result.RowsAffected()
+		}
+		if rows, err := insert("one"); err != nil || rows != 1 {
+			t.Fatalf("the first insert reported %d rows, %v; want one", rows, err)
+		}
+		if rows, err := insert("one"); err != nil || rows != 0 {
+			t.Fatalf("an insert of a key that exists reported %d rows, %v; want none and no error", rows, err)
+		}
+		const racers = 8
+		var stored atomic.Int64
+		var wg sync.WaitGroup
+		for range racers {
+			wg.Go(func() {
+				rows, err := insert("raced")
+				if err != nil {
+					t.Errorf("an insert of a key that is being inserted failed: %v", err)
+				}
+				stored.Add(rows)
+			})
+		}
+		wg.Wait()
+		if stored.Load() != 1 {
+			t.Fatalf("%d of %d concurrent inserts of one key stored a row, want exactly one", stored.Load(), racers)
 		}
 	})
 }
