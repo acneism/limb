@@ -13,8 +13,14 @@ import (
 )
 
 const (
-	maxRawLength = 1024
-	namePattern  = `^[a-z][a-z0-9_]{0,31}$`
+	// MaxInputLength is the longest raw value in bytes that Normalize accepts.
+	MaxInputLength = 1024
+
+	// MaxValueLength is the longest normalized value in bytes that Normalize
+	// returns, whatever the length options of the type say.
+	MaxValueLength = 512
+
+	namePattern = `^[a-z][a-z0-9_]{0,31}$`
 )
 
 var (
@@ -83,15 +89,15 @@ func (t Type) IsRequired() bool {
 }
 
 // Normalize converts raw to the canonical form of the type and validates it.
-// Input longer than 1024 bytes, text that is not valid UTF-8 and values with
-// control characters are rejected. The result is a fixed point: normalizing it
-// again returns the same value, and a value for which that does not hold is
-// rejected.
+// Input longer than MaxInputLength bytes, text that is not valid UTF-8, values
+// with control characters and normalized values longer than MaxValueLength
+// bytes are rejected. The result is a fixed point: normalizing it again returns
+// the same value, and a value for which that does not hold is rejected.
 func (t Type) Normalize(raw string) (string, error) {
 	if err := t.Err(); err != nil {
 		return "", err
 	}
-	if len(raw) > maxRawLength {
+	if len(raw) > MaxInputLength {
 		return "", errTooLong
 	}
 	if !utf8.ValidString(raw) {
@@ -100,6 +106,9 @@ func (t Type) Normalize(raw string) (string, error) {
 	value, err := t.apply(raw)
 	if err != nil {
 		return "", err
+	}
+	if len(value) > MaxValueLength {
+		return "", errTooLong
 	}
 	again, err := t.apply(value)
 	if err != nil || again != value {

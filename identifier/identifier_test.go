@@ -186,6 +186,45 @@ func TestCustomTypeNormalizeAndValidate(t *testing.T) {
 	}
 }
 
+func TestNormalizeHasLengthLimitsInBytes(t *testing.T) {
+	typ := identifier.Custom("badge")
+	cases := []normalizeCase{
+		{name: "the longest value", raw: strings.Repeat("a", identifier.MaxValueLength), want: strings.Repeat("a", identifier.MaxValueLength)},
+		{name: "the longest value in two byte characters", raw: strings.Repeat("é", identifier.MaxValueLength/2), want: strings.Repeat("é", identifier.MaxValueLength/2)},
+		{name: "the longest value in four byte characters", raw: strings.Repeat("\U0001F600", identifier.MaxValueLength/4), want: strings.Repeat("\U0001F600", identifier.MaxValueLength/4)},
+		{name: "one byte over", raw: strings.Repeat("a", identifier.MaxValueLength+1), fail: true},
+		{name: "two byte characters over", raw: strings.Repeat("é", identifier.MaxValueLength/2+1), fail: true},
+		{name: "four byte characters over", raw: strings.Repeat("\U0001F600", identifier.MaxValueLength/4+1), fail: true},
+		{name: "the longest input", raw: strings.Repeat("a", identifier.MaxInputLength), fail: true},
+		{name: "one byte over the longest input", raw: strings.Repeat("a", identifier.MaxInputLength+1), fail: true},
+	}
+	runNormalizeCases(t, typ, cases)
+	for _, raw := range []string{
+		strings.Repeat("a", identifier.MaxValueLength+1),
+		strings.Repeat("a", identifier.MaxInputLength),
+		strings.Repeat("a", identifier.MaxInputLength+1),
+	} {
+		if _, err := typ.Normalize(raw); err == nil || err.Error() != "value is too long" {
+			t.Errorf("Normalize of %d bytes: %v, want the error about the length", len(raw), err)
+		}
+	}
+}
+
+func TestNormalizeLimitsTheValueNotTheInput(t *testing.T) {
+	typ := identifier.Custom("badge", identifier.Normalize(func(s string) (string, error) { return strings.TrimSpace(s), nil }))
+	padded := strings.Repeat(" ", 400) + strings.Repeat("a", identifier.MaxValueLength) + strings.Repeat(" ", 100)
+	if len(padded) > identifier.MaxInputLength {
+		t.Fatalf("the test input has %d bytes and does not fit the input limit", len(padded))
+	}
+	got, err := typ.Normalize(padded)
+	if err != nil || got != strings.Repeat("a", identifier.MaxValueLength) {
+		t.Fatalf("a value that fits after trimming was rejected: %d bytes, %v", len(got), err)
+	}
+	if _, err = typ.Normalize(padded + "a"); err == nil {
+		t.Fatal("a value that is one byte too long after trimming was accepted")
+	}
+}
+
 func TestNormalizeStepError(t *testing.T) {
 	failing := errors.New("step failed")
 	typ := identifier.Custom("broken", identifier.Normalize(func(string) (string, error) { return "", failing }))
