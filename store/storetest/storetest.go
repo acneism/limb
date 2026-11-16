@@ -55,6 +55,7 @@ var cases = []testCase{
 	{name: "Limits/values over the limit are invalid", run: testValuesOverTheLimitAreInvalid},
 	{name: "Limits/signing keys over the limit are invalid", run: testSigningKeyMaterialLimit},
 	{name: "Limits/long values are not found", run: testLongValuesAreNotFound},
+	{name: "Lookups/empty values are not found", run: testEmptyValuesAreNotFound},
 	{name: "Bytes/keys are compared byte by byte", run: testKeysAreComparedByteByByte},
 	{name: "Bytes/signing keys are stored exactly", run: testBinaryValuesAreExact},
 	{name: "Bytes/hashes are stored exactly", run: testHashesAreExact},

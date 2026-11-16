@@ -458,3 +458,54 @@ func testLongValuesAreNotFound(t *testing.T, s store.Store) {
 		}
 	}
 }
+
+func testEmptyValuesAreNotFound(t *testing.T, s store.Store) {
+	ctx := t.Context()
+	mustCreate(t, s, newUser(tenantA, id(1)))
+	mustAdd(t, s, newIdentifier(tenantA, "nick", "value", id(1)))
+	mustCreateSession(t, s, newCookieSession(tenantA, id(10), id(1), 1))
+	mustAddKey(t, s, newSigningKey(1, 1))
+	notFound := func(call string, err error) {
+		t.Helper()
+		if !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("%s = %v, want ErrNotFound", call, err)
+		}
+	}
+	_, err := s.Users().Get(ctx, "", id(1))
+	notFound("Users.Get with an empty tenant", err)
+	_, err = s.Users().Get(ctx, tenantA, "")
+	notFound("Users.Get with an empty ID", err)
+	notFound("Users.Delete with an empty ID", s.Users().Delete(ctx, tenantA, ""))
+	_, err = s.Identifiers().Find(ctx, tenantA, "nick", "")
+	notFound("Identifiers.Find with an empty value", err)
+	_, err = s.Identifiers().Find(ctx, tenantA, "", "value")
+	notFound("Identifiers.Find with an empty type", err)
+	_, err = s.Identifiers().Find(ctx, "", "nick", "value")
+	notFound("Identifiers.Find with an empty tenant", err)
+	notFound("Identifiers.Remove with an empty value", s.Identifiers().Remove(ctx, tenantA, "nick", ""))
+	notFound("Identifiers.MarkVerified with an empty value", s.Identifiers().MarkVerified(ctx, tenantA, "nick", "", sessionBase))
+	for name, user := range map[string]string{"an empty user": "", "no tenant": id(1)} {
+		tenant := tenantA
+		if name == "no tenant" {
+			tenant = ""
+		}
+		if list, listErr := s.Identifiers().ListByUser(ctx, tenant, user); listErr != nil || len(list) != 0 {
+			t.Errorf("Identifiers.ListByUser with %s = %v, %v; want an empty list", name, list, listErr)
+		}
+		if list, listErr := s.Sessions().ListByUser(ctx, tenant, user, sessionBase); listErr != nil || len(list) != 0 {
+			t.Errorf("Sessions.ListByUser with %s = %v, %v; want an empty list", name, list, listErr)
+		}
+	}
+	_, err = s.Sessions().ResolveByID(ctx, "", id(10))
+	notFound("Sessions.ResolveByID with an empty tenant", err)
+	notFound("Sessions.Revoke with an empty session", s.Sessions().Revoke(ctx, tenantA, id(1), "", sessionBase))
+	notFound("Sessions.Revoke with an empty user", s.Sessions().Revoke(ctx, tenantA, "", id(10), sessionBase))
+	if count, revokeErr := s.Sessions().RevokeAllForUser(ctx, tenantA, "", "", sessionBase); revokeErr != nil || count != 0 {
+		t.Errorf("Sessions.RevokeAllForUser with an empty user = %d, %v; want no session ended", count, revokeErr)
+	}
+	notFound("SigningKeys.Retire with an empty kid", s.SigningKeys().Retire(ctx, "", sessionBase))
+	resolved, err := s.Sessions().ResolveByID(ctx, tenantA, id(10))
+	if err != nil || !resolved.Session.RevokedAt.IsZero() {
+		t.Fatalf("the session was touched by calls with empty values: %+v, %v", resolved.Session, err)
+	}
+}
