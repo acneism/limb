@@ -19,6 +19,7 @@ type refreshOutcome int
 const (
 	refreshRefused refreshOutcome = iota
 	refreshDone
+	refreshRaced
 	refreshReplayed
 	refreshReused
 )
@@ -41,12 +42,17 @@ const (
 // used already, gives the same ErrUnauthenticated. Other errors are failures of
 // the application.
 func (a *Auth) Refresh(ctx context.Context, refreshToken string) (Tokens, error) {
+	tokens, _, err := a.refresh(ctx, refreshToken)
+	return tokens, err
+}
+
+func (a *Auth) refresh(ctx context.Context, refreshToken string) (Tokens, refreshOutcome, error) {
 	hash, err := secret.Hash(refreshToken)
 	if err != nil {
-		return Tokens{}, ErrUnauthenticated
+		return Tokens{}, refreshRefused, ErrUnauthenticated
 	}
 	if _, err = a.ring.signer(ctx); err != nil {
-		return Tokens{}, err
+		return Tokens{}, refreshRefused, err
 	}
 	now := a.now().UTC().Truncate(time.Microsecond)
 	var (
@@ -68,10 +74,11 @@ func (a *Auth) Refresh(ctx context.Context, refreshToken string) (Tokens, error)
 		}
 		current = resolved
 		if use.Reused {
-			outcome = refreshReplayed
 			if now.Sub(use.Token.UsedAt) <= reuseWindow {
+				outcome = refreshRaced
 				return nil
 			}
+			outcome = refreshReplayed
 			return a.endReusedSession(ctx, tx, resolved.Session, now, &outcome)
 		}
 		if !a.mayRefresh(use.Token, resolved, now) {
@@ -93,27 +100,27 @@ func (a *Auth) Refresh(ctx context.Context, refreshToken string) (Tokens, error)
 	})
 	switch {
 	case errors.Is(err, errRefreshRejected):
-		return Tokens{}, ErrUnauthenticated
+		return Tokens{}, refreshRefused, ErrUnauthenticated
 	case err != nil:
-		return Tokens{}, fmt.Errorf("limb: refresh the tokens: %w", err)
+		return Tokens{}, refreshRefused, fmt.Errorf("limb: refresh the tokens: %w", err)
 	}
 	if outcome == refreshReused {
 		a.logger.WarnContext(ctx, "limb: a refresh token was used again, the session was ended",
 			"user_id", current.Session.UserID, "session_id", current.Session.ID)
 	}
 	if outcome != refreshDone {
-		return Tokens{}, ErrUnauthenticated
+		return Tokens{}, outcome, ErrUnauthenticated
 	}
 	access, accessExpires, err := a.issueAccessToken(ctx, current.Session.UserID, current.Session.ID, current.User.MustChangePassword, now)
 	if err != nil {
-		return Tokens{}, err
+		return Tokens{}, refreshRefused, err
 	}
 	return Tokens{
 		AccessToken:      access,
 		AccessExpiresAt:  accessExpires,
 		RefreshToken:     fresh.text,
 		RefreshExpiresAt: fresh.record.ExpiresAt,
-	}, nil
+	}, refreshDone, nil
 }
 
 func (a *Auth) mayRefresh(token store.RefreshToken, resolved store.ResolvedSession, now time.Time) bool {
