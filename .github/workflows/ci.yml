@@ -180,3 +180,46 @@ jobs:
             echo "integration tests must not be skipped"
             exit 1
           fi
+
+  integration-oracle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: gvenzl/oracle-xe:21-slim-faststart
+            pdb: XEPDB1
+          - image: gvenzl/oracle-free:23-slim-faststart
+            pdb: FREEPDB1
+    services:
+      oracle:
+        image: ${{ matrix.image }}
+        env:
+          ORACLE_PASSWORD: oracle
+          APP_USER: limb
+          APP_USER_PASSWORD: limbtest
+        ports:
+          - 1521:1521
+        options: >-
+          --health-cmd healthcheck.sh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      LIMB_TEST_ORACLE_DSN: oracle://limb:limbtest@127.0.0.1:1521/${{ matrix.pdb }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.x"
+      - name: Test against ${{ matrix.image }}
+        shell: bash
+        run: |
+          go test -race -count=1 -v . ./sqlstore/... 2>&1 | tee integration.log
+          if grep -E -e '--- SKIP' integration.log; then
+            echo "integration tests must not be skipped"
+            exit 1
+          fi
