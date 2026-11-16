@@ -5,8 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"net/netip"
 	"net/url"
+	"path"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +38,10 @@ type config struct {
 	audience    string
 	endSessions bool
 	services    []serviceKey
+	mountPath   string
+	refreshJar  bool
+	sameSite    http.SameSite
+	disabled    []Endpoint
 	err         error
 }
 
@@ -330,6 +338,99 @@ func WithServiceKey(name, key string) Option {
 			c.fail(fmt.Errorf("limb: the key of the service %q must be printable ASCII without spaces", name))
 		default:
 			c.services = append(c.services, serviceKey{name: name, hash: sha256.Sum256([]byte(key))})
+		}
+	}
+}
+
+// WithMountPath tells limb where the application mounts the handler, as seen by
+// the browser, for example "/auth" for mux.Handle("/auth/", http.StripPrefix("/auth",
+// auth.Handler())). It is needed only for WithRefreshCookie, which scopes the cookie
+// to the path of the refresh route. The path starts with a slash, has no slash at
+// the end, unless it is the root, and is made of letters, digits and the characters
+// . _ ~ - only; New fails for anything else.
+func WithMountPath(mountPath string) Option {
+	return func(c *config) {
+		if !validMountPath(mountPath) {
+			c.fail(fmt.Errorf("limb: %q is not a mount path: it starts with a slash, is clean, has no slash at the end and only the characters of a path", mountPath))
+			return
+		}
+		c.mountPath = mountPath
+	}
+}
+
+var mountPathPattern = regexp.MustCompile(`^(/[A-Za-z0-9._~-]+)+$`)
+
+func validMountPath(p string) bool {
+	return p == "/" || (path.Clean(p) == p && mountPathPattern.MatchString(p))
+}
+
+// WithRefreshCookie makes the token endpoints keep the refresh token in an
+// HttpOnly cookie instead of the body of the response, so that a script of a
+// single-page application never sees it. The cookie is scoped to the refresh route
+// and is sent only on requests of the same site, and the refresh endpoint then
+// reads the token from it and refuses one in the body. It needs WithMountPath,
+// and New fails without it.
+func WithRefreshCookie() Option {
+	return func(c *config) {
+		c.refreshJar = true
+	}
+}
+
+// WithCookieSameSite sets the SameSite attribute of the session cookie, which is
+// Lax by default. Strict, or None for a single-page application on another site,
+// can be set; New fails for any other value.
+func WithCookieSameSite(mode http.SameSite) Option {
+	return func(c *config) {
+		if !slices.Contains([]http.SameSite{http.SameSiteLaxMode, http.SameSiteStrictMode, http.SameSiteNoneMode}, mode) {
+			c.fail(fmt.Errorf("limb: SameSite mode %d is not Lax, Strict or None", mode))
+			return
+		}
+		c.sameSite = mode
+	}
+}
+
+// Endpoint names a route of the handler.
+type Endpoint string
+
+// The routes of the handler that can be turned off.
+const (
+	// EndpointLogin is POST /login, the sign-in with a cookie session.
+	EndpointLogin Endpoint = "login"
+	// EndpointToken is POST /token, the sign-in with tokens.
+	EndpointToken Endpoint = "token"
+	// EndpointRefresh is POST /token/refresh.
+	EndpointRefresh Endpoint = "refresh"
+	// EndpointLogout is POST /logout.
+	EndpointLogout Endpoint = "logout"
+	// EndpointLogoutAll is POST /logout/all.
+	EndpointLogoutAll Endpoint = "logout_all"
+	// EndpointPasswordChange is POST /password/change.
+	EndpointPasswordChange Endpoint = "password_change"
+	// EndpointSessions is GET /sessions, GET /sessions/current and DELETE /sessions/{id}.
+	EndpointSessions Endpoint = "sessions"
+	// EndpointJWKS is GET /.well-known/jwks.json.
+	EndpointJWKS Endpoint = "jwks"
+	// EndpointIntrospect is POST /token/introspect. It exists only when a service
+	// key is given with WithServiceKey.
+	EndpointIntrospect Endpoint = "introspect"
+)
+
+var allEndpoints = []Endpoint{
+	EndpointLogin, EndpointToken, EndpointRefresh, EndpointLogout, EndpointLogoutAll,
+	EndpointPasswordChange, EndpointSessions, EndpointJWKS, EndpointIntrospect,
+}
+
+// WithoutEndpoints turns routes of the handler off: a request for one gets the
+// same answer as for a route that does not exist. New fails for a name that is
+// not an Endpoint.
+func WithoutEndpoints(endpoints ...Endpoint) Option {
+	return func(c *config) {
+		for _, endpoint := range endpoints {
+			if !slices.Contains(allEndpoints, endpoint) {
+				c.fail(fmt.Errorf("limb: unknown endpoint %q", endpoint))
+				continue
+			}
+			c.disabled = append(c.disabled, endpoint)
 		}
 	}
 }

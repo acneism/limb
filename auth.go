@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"net/netip"
 	"runtime"
 	"time"
@@ -65,9 +66,17 @@ type Auth struct {
 	audience   string
 	endNeeds   bool
 	services   []serviceKey
+	secure     bool
+	sameSite   http.SameSite
+	mountPath  string
+	refreshJar bool
+	disabled   map[Endpoint]bool
 	ring       *keyring
 	now        func() time.Time
 	newID      func() (string, error)
+
+	refreshCookie string
+	refreshPath   string
 }
 
 // New creates the service on top of the database db, which the application
@@ -150,6 +159,12 @@ func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
 	if err = checkServiceKeys(cfg.services); err != nil {
 		return nil, err
 	}
+	if cfg.refreshJar && cfg.mountPath == "" {
+		return nil, errors.New("limb: WithRefreshCookie needs WithMountPath, because the cookie is scoped to the path of the refresh route")
+	}
+	if cfg.sameSite == http.SameSiteNoneMode && cfg.development {
+		return nil, errors.New("limb: SameSite=None needs a Secure cookie, and the development mode turns Secure off")
+	}
 	limits, err := cfg.limits.resolve()
 	if err != nil {
 		return nil, err
@@ -191,6 +206,17 @@ func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
 		issuer:     cmp.Or(cfg.issuer, defaultIssuer),
 		endNeeds:   cfg.endSessions,
 		services:   cfg.services,
+		secure:     !cfg.development,
+		sameSite:   cmp.Or(cfg.sameSite, http.SameSiteLaxMode),
+		mountPath:  cfg.mountPath,
+		refreshJar: cfg.refreshJar,
+		disabled:   make(map[Endpoint]bool, len(cfg.disabled)),
+
+		refreshCookie: refreshCookieName(cfg.development),
+		refreshPath:   refreshCookiePath(cfg.mountPath),
+	}
+	for _, endpoint := range cfg.disabled {
+		a.disabled[endpoint] = true
 	}
 	a.audience = cmp.Or(cfg.audience, a.issuer)
 	a.ring = newKeyring(a)
