@@ -2,6 +2,7 @@ package limb
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -59,6 +60,19 @@ func (f *sessionFixture) request(t *testing.T, method string, login Login, heade
 		r.Header.Set(name, value)
 	}
 	return r
+}
+
+func (f *sessionFixture) sessionExists(t *testing.T, id string) bool {
+	t.Helper()
+	_, err := f.a.store.Sessions().ResolveByID(t.Context(), f.a.tenant, id)
+	switch {
+	case err == nil:
+		return true
+	case errors.Is(err, store.ErrNotFound):
+		return false
+	}
+	t.Fatal(err)
+	return false
 }
 
 func (f *sessionFixture) sameOrigin(login Login) map[string]string {
