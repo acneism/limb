@@ -100,3 +100,83 @@ jobs:
             echo "integration tests must not be skipped"
             exit 1
           fi
+
+  integration-mysql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        mysql: ["8.4", "9"]
+    services:
+      mysql:
+        image: mysql:${{ matrix.mysql }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_USER: limb
+          MYSQL_PASSWORD: limb
+          MYSQL_DATABASE: limb_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ulimb -plimb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 24
+    env:
+      LIMB_TEST_MYSQL_DSN: limb:limb@tcp(127.0.0.1:3306)/limb_test?parseTime=true&loc=UTC
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.x"
+      - name: Test against MySQL ${{ matrix.mysql }}
+        shell: bash
+        run: |
+          go test -race -count=1 -v . ./sqlstore/... 2>&1 | tee integration.log
+          if grep -E -e '--- SKIP' integration.log; then
+            echo "integration tests must not be skipped"
+            exit 1
+          fi
+
+  integration-mariadb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        mariadb: ["10.11", "11.8"]
+    services:
+      mariadb:
+        image: mariadb:${{ matrix.mariadb }}
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_USER: limb
+          MARIADB_PASSWORD: limb
+          MARIADB_DATABASE: limb_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 24
+    env:
+      LIMB_TEST_MARIADB_DSN: limb:limb@tcp(127.0.0.1:3306)/limb_test?parseTime=true&loc=UTC
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.x"
+      - name: Test against MariaDB ${{ matrix.mariadb }}
+        shell: bash
+        run: |
+          go test -race -count=1 -v . ./sqlstore/... 2>&1 | tee integration.log
+          if grep -E -e '--- SKIP' integration.log; then
+            echo "integration tests must not be skipped"
+            exit 1
+          fi
