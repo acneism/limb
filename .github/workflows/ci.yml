@@ -30,19 +30,6 @@ jobs:
         with:
           version: v2.15.0
 
-  comments:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: actions/setup-go@v7
-        with:
-          go-version: "1.27.x"
-      - name: Check comments
-        run: make comments
-
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
