@@ -22,6 +22,10 @@ import (
 const (
 	minMasterKeyLength = 32
 	startupTimeout     = 3 * time.Minute
+
+	defaultSessionAbsolute = 30 * 24 * time.Hour
+	defaultSessionIdle     = 7 * 24 * time.Hour
+	touchInterval          = time.Minute
 )
 
 type passwordHasher interface {
@@ -44,8 +48,13 @@ type Auth struct {
 	proxies []netip.Prefix
 	limits  loginLimits
 	slots   chan struct{}
-	now     func() time.Time
-	newID   func() (string, error)
+
+	absolute time.Duration
+	idle     time.Duration
+	origins  map[string]struct{}
+	cookie   string
+	now      func() time.Time
+	newID    func() (string, error)
 }
 
 // New creates the service on top of the database db, which the application
@@ -121,6 +130,10 @@ func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
 	if err = policy.Validate(); err != nil {
 		return nil, fmt.Errorf("limb: %w", err)
 	}
+	absolute, idle := cfg.absolute, cfg.idle
+	if absolute == 0 {
+		absolute, idle = defaultSessionAbsolute, defaultSessionIdle
+	}
 	limits, err := cfg.limits.resolve()
 	if err != nil {
 		return nil, err
@@ -151,6 +164,17 @@ func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
 		slots:   make(chan struct{}, runtime.GOMAXPROCS(0)),
 		now:     time.Now,
 		newID:   newUserID,
+
+		absolute: absolute,
+		idle:     idle,
+		origins:  make(map[string]struct{}, len(cfg.origins)),
+		cookie:   sessionCookieName(cfg.development),
+	}
+	for _, origin := range cfg.origins {
+		a.origins[origin] = struct{}{}
+	}
+	if cfg.development {
+		logger.Warn("limb: development mode is on, cookies are not Secure: never use it in production")
 	}
 	if err = a.ensureSchema(cfg.autoMigrate); err != nil {
 		return nil, err

@@ -2,8 +2,13 @@ package limb
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/netip"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/acneism/limb/identifier"
 )
@@ -17,6 +22,10 @@ type config struct {
 	autoMigrate bool
 	proxies     []netip.Prefix
 	limits      LoginLimits
+	absolute    time.Duration
+	idle        time.Duration
+	origins     []string
+	development bool
 	err         error
 }
 
@@ -101,6 +110,85 @@ func WithLoginLimits(l LoginLimits) Option {
 	return func(c *config) {
 		c.limits = l
 	}
+}
+
+// WithSessionTTL sets how long a session lasts. A session ends absolute after
+// the user signed in whatever they do, and idle after the last time it was used
+// if that is earlier. The defaults are 30 days and 7 days. Both must be at least
+// a minute and idle must not exceed absolute, or New fails.
+func WithSessionTTL(absolute, idle time.Duration) Option {
+	return func(c *config) {
+		switch {
+		case absolute < time.Minute || idle < time.Minute:
+			c.fail(errors.New("limb: the session lifetimes must be at least a minute"))
+		case idle > absolute:
+			c.fail(errors.New("limb: the idle lifetime of a session must not exceed its absolute lifetime"))
+		default:
+			c.absolute, c.idle = absolute, idle
+		}
+	}
+}
+
+// WithTrustedOrigins lists the origins other than the application's own whose
+// pages may send requests that change data with the cookie of a session, for
+// example a single-page application served from another host. An origin is
+// written as scheme://host or scheme://host:port with no path, and New fails
+// for anything else. The origin of the application itself is always allowed.
+// limb does not send any CORS headers: the application has to allow these
+// origins itself.
+func WithTrustedOrigins(origins ...string) Option {
+	return func(c *config) {
+		for _, origin := range origins {
+			normalized, ok := parseOrigin(origin)
+			if !ok {
+				c.fail(fmt.Errorf("limb: %q is not an origin: write scheme://host or scheme://host:port without a path", origin))
+				continue
+			}
+			c.origins = append(c.origins, normalized)
+		}
+	}
+}
+
+// WithDevelopmentMode relaxes what only works on a development machine: the
+// cookies are not marked Secure and lose their __Host- and __Secure- prefixes,
+// so that they work over plain http. It must never be used in production, and
+// limb logs a warning when it starts in this mode.
+func WithDevelopmentMode() Option {
+	return func(c *config) {
+		c.development = true
+	}
+}
+
+func parseOrigin(origin string) (string, bool) {
+	if origin != strings.TrimSpace(origin) || origin == "" {
+		return "", false
+	}
+	u, err := url.Parse(origin)
+	if err != nil || u.Opaque != "" || u.User != nil || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.Fragment != "" ||
+		u.ForceQuery || strings.HasSuffix(origin, "/") {
+		return "", false
+	}
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return "", false
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "" {
+		return "", false
+	}
+	if strings.Contains(host, ":") {
+		host = "[" + host + "]"
+	}
+	port := u.Port()
+	if port != "" {
+		if number, err := strconv.Atoi(port); err != nil || number < 1 || number > 65535 || port != strconv.Itoa(number) {
+			return "", false
+		}
+	}
+	if port == "" || (scheme == "http" && port == "80") || (scheme == "https" && port == "443") {
+		return scheme + "://" + host, true
+	}
+	return scheme + "://" + host + ":" + port, true
 }
 
 // WithLogger sets the logger. Messages never contain passwords, hashes or
