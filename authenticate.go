@@ -57,7 +57,7 @@ func (a *Auth) Authenticate(r *http.Request) (Principal, error) {
 	case err != nil:
 		return Principal{}, fmt.Errorf("limb: read the session: %w", err)
 	}
-	principal, err := a.activePrincipal(ctx, resolved)
+	principal, err := a.activePrincipal(resolved)
 	if err != nil {
 		return Principal{}, err
 	}
@@ -66,6 +66,7 @@ func (a *Auth) Authenticate(r *http.Request) (Principal, error) {
 			return Principal{}, err
 		}
 	}
+	a.touch(ctx, resolved.Session)
 	if principal.MustChangePassword {
 		return principal, ErrPasswordChangeRequired
 	}
@@ -106,7 +107,12 @@ func (a *Auth) checkTokenSession(ctx context.Context, claims accessClaims) (Prin
 	if resolved.Session.UserID != claims.Subject || resolved.Session.Kind != store.SessionToken {
 		return Principal{}, ErrUnauthenticated
 	}
-	return a.activePrincipal(ctx, resolved)
+	principal, err := a.activePrincipal(resolved)
+	if err != nil {
+		return Principal{}, err
+	}
+	a.touch(ctx, resolved.Session)
+	return principal, nil
 }
 
 func bearerToken(r *http.Request) (string, bool) {
@@ -119,12 +125,11 @@ func bearerToken(r *http.Request) (string, bool) {
 	return "", false
 }
 
-func (a *Auth) activePrincipal(ctx context.Context, resolved store.ResolvedSession) (Principal, error) {
+func (a *Auth) activePrincipal(resolved store.ResolvedSession) (Principal, error) {
 	now := a.now()
 	if !a.sessionActive(resolved.Session, now) || !userActive(resolved.User, now) {
 		return Principal{}, ErrUnauthenticated
 	}
-	a.touch(ctx, resolved.Session, now)
 	return Principal{
 		UserID:             UserID(resolved.Session.UserID),
 		SessionID:          resolved.Session.ID,
@@ -149,7 +154,8 @@ func userActive(u store.UserState, now time.Time) bool {
 	return false
 }
 
-func (a *Auth) touch(ctx context.Context, s store.Session, now time.Time) {
+func (a *Auth) touch(ctx context.Context, s store.Session) {
+	now := a.now()
 	if now.Sub(s.LastSeenAt) < touchInterval {
 		return
 	}

@@ -187,6 +187,47 @@ func TestAuthenticateMarksTheSessionAsUsedAtMostOnceAMinute(t *testing.T) {
 	}
 }
 
+func TestARequestThatFailsTheCrossSiteCheckDoesNotKeepTheSessionAlive(t *testing.T) {
+	f := newSessionFixture(t)
+	var touched []string
+	login := f.login(t)
+	f.breakSessions(func(s *sessionsFault) { s.touched = &touched })
+	f.clock.advance(time.Hour)
+	for name, headers := range map[string]map[string]string{
+		"no hint":        nil,
+		"no token":       {"Sec-Fetch-Site": "same-origin"},
+		"another origin": {"Origin": "https://evil.example", csrfHeader: login.CSRFToken},
+	} {
+		if _, err := f.a.Authenticate(f.request(t, http.MethodPost, login, headers)); !errors.Is(err, ErrCSRF) {
+			t.Fatalf("%s: Authenticate = %v, want ErrCSRF", name, err)
+		}
+	}
+	if len(touched) != 0 {
+		t.Fatalf("a request of another site kept the session alive: %v", touched)
+	}
+	if _, err := f.a.Authenticate(f.request(t, http.MethodPost, login, f.sameOrigin(login))); err != nil {
+		t.Fatal(err)
+	}
+	if len(touched) != 1 {
+		t.Fatalf("touched = %v, want the session once for the request of the page", touched)
+	}
+}
+
+func TestASessionThatMustChangeThePasswordIsMarkedAsUsed(t *testing.T) {
+	f := newSessionFixture(t)
+	var touched []string
+	login := f.login(t)
+	f.change(t, func(u *store.User) { u.MustChangePassword = true })
+	f.breakSessions(func(s *sessionsFault) { s.touched = &touched })
+	f.clock.advance(time.Hour)
+	if _, err := f.a.Authenticate(f.request(t, http.MethodGet, login, nil)); !errors.Is(err, ErrPasswordChangeRequired) {
+		t.Fatalf("Authenticate = %v, want ErrPasswordChangeRequired", err)
+	}
+	if len(touched) != 1 {
+		t.Fatalf("touched = %v, want the session once", touched)
+	}
+}
+
 func TestAFailedTouchDoesNotFailTheRequest(t *testing.T) {
 	logger, logs := capturingLogger()
 	f := newSessionFixture(t, WithLogger(logger))
