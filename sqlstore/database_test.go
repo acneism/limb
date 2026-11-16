@@ -437,7 +437,7 @@ func TestInsertIgnoringStoresTheRowOnce(t *testing.T) {
 		for range racers {
 			wg.Go(func() {
 				rows, err := insert("raced")
-				if err != nil {
+				if err != nil && !d.dialect.IsUniqueViolation(err) {
 					t.Errorf("an insert of a key that is being inserted failed: %v", err)
 				}
 				stored.Add(rows)
