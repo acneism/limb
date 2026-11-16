@@ -123,6 +123,27 @@ func TestTablesUseThePrefix(t *testing.T) {
 	}
 }
 
+func TestCheckPassesOnPostgresWithAndWithoutTheSchema(t *testing.T) {
+	db := openPostgres(t)
+	s := newPostgresStore(t, db)
+	if err := s.Check(t.Context()); err != nil {
+		t.Fatalf("Check before the schema exists = %v, want nil", err)
+	}
+	if err := s.Migrate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Check(t.Context()); err != nil {
+		t.Fatalf("Check after the schema exists = %v, want nil", err)
+	}
+	result, err := db.ExecContext(t.Context(), s.q.touchSchema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows, rowsErr := result.RowsAffected(); rowsErr != nil || rows != 1 {
+		t.Fatalf("the probing UPDATE reported %d rows, %v; PostgreSQL reports the rows that matched", rows, rowsErr)
+	}
+}
+
 func TestStoresWithDifferentPrefixesAreIndependent(t *testing.T) {
 	db := openPostgres(t)
 	first, second := newPostgresStore(t, db), newPostgresStore(t, db)

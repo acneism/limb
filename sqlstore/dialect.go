@@ -1,6 +1,7 @@
 package sqlstore
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"errors"
@@ -54,6 +55,19 @@ type Dialect interface {
 	// expressions, one for every column, in which each parameter is written as a
 	// question mark, and the statement takes the parameters in their order.
 	InsertIgnoring(table string, columns, values, key []string) string
+
+	// Check verifies that the connections of db are set up as the dialect needs,
+	// for example that times are read and written in UTC, and returns an error
+	// that says what to change in the way the database is opened. It reads no
+	// table and writes nothing, so it can run before the schema exists.
+	Check(ctx context.Context, db *sql.DB) error
+
+	// CheckUpdateCount is given the number of rows that the database reported
+	// for an UPDATE that matched one row and left it as it was. Some databases
+	// report the rows that an UPDATE matched, others the rows that it changed,
+	// and the store relies on the way of its dialect. An error says what to
+	// change in the way the database is opened.
+	CheckUpdateCount(reported int64) error
 
 	// Migrations returns the files of the schema: bootstrap.sql, which creates
 	// the table that records the schema version and the migration lock, and the
@@ -124,6 +138,14 @@ func (postgres) IsAlreadyExists(err error) bool {
 func (postgres) InsertIgnoring(table string, columns, values, key []string) string {
 	return "INSERT INTO " + table + " (" + strings.Join(columns, ", ") + ") VALUES (" + strings.Join(values, ", ") +
 		") ON CONFLICT (" + strings.Join(key, ", ") + ") DO NOTHING"
+}
+
+func (postgres) Check(context.Context, *sql.DB) error {
+	return nil
+}
+
+func (postgres) CheckUpdateCount(int64) error {
+	return nil
 }
 
 func (postgres) Migrations() fs.FS {

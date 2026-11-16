@@ -107,7 +107,7 @@ func New(db *sql.DB, dialect Dialect, masterKey []byte, opts ...Option) (*Auth, 
 	if err != nil {
 		return nil, fmt.Errorf("limb: %w", err)
 	}
-	return create(s, masterKey, cfg)
+	return create(s, masterKey, cfg, s.Check)
 }
 
 // NewWithStore creates the service on top of a store that the application
@@ -123,7 +123,7 @@ func NewWithStore(s store.Store, masterKey []byte, opts ...Option) (*Auth, error
 	if cfg.prefixSet {
 		return nil, errors.New("limb: WithTablePrefix applies only to New, a custom store has its own tables")
 	}
-	return create(s, masterKey, cfg)
+	return create(s, masterKey, cfg, nil)
 }
 
 func newConfig(opts []Option) config {
@@ -136,7 +136,7 @@ func newConfig(opts []Option) config {
 	return cfg
 }
 
-func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
+func create(s store.Store, masterKey []byte, cfg config, check func(context.Context) error) (*Auth, error) {
 	if cfg.err != nil {
 		return nil, cfg.err
 	}
@@ -224,7 +224,7 @@ func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
 	if cfg.development {
 		logger.Warn("limb: development mode is on, cookies are not Secure: never use it in production")
 	}
-	if err = a.ensureSchema(cfg.autoMigrate); err != nil {
+	if err = a.ensureSchema(cfg.autoMigrate, check); err != nil {
 		return nil, err
 	}
 	return a, nil
@@ -268,9 +268,29 @@ func checkIdentifiers(declared []identifier.Type) ([]identifier.Type, map[string
 	return types, known, nil
 }
 
-func (a *Auth) ensureSchema(autoMigrate bool) error {
+func (a *Auth) ensureSchema(autoMigrate bool, check func(context.Context) error) error {
 	ctx, cancel := context.WithTimeout(context.Background(), startupTimeout)
 	defer cancel()
+	if err := checkConnection(ctx, check); err != nil {
+		return err
+	}
+	if err := a.updateSchema(ctx, autoMigrate); err != nil {
+		return err
+	}
+	return checkConnection(ctx, check)
+}
+
+func checkConnection(ctx context.Context, check func(context.Context) error) error {
+	if check == nil {
+		return nil
+	}
+	if err := check(ctx); err != nil {
+		return fmt.Errorf("limb: check the database connection: %w", err)
+	}
+	return nil
+}
+
+func (a *Auth) updateSchema(ctx context.Context, autoMigrate bool) error {
 	_, err := a.store.SchemaVersion(ctx)
 	switch {
 	case err == nil:

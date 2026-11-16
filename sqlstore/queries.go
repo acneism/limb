@@ -59,6 +59,7 @@ type queries struct {
 	deleteKeys       string
 	schemaVersion    string
 	probeSchema      string
+	touchSchema      string
 	insertSchemaRow  string
 	acquireLock      string
 	renewLock        string
@@ -143,6 +144,7 @@ func newQueries(prefix string, d Dialect) queries {
 		deleteKeys:      build("DELETE FROM {signing_keys} WHERE retire_after < ?"),
 		schemaVersion:   build("SELECT version FROM {schema} WHERE id = 1"),
 		probeSchema:     build("SELECT 1 FROM {schema} WHERE id = 1"),
+		touchSchema:     build("UPDATE {schema} SET version = version WHERE id = 1"),
 		insertSchemaRow: build("INSERT INTO {schema} (id, version, applied_at) VALUES (1, 0, ?)"),
 		acquireLock: build("UPDATE {schema} SET lock_holder = ?, lock_expires_at = ? " +
 			"WHERE id = 1 AND (lock_holder IS NULL OR lock_expires_at < ?)"),

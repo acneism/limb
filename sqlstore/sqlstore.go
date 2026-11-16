@@ -200,6 +200,37 @@ func (s *Store) runTx(ctx context.Context, fn func(ctx context.Context, tx store
 	return nil
 }
 
+// Check verifies that the connections of the database are set up as the dialect
+// needs and returns an error that says what to change when they are not. It
+// can be called before the schema exists, then it checks what needs no table,
+// and again when the schema is there, then it also checks how the connections
+// count the rows of an UPDATE, which writes to the table of the schema without
+// changing anything.
+func (s *Store) Check(ctx context.Context) error {
+	if err := s.dialect.Check(ctx, s.db); err != nil {
+		return fmt.Errorf("sqlstore: %w", err)
+	}
+	var one int
+	switch err := s.db.QueryRowContext(ctx, s.q.probeSchema).Scan(&one); {
+	case errors.Is(err, sql.ErrNoRows), err != nil && s.dialect.IsMissingTable(err):
+		return nil
+	case err != nil:
+		return fmt.Errorf("sqlstore: check the database: %w", err)
+	}
+	result, err := s.db.ExecContext(ctx, s.q.touchSchema)
+	if err != nil {
+		return fmt.Errorf("sqlstore: check the database: %w", err)
+	}
+	reported, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("sqlstore: check the database: %w", err)
+	}
+	if err = s.dialect.CheckUpdateCount(reported); err != nil {
+		return fmt.Errorf("sqlstore: %w", err)
+	}
+	return nil
+}
+
 // SchemaVersion returns the version recorded in the database, 0 if the schema
 // does not exist, together with an error that wraps store.ErrSchemaOutdated if
 // it is older than the latest embedded migration.
