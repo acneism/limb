@@ -49,12 +49,14 @@ func (a *Auth) routes() []route {
 		{EndpointLogin, http.MethodPost, "/login", false, a.handleLogin},
 		{EndpointToken, http.MethodPost, "/token", false, a.handleToken},
 		{EndpointRefresh, http.MethodPost, "/token/refresh", false, a.handleRefresh},
+		{EndpointIntrospect, http.MethodPost, "/token/introspect", false, a.handleIntrospect},
 		{EndpointLogout, http.MethodPost, "/logout", false, a.handleLogout},
 		{EndpointLogoutAll, http.MethodPost, "/logout/all", false, a.handleLogoutAll},
 		{EndpointPasswordChange, http.MethodPost, "/password/change", false, a.handlePasswordChange},
 		{EndpointSessions, http.MethodGet, "/sessions", false, a.handleSessions},
 		{EndpointSessions, http.MethodGet, "/sessions/current", false, a.handleCurrentSession},
 		{EndpointSessions, http.MethodDelete, sessionsPrefix, true, a.handleEndSession},
+		{EndpointJWKS, http.MethodGet, "/.well-known/jwks.json", false, a.handleJWKS},
 	}
 	return slices.DeleteFunc(all, func(rt route) bool {
 		return a.disabled[rt.endpoint] || (rt.endpoint == EndpointIntrospect && len(a.services) == 0)

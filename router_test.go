@@ -8,15 +8,17 @@ import (
 )
 
 var routeMethods = map[string][]string{
-	"/login":            {http.MethodPost},
-	"/token":            {http.MethodPost},
-	"/token/refresh":    {http.MethodPost},
-	"/logout":           {http.MethodPost},
-	"/logout/all":       {http.MethodPost},
-	"/password/change":  {http.MethodPost},
-	"/sessions":         {http.MethodGet, http.MethodHead},
-	"/sessions/current": {http.MethodGet, http.MethodHead, http.MethodDelete},
-	"/sessions/someone": {http.MethodDelete},
+	"/login":                 {http.MethodPost},
+	"/token":                 {http.MethodPost},
+	"/token/refresh":         {http.MethodPost},
+	"/token/introspect":      {http.MethodPost},
+	"/logout":                {http.MethodPost},
+	"/logout/all":            {http.MethodPost},
+	"/password/change":       {http.MethodPost},
+	"/sessions":              {http.MethodGet, http.MethodHead},
+	"/sessions/current":      {http.MethodGet, http.MethodHead, http.MethodDelete},
+	"/sessions/someone":      {http.MethodDelete},
+	"/.well-known/jwks.json": {http.MethodGet, http.MethodHead},
 }
 
 var everyMethod = []string{
@@ -100,6 +102,8 @@ var endpointRoutes = []struct {
 	{"logout all", EndpointLogoutAll, []string{"/logout/all"}},
 	{"password change", EndpointPasswordChange, []string{"/password/change"}},
 	{"sessions", EndpointSessions, []string{"/sessions", "/sessions/current", "/sessions/someone"}},
+	{"jwks", EndpointJWKS, []string{"/.well-known/jwks.json"}},
+	{"introspect", EndpointIntrospect, []string{"/token/introspect"}},
 }
 
 func TestEndpointsCanBeTurnedOff(t *testing.T) {
