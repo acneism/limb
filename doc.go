@@ -58,4 +58,16 @@
 // for an address and for an account, and the next attempts are turned down with a
 // *RateLimitError before the password is looked at, see WithLoginLimits. The
 // account is never locked: its attempts are only slowed down.
+//
+// # HTTP
+//
+// Handler serves the routes for signing in and out, for the sessions of the user
+// and for tokens as a JSON API, and publishes the keys that verify access tokens.
+// The application mounts it under a path of its choice. RequireAuth and
+// OptionalAuth wrap the handlers of the application: they find who made the
+// request by the rules of Authenticate and keep the answer in the context, where
+// CurrentUser finds it. An application that needs other routes or other answers
+// calls Login, Authenticate, Refresh and the rest directly. limb never sets CORS
+// headers: an application whose single-page client lives on another origin adds
+// them itself, in front of the handler.
 package limb

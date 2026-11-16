@@ -5,8 +5,11 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
@@ -98,4 +101,54 @@ func ExampleWithPasswordPolicy() {
 
 func leaked(context.Context, string) bool {
 	return false
+}
+
+func openAuth(opts ...limb.Option) *limb.Auth {
+	db, err := sql.Open("pgx", os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	masterKey, err := base64.StdEncoding.DecodeString(os.Getenv("LIMB_MASTER_KEY"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	opts = append([]limb.Option{limb.WithIdentifiers(identifier.Email(identifier.Required())), limb.WithAutoMigrate()}, opts...)
+	auth, err := limb.New(db, limb.Postgres, masterKey, opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return auth
+}
+
+func ExampleAuth_Handler() {
+	auth := openAuth(limb.WithMountPath("/auth"), limb.WithRefreshCookie())
+	mux := http.NewServeMux()
+	mux.Handle("/auth/", http.StripPrefix("/auth", auth.Handler()))
+	server := &http.Server{Addr: ":8080", Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+	log.Fatal(server.ListenAndServe())
+}
+
+func ExampleAuth_RequireAuth() {
+	auth := openAuth()
+	mux := http.NewServeMux()
+	mux.Handle("/auth/", http.StripPrefix("/auth", auth.Handler()))
+	mux.Handle("/api/me", auth.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		principal, _ := limb.CurrentUser(r.Context())
+		_, _ = fmt.Fprintf(w, "user %s, session %s\n", principal.UserID, principal.SessionID)
+	})))
+	server := &http.Server{Addr: ":8080", Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+	log.Fatal(server.ListenAndServe())
+}
+
+func ExampleAuth_OptionalAuth() {
+	auth := openAuth()
+	home := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if principal, signedIn := limb.CurrentUser(r.Context()); signedIn {
+			_, _ = fmt.Fprintf(w, "welcome back, %s\n", principal.UserID)
+			return
+		}
+		_, _ = fmt.Fprintln(w, "welcome, stranger")
+	})
+	server := &http.Server{Addr: ":8080", Handler: auth.OptionalAuth(home), ReadHeaderTimeout: 10 * time.Second}
+	log.Fatal(server.ListenAndServe())
 }
