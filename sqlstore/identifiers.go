@@ -91,7 +91,18 @@ func (r identifiers) MarkVerified(ctx context.Context, tenantID, typ, value stri
 	if err != nil {
 		return fmt.Errorf("sqlstore: mark identifier verified: %w", err)
 	}
-	return requireRow(result, "mark identifier verified")
+	changed, err := affected(result, "mark identifier verified")
+	if err != nil || changed > 0 {
+		return err
+	}
+	var one int
+	switch err = r.x.QueryRowContext(ctx, r.s.q.identifierExists, tenantID, typ, value).Scan(&one); {
+	case errors.Is(err, sql.ErrNoRows):
+		return store.ErrNotFound
+	case err != nil:
+		return fmt.Errorf("sqlstore: mark identifier verified: %w", err)
+	}
+	return nil
 }
 
 func scanIdentifier(row scanner) (store.Identifier, error) {

@@ -171,8 +171,15 @@ func (s *Store) extendLease(ctx context.Context, holder string) error {
 	if err != nil {
 		return err
 	}
-	if renewed != 1 {
+	if renewed == 1 {
+		return nil
+	}
+	var one int
+	switch err = s.db.QueryRowContext(ctx, s.q.lockHeld, holder).Scan(&one); {
+	case errors.Is(err, sql.ErrNoRows):
 		return errors.New("the lease is held by another process")
+	case err != nil:
+		return err
 	}
 	return nil
 }

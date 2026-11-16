@@ -44,6 +44,7 @@ var cases = []testCase{
 	{name: "Users/no lost updates", run: testNoLostUpdates},
 	{name: "Identifiers/lifecycle", run: testIdentifierLifecycle},
 	{name: "Identifiers/errors", run: testIdentifierErrors},
+	{name: "Identifiers/MarkVerified at the time it has", run: testMarkVerifiedAtTheTimeItHas},
 	{name: "Identifiers/listed in byte order", run: testListByUserIsInByteOrder},
 	{name: "Identifiers/values are compared byte by byte", run: testBytewiseValues},
 	{name: "Identifiers/deleted with the user", run: testIdentifiersFollowTheUser},
@@ -604,6 +605,30 @@ func testIdentifierLifecycle(t *testing.T, s store.Store) {
 		t.Fatalf("Find after Remove = %v, want ErrNotFound", err)
 	}
 	mustAdd(t, s, email)
+}
+
+func testMarkVerifiedAtTheTimeItHas(t *testing.T, s store.Store) {
+	ctx := t.Context()
+	mustCreate(t, s, newUser(tenantA, id(1)))
+	mustAdd(t, s, newIdentifier(tenantA, "email", "a@example.com", id(1)))
+	at := sessionBase
+	sameInstant := []time.Time{
+		at, at,
+		at.In(time.FixedZone("UTC+3", 3*60*60)),
+		at.Add(100 * time.Nanosecond),
+	}
+	for n, moment := range sameInstant {
+		if err := s.Identifiers().MarkVerified(ctx, tenantA, "email", "a@example.com", moment); err != nil {
+			t.Fatalf("MarkVerified %d at the time the identifier has = %v, want nil", n+1, err)
+		}
+		found, err := s.Identifiers().Find(ctx, tenantA, "email", "a@example.com")
+		if err != nil || !sameTime(found.VerifiedAt, at) {
+			t.Fatalf("after MarkVerified %d the identifier = %+v, %v; want it verified at %v", n+1, found, err, at)
+		}
+	}
+	if err := s.Identifiers().MarkVerified(ctx, tenantA, "email", "missing@example.com", at); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("MarkVerified of a missing identifier = %v, want ErrNotFound", err)
+	}
 }
 
 func testIdentifierErrors(t *testing.T, s store.Store) {

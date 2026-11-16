@@ -24,6 +24,7 @@ type queries struct {
 	selectUser       string
 	updateUser       string
 	userExists       string
+	identifierExists string
 	deleteUser       string
 	insertIdentifier string
 	selectIdentifier string
@@ -61,6 +62,7 @@ type queries struct {
 	insertSchemaRow  string
 	acquireLock      string
 	renewLock        string
+	lockHeld         string
 	setVersion       string
 	releaseLock      string
 }
@@ -99,6 +101,7 @@ func newQueries(prefix string, d Dialect) queries {
 		insertIdentifier: build("INSERT INTO {identifiers} (" + identifierColumns + ") VALUES (?, ?, ?, ?, ?, ?)"),
 		selectIdentifier: build("SELECT " + identifierColumns + " FROM {identifiers} WHERE tenant_id = ? AND type = ? AND value = ?"),
 		listIdentifiers:  build("SELECT " + identifierColumns + " FROM {identifiers} WHERE tenant_id = ? AND user_id = ?"),
+		identifierExists: build("SELECT 1 FROM {identifiers} WHERE tenant_id = ? AND type = ? AND value = ?"),
 		deleteIdentifier: build("DELETE FROM {identifiers} WHERE tenant_id = ? AND type = ? AND value = ?"),
 		markVerified:     build("UPDATE {identifiers} SET verified_at = ? WHERE tenant_id = ? AND type = ? AND value = ?"),
 		insertSession:    build("INSERT INTO {sessions} (" + sessionColumns + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)"),
@@ -144,6 +147,7 @@ func newQueries(prefix string, d Dialect) queries {
 		acquireLock: build("UPDATE {schema} SET lock_holder = ?, lock_expires_at = ? " +
 			"WHERE id = 1 AND (lock_holder IS NULL OR lock_expires_at < ?)"),
 		renewLock: build("UPDATE {schema} SET lock_expires_at = ? WHERE id = 1 AND lock_holder = ?"),
+		lockHeld:  build("SELECT 1 FROM {schema} WHERE id = 1 AND lock_holder = ?"),
 		setVersion: build("UPDATE {schema} SET version = ?, applied_at = ?, lock_expires_at = ? " +
 			"WHERE id = 1 AND lock_holder = ?"),
 		releaseLock: build("UPDATE {schema} SET lock_holder = NULL, lock_expires_at = NULL " +
