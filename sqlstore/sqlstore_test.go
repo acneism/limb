@@ -33,8 +33,8 @@ func TestNewValidatesItsArguments(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a nil option must be skipped: %v", err)
 	}
-	if s.prefix != "limb_" || s.latest != 1 || len(s.bootstrap) == 0 {
-		t.Fatalf("unexpected defaults: prefix=%q latest=%d bootstrap=%d", s.prefix, s.latest, len(s.bootstrap))
+	if s.prefix != "limb_" || s.latest != 1 || len(s.bootstrap) == 0 || s.lockTTL != 2*time.Minute {
+		t.Fatalf("unexpected defaults: prefix=%q latest=%d bootstrap=%d lease=%v", s.prefix, s.latest, len(s.bootstrap), s.lockTTL)
 	}
 }
 

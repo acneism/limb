@@ -66,6 +66,7 @@ type Store struct {
 	bootstrap []string
 	versions  []migration
 	latest    int
+	lockTTL   time.Duration
 	now       func() time.Time
 }
 
@@ -101,6 +102,7 @@ func New(db *sql.DB, dialect Dialect, opts ...Option) (*Store, error) {
 		bootstrap: bootstrap,
 		versions:  versions,
 		latest:    versions[len(versions)-1].version,
+		lockTTL:   defaultLockTTL,
 		now:       time.Now,
 	}
 	s.q = newQueries(s.prefix, dialect)

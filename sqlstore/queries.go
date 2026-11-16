@@ -26,6 +26,7 @@ type queries struct {
 	probeSchema      string
 	insertSchemaRow  string
 	acquireLock      string
+	renewLock        string
 	setVersion       string
 	releaseLock      string
 }
@@ -68,6 +69,7 @@ func newQueries(prefix string, d Dialect) queries {
 		insertSchemaRow:  build("INSERT INTO {schema} (id, version, applied_at) VALUES (1, 0, ?)"),
 		acquireLock: build("UPDATE {schema} SET lock_holder = ?, lock_expires_at = ? " +
 			"WHERE id = 1 AND (lock_holder IS NULL OR lock_expires_at < ?)"),
+		renewLock: build("UPDATE {schema} SET lock_expires_at = ? WHERE id = 1 AND lock_holder = ?"),
 		setVersion: build("UPDATE {schema} SET version = ?, applied_at = ?, lock_expires_at = ? " +
 			"WHERE id = 1 AND lock_holder = ?"),
 		releaseLock: build("UPDATE {schema} SET lock_holder = NULL, lock_expires_at = NULL " +

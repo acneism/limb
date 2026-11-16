@@ -6,10 +6,12 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"io/fs"
 	"os"
 	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -51,7 +53,7 @@ func uniquePrefix(t *testing.T) string {
 func dropTables(db *sql.DB, prefix string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	_, _ = db.ExecContext(ctx, "DROP TABLE IF EXISTS "+prefix+"identifiers, "+prefix+"users, "+prefix+"schema CASCADE")
+	_, _ = db.ExecContext(ctx, "DROP TABLE IF EXISTS "+prefix+"identifiers, "+prefix+"users, "+prefix+"schema, "+prefix+"probe CASCADE")
 }
 
 func newPostgresStore(t *testing.T, db *sql.DB) *Store {
@@ -261,5 +263,160 @@ func TestStatusIsCheckedByTheDatabase(t *testing.T) {
 	got, err := s.Users().Get(t.Context(), store.DefaultTenant, "x")
 	if err != nil || got.Version != 1 || got.MustChangePassword {
 		t.Fatalf("column defaults are wrong: %+v, %v", got, err)
+	}
+}
+
+type customMigrations struct {
+	Dialect
+	files fs.FS
+}
+
+func (c customMigrations) Migrations() fs.FS {
+	return c.files
+}
+
+func slowStore(t *testing.T, db *sql.DB, prefix, seconds string) *Store {
+	t.Helper()
+	bootstrap, err := fs.ReadFile(Postgres.Migrations(), bootstrapFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slow := "CREATE TABLE IF NOT EXISTS {prefix}probe (n integer);\nINSERT INTO {prefix}probe (n) VALUES (1);\nSELECT pg_sleep(" + seconds + ")"
+	files := fstest.MapFS{bootstrapFile: {Data: bootstrap}, "0001_slow.sql": {Data: []byte(slow)}}
+	s, err := New(db, customMigrations{Dialect: Postgres, files: files}, WithTablePrefix(prefix))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.lockTTL = time.Second
+	return s
+}
+
+func waitForLease(t *testing.T, db *sql.DB, prefix string) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		var holder sql.NullString
+		err := db.QueryRowContext(t.Context(), "SELECT lock_holder FROM "+prefix+"schema WHERE id = 1").Scan(&holder)
+		if err == nil && holder.Valid {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("the migration never took the lease")
+}
+
+func leaseExpiry(t *testing.T, db *sql.DB, prefix string) time.Time {
+	t.Helper()
+	var expiry sql.NullTime
+	if err := db.QueryRowContext(t.Context(), "SELECT lock_expires_at FROM "+prefix+"schema WHERE id = 1").Scan(&expiry); err != nil {
+		t.Fatal(err)
+	}
+	return expiry.Time
+}
+
+func countProbes(t *testing.T, db *sql.DB, prefix string) int {
+	t.Helper()
+	var n int
+	if err := db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+prefix+"probe").Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func recordedVersion(t *testing.T, db *sql.DB, prefix string) int {
+	t.Helper()
+	var version int
+	if err := db.QueryRowContext(t.Context(), "SELECT version FROM "+prefix+"schema WHERE id = 1").Scan(&version); err != nil {
+		t.Fatal(err)
+	}
+	return version
+}
+
+func TestMigrateKeepsTheLeaseWhileMigrationsRun(t *testing.T) {
+	db := openPostgres(t)
+	prefix := uniquePrefix(t)
+	t.Cleanup(func() { dropTables(db, prefix) })
+	first, rival := slowStore(t, db, prefix, "3.5"), slowStore(t, db, prefix, "3.5")
+
+	finished := make(chan error, 1)
+	go func() { finished <- first.Migrate(t.Context()) }()
+	waitForLease(t, db, prefix)
+	early := leaseExpiry(t, db, prefix)
+	time.Sleep(1500 * time.Millisecond)
+	if late := leaseExpiry(t, db, prefix); late.Sub(early) < 500*time.Millisecond {
+		t.Fatalf("the lease must be pushed forward while a migration runs: it expired at %v and later at %v", early, late)
+	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), 1200*time.Millisecond)
+	defer cancel()
+	if err := rival.Migrate(ctx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("a second process must wait for the lease of a slow migration, got %v", err)
+	}
+	if err := <-finished; err != nil {
+		t.Fatalf("the slow migration failed: %v", err)
+	}
+	if n := countProbes(t, db, prefix); n != 1 {
+		t.Fatalf("the migration ran %d times, want once: another process took the lease while it was still held", n)
+	}
+	if version := recordedVersion(t, db, prefix); version != 1 {
+		t.Fatalf("version = %d, want 1", version)
+	}
+	if holder := lockHolder(t, db, prefix); holder.Valid {
+		t.Fatalf("the lease must be released, held by %q", holder.String)
+	}
+}
+
+func TestMigrateIsAbandonedWhenTheLeaseIsTaken(t *testing.T) {
+	db := openPostgres(t)
+	prefix := uniquePrefix(t)
+	t.Cleanup(func() { dropTables(db, prefix) })
+	s := slowStore(t, db, prefix, "30")
+
+	started := time.Now()
+	finished := make(chan error, 1)
+	go func() { finished <- s.Migrate(t.Context()) }()
+	waitForLease(t, db, prefix)
+	if _, err := db.ExecContext(t.Context(), "UPDATE "+prefix+"schema SET lock_holder = 'thief', lock_expires_at = $1 WHERE id = 1", time.Now().Add(time.Hour)); err != nil { //nolint:gosec
+		t.Fatal(err)
+	}
+	var err error
+	select {
+	case err = <-finished:
+	case <-time.After(15 * time.Second):
+		t.Fatal("the migration kept running after another process took its lease")
+	}
+	if !errors.Is(err, errLeaseLost) {
+		t.Fatalf("Migrate = %v, want an error about the lost lease", err)
+	}
+	if elapsed := time.Since(started); elapsed > 10*time.Second {
+		t.Fatalf("the running statement must be canceled, Migrate took %v", elapsed)
+	}
+	if holder := lockHolder(t, db, prefix); holder.String != "thief" {
+		t.Fatalf("a lease of another process must stay untouched, holder is %q", holder.String)
+	}
+	if version := recordedVersion(t, db, prefix); version != 0 {
+		t.Fatalf("an abandoned migration must not record its version, got %d", version)
+	}
+}
+
+func TestMigrateIsAbandonedWhenTheLeaseCannotBeRenewed(t *testing.T) {
+	db := openPostgres(t)
+	prefix := uniquePrefix(t)
+	t.Cleanup(func() { dropTables(db, prefix) })
+	s := slowStore(t, db, prefix, "30")
+
+	finished := make(chan error, 1)
+	go func() { finished <- s.Migrate(t.Context()) }()
+	waitForLease(t, db, prefix)
+	if _, err := db.ExecContext(t.Context(), "DROP TABLE "+prefix+"schema"); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-finished:
+		if !errors.Is(err, errLeaseLost) {
+			t.Fatalf("Migrate = %v, want an error about the lost lease", err)
+		}
+	case <-time.After(15 * time.Second):
+		t.Fatal("the migration kept running although its lease could not be renewed")
 	}
 }

@@ -15,13 +15,19 @@ import (
 )
 
 const (
-	bootstrapFile = "bootstrap.sql"
-	lockTTL       = 2 * time.Minute
-	lockPoll      = 50 * time.Millisecond
-	releaseGrace  = 5 * time.Second
+	bootstrapFile  = "bootstrap.sql"
+	defaultLockTTL = 2 * time.Minute
+	lockPoll       = 50 * time.Millisecond
+	releaseGrace   = 5 * time.Second
+	renewalsPerTTL = 4
+	minRenewal     = time.Millisecond
 )
 
-var migrationFile = regexp.MustCompile(`^(\d{4})_[a-z0-9_]+\.sql$`)
+var (
+	migrationFile = regexp.MustCompile(`^(\d{4})_[a-z0-9_]+\.sql$`)
+
+	errLeaseLost = errors.New("sqlstore: the migration lock was lost")
+)
 
 type migration struct {
 	version    int
@@ -83,7 +89,10 @@ func splitStatements(text string) []string {
 // Migrate creates the schema or brings it up to date. Only one process applies
 // the migrations at a time: it takes a lease recorded in the schema table and
 // the others wait for it, or take it over when it expires because its holder
-// died. The migrations are written so that applying one again is harmless.
+// died. While the migrations run the lease is renewed in the background, and
+// if that fails the migration is abandoned and an error is returned, so a slow
+// migration is never run by two processes at once. The migrations are written
+// so that applying one again is harmless.
 func (s *Store) Migrate(ctx context.Context) (err error) {
 	if err = s.createSchemaTable(ctx); err != nil {
 		return err
@@ -95,20 +104,75 @@ func (s *Store) Migrate(ctx context.Context) (err error) {
 	if err = s.acquire(ctx, holder); err != nil {
 		return err
 	}
+	work, abandon := context.WithCancelCause(ctx)
+	stopRenewing := s.renewLease(work, abandon, holder)
 	defer func() {
+		stopRenewing()
+		abandon(nil)
 		err = errors.Join(err, s.release(ctx, holder))
 	}()
+	err = s.applyPending(work, holder)
+	if cause := context.Cause(work); errors.Is(cause, errLeaseLost) {
+		return cause
+	}
+	return err
+}
+
+func (s *Store) applyPending(ctx context.Context, holder string) error {
 	var current int
-	if err = s.db.QueryRowContext(ctx, s.q.schemaVersion).Scan(&current); err != nil {
+	if err := s.db.QueryRowContext(ctx, s.q.schemaVersion).Scan(&current); err != nil {
 		return fmt.Errorf("sqlstore: read schema version: %w", err)
 	}
 	for _, m := range s.versions {
 		if m.version <= current {
 			continue
 		}
-		if err = s.apply(ctx, holder, m); err != nil {
+		if err := s.apply(ctx, holder, m); err != nil {
 			return fmt.Errorf("sqlstore: apply migration %s: %w", m.name, err)
 		}
+	}
+	return nil
+}
+
+func (s *Store) renewLease(ctx context.Context, abandon context.CancelCauseFunc, holder string) (stop func()) {
+	quit := make(chan struct{})
+	finished := make(chan struct{})
+	interval := max(s.lockTTL/renewalsPerTTL, minRenewal)
+	go func() {
+		defer close(finished)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-quit:
+				return
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := s.extendLease(ctx, holder); err != nil {
+					abandon(fmt.Errorf("%w: %w", errLeaseLost, err))
+					return
+				}
+			}
+		}
+	}()
+	return func() {
+		close(quit)
+		<-finished
+	}
+}
+
+func (s *Store) extendLease(ctx context.Context, holder string) error {
+	result, err := s.db.ExecContext(ctx, s.q.renewLock, storedTime(s.now().Add(s.lockTTL)), holder)
+	if err != nil {
+		return err
+	}
+	renewed, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if renewed != 1 {
+		return errors.New("the lease is held by another process")
 	}
 	return nil
 }
@@ -152,7 +216,7 @@ func newHolder() (string, error) {
 func (s *Store) acquire(ctx context.Context, holder string) error {
 	for {
 		now := s.now()
-		result, err := s.db.ExecContext(ctx, s.q.acquireLock, holder, storedTime(now.Add(lockTTL)), storedTime(now))
+		result, err := s.db.ExecContext(ctx, s.q.acquireLock, holder, storedTime(now.Add(s.lockTTL)), storedTime(now))
 		if err != nil {
 			return fmt.Errorf("sqlstore: take the migration lock: %w", err)
 		}
@@ -178,7 +242,7 @@ func (s *Store) apply(ctx context.Context, holder string, m migration) error {
 		}
 	}
 	now := s.now()
-	result, err := s.db.ExecContext(ctx, s.q.setVersion, m.version, storedTime(now), storedTime(now.Add(lockTTL)), holder)
+	result, err := s.db.ExecContext(ctx, s.q.setVersion, m.version, storedTime(now), storedTime(now.Add(s.lockTTL)), holder)
 	if err != nil {
 		return err
 	}
@@ -187,7 +251,7 @@ func (s *Store) apply(ctx context.Context, holder string, m migration) error {
 		return err
 	}
 	if updated != 1 {
-		return errors.New("the migration lock was lost")
+		return errLeaseLost
 	}
 	return nil
 }
