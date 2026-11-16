@@ -21,3 +21,7 @@ var MySQL = Dialect{inner: sqlstore.MySQL}
 // parseTime=true and loc=UTC and must not contain clientFoundRows=true; New
 // checks it and reports what to change.
 var MariaDB = Dialect{inner: sqlstore.MariaDB}
+
+// Oracle is the dialect of Oracle Database 19c and newer, for the driver
+// github.com/sijms/go-ora/v2.
+var Oracle = Dialect{inner: sqlstore.Oracle}

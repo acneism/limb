@@ -84,6 +84,7 @@ var (
 	postgresMigrations = mustSub(migrationFiles, "migrations/postgres")
 	mysqlMigrations    = mustSub(migrationFiles, "migrations/mysql")
 	mariadbMigrations  = mustSub(migrationFiles, "migrations/mariadb")
+	oracleMigrations   = mustSub(migrationFiles, "migrations/oracle")
 )
 
 func mustSub(fsys fs.FS, dir string) fs.FS {

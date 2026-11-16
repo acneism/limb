@@ -43,10 +43,10 @@ func (r attempts) Hit(ctx context.Context, key string, at time.Time, window time
 			return counter, readErr
 		}
 		inserted, err := r.exec(ctx, r.s.q.insertAttempt, key, moment)
-		if err != nil {
+		if err != nil && !r.s.dialect.IsUniqueViolation(err) {
 			return store.Attempt{}, err
 		}
-		if inserted > 0 {
+		if err == nil && inserted > 0 {
 			return store.Attempt{Key: key, WindowStart: moment, Count: 1}, nil
 		}
 	}
