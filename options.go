@@ -1,7 +1,9 @@
 package limb
 
 import (
+	"errors"
 	"log/slog"
+	"net/netip"
 
 	"github.com/acneism/limb/identifier"
 )
@@ -13,6 +15,14 @@ type config struct {
 	tablePrefix string
 	prefixSet   bool
 	autoMigrate bool
+	proxies     []netip.Prefix
+	err         error
+}
+
+func (c *config) fail(err error) {
+	if c.err == nil {
+		c.err = err
+	}
 }
 
 // Option customizes the Auth that New and NewWithStore create. Every option
@@ -58,6 +68,29 @@ func WithTablePrefix(prefix string) Option {
 func WithAutoMigrate() Option {
 	return func(c *config) {
 		c.autoMigrate = true
+	}
+}
+
+// WithTrustedProxies lists the networks of the reverse proxies that stand in
+// front of the application. Only a request that comes from one of them may say
+// in X-Forwarded-For who the client is and in X-Forwarded-Proto which scheme it
+// used; the headers of any other request are ignored, because anyone can send
+// them. The client is the first address of X-Forwarded-For, read from the right,
+// that does not belong to a trusted proxy. Without this option the address of
+// the connection is the address of the client. New fails for an invalid prefix
+// and for one that covers every address.
+func WithTrustedProxies(prefixes ...netip.Prefix) Option {
+	return func(c *config) {
+		for _, p := range prefixes {
+			switch {
+			case !p.IsValid():
+				c.fail(errors.New("limb: a trusted proxy prefix is not valid"))
+			case p.Bits() == 0:
+				c.fail(errors.New("limb: a trusted proxy prefix must not cover every address, list the networks of the proxies"))
+			default:
+				c.proxies = append(c.proxies, p.Masked())
+			}
+		}
 	}
 }
 

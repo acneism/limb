@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"time"
 
 	"github.com/google/uuid"
@@ -39,6 +40,7 @@ type Auth struct {
 	logger    *slog.Logger
 	masterKey []byte
 	tenant    string
+	proxies   []netip.Prefix
 	now       func() time.Time
 	newID     func() (string, error)
 }
@@ -102,6 +104,9 @@ func newConfig(opts []Option) config {
 }
 
 func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
+	if cfg.err != nil {
+		return nil, cfg.err
+	}
 	if len(masterKey) < minMasterKeyLength {
 		return nil, fmt.Errorf("limb: the master key must be at least %d bytes long, got %d", minMasterKeyLength, len(masterKey))
 	}
@@ -130,6 +135,7 @@ func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
 		logger:    logger,
 		masterKey: bytes.Clone(masterKey),
 		tenant:    store.DefaultTenant,
+		proxies:   cfg.proxies,
 		now:       time.Now,
 		newID:     newUserID,
 	}
