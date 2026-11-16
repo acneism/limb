@@ -168,11 +168,11 @@ func (r repositories) SigningKeys() store.SigningKeys {
 	return signingKeys(r)
 }
 
-// InTx runs fn in a database transaction with the default isolation level. The
-// transaction is committed if fn returns nil and rolled back if fn returns an
-// error or panics.
+// InTx runs fn in a database transaction at the isolation level that the dialect
+// asks for, READ COMMITTED. The transaction is committed if fn returns nil and
+// rolled back if fn returns an error or panics.
 func (s *Store) InTx(ctx context.Context, fn func(ctx context.Context, tx store.Repositories) error) error {
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.db.BeginTx(ctx, s.dialect.TxOptions())
 	if err != nil {
 		return fmt.Errorf("sqlstore: begin transaction: %w", err)
 	}

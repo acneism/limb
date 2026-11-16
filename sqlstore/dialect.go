@@ -1,6 +1,7 @@
 package sqlstore
 
 import (
+	"database/sql"
 	"embed"
 	"errors"
 	"io/fs"
@@ -27,6 +28,12 @@ type Dialect interface {
 
 	// IsMissingTable reports whether err means that a table does not exist.
 	IsMissingTable(err error) bool
+
+	// TxOptions returns the options of the transactions of the store, or nil for
+	// the default of the driver. They have to give READ COMMITTED: a statement
+	// must see what was committed before it began, whatever the transaction has
+	// read before.
+	TxOptions() *sql.TxOptions
 
 	// IgnoreConflict turns an INSERT statement into one that inserts nothing and
 	// raises no error when the row conflicts with an existing one. Its result is
@@ -78,6 +85,10 @@ func (postgres) IsForeignKeyViolation(err error) bool {
 
 func (postgres) IsMissingTable(err error) bool {
 	return sqlState(err) == "42P01"
+}
+
+func (postgres) TxOptions() *sql.TxOptions {
+	return &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 }
 
 func (postgres) IgnoreConflict(insert string) string {

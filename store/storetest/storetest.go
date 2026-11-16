@@ -97,6 +97,9 @@ var cases = []testCase{
 	{name: "InTx/rollback on panic", run: testTxRollbackOnPanic},
 	{name: "InTx/rollback after a conflict", run: testTxRollbackAfterConflict},
 	{name: "InTx/concurrent registrations of one identifier", run: testConcurrentTransactions},
+	{name: "InTx/Use sees a commit made after the first read", run: testUseSeesACommitAfterTheFirstRead},
+	{name: "InTx/Hit sees a commit made after the first read", run: testHitSeesACommitAfterTheFirstRead},
+	{name: "InTx/Update tells a missing user from a stale one", run: testUpdateTellsAMissingUserFromAStaleOne},
 	{name: "Context/canceled", run: testCanceledContext},
 }
 
