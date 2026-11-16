@@ -3,6 +3,7 @@ package limb_test
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"log"
 	"os"
@@ -18,7 +19,11 @@ func ExampleNew() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	auth, err := limb.New(db, limb.Postgres, []byte(os.Getenv("LIMB_MASTER_KEY")),
+	masterKey, err := base64.StdEncoding.DecodeString(os.Getenv("LIMB_MASTER_KEY"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	auth, err := limb.New(db, limb.Postgres, masterKey,
 		limb.WithIdentifiers(identifier.Email(identifier.Required()), identifier.Username()),
 		limb.WithAutoMigrate(),
 	)
@@ -33,7 +38,11 @@ func ExampleAuth_Register() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	auth, err := limb.New(db, limb.Postgres, []byte(os.Getenv("LIMB_MASTER_KEY")),
+	masterKey, err := base64.StdEncoding.DecodeString(os.Getenv("LIMB_MASTER_KEY"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	auth, err := limb.New(db, limb.Postgres, masterKey,
 		limb.WithIdentifiers(identifier.Email(identifier.Required()), identifier.Username()),
 		limb.WithAutoMigrate(),
 	)
@@ -78,7 +87,11 @@ func ExampleWithPasswordPolicy() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if _, err = limb.New(db, limb.Postgres, []byte(os.Getenv("LIMB_MASTER_KEY")), limb.WithPasswordPolicy(policy)); err != nil {
+	masterKey, err := base64.StdEncoding.DecodeString(os.Getenv("LIMB_MASTER_KEY"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if _, err = limb.New(db, limb.Postgres, masterKey, limb.WithPasswordPolicy(policy)); err != nil {
 		log.Fatal(err)
 	}
 }

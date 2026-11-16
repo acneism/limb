@@ -45,8 +45,13 @@ type Auth struct {
 
 // New creates the service on top of the database db, which the application
 // opened with the driver it prefers. dialect tells which database engine it
-// is. masterKey is at least 32 random bytes that protect the secrets limb
-// stores; keep it out of the database and the source code.
+// is.
+//
+// masterKey is at least 32 random bytes that protect the secrets limb stores.
+// It is a key, not a passphrase: generate it once, for example with
+// "openssl rand -base64 32", keep the text in the secret storage of the
+// application, never in the database or the source code, and pass the decoded
+// bytes, for example the result of base64.StdEncoding.DecodeString.
 //
 // New checks the configuration and the schema of the database. It returns an
 // error for a configuration that cannot work and for a database whose schema
@@ -72,8 +77,9 @@ func New(db *sql.DB, dialect Dialect, masterKey []byte, opts ...Option) (*Auth, 
 
 // NewWithStore creates the service on top of a store that the application
 // provides, for example one for a database that limb has no dialect for. The
-// store should pass the tests of package storetest. WithTablePrefix is not
-// accepted, because the tables belong to the store.
+// store should pass the tests of package storetest. masterKey is the same as
+// in New. WithTablePrefix is not accepted, because the tables belong to the
+// store.
 func NewWithStore(s store.Store, masterKey []byte, opts ...Option) (*Auth, error) {
 	if s == nil {
 		return nil, errors.New("limb: the store is nil")
