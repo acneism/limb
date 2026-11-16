@@ -68,7 +68,6 @@ type Auth struct {
 	services   []serviceKey
 	secure     bool
 	sameSite   http.SameSite
-	mountPath  string
 	refreshJar bool
 	disabled   map[Endpoint]bool
 	ring       *keyring
@@ -208,7 +207,6 @@ func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
 		services:   cfg.services,
 		secure:     !cfg.development,
 		sameSite:   cmp.Or(cfg.sameSite, http.SameSiteLaxMode),
-		mountPath:  cfg.mountPath,
 		refreshJar: cfg.refreshJar,
 		disabled:   make(map[Endpoint]bool, len(cfg.disabled)),
 

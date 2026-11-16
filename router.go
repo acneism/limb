@@ -28,7 +28,6 @@ func (rt route) matches(path string) (string, bool) {
 }
 
 type router struct {
-	auth   *Auth
 	routes []route
 }
 
@@ -164,7 +163,7 @@ type router struct {
 // WithTrustedOrigins, and the cookie may have to be SameSite=None, see
 // WithCookieSameSite.
 func (a *Auth) Handler() http.Handler {
-	return &router{auth: a, routes: a.routes()}
+	return &router{routes: a.routes()}
 }
 
 func (a *Auth) routes() []route {
