@@ -60,7 +60,7 @@ func uniquePrefix(t *testing.T, db *sql.DB) string {
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
-		_, _ = db.ExecContext(ctx, "DROP TABLE IF EXISTS "+prefix+"identifiers, "+prefix+"users, "+prefix+"schema CASCADE")
+		_, _ = db.ExecContext(ctx, "DROP TABLE IF EXISTS "+strings.Join([]string{prefix + "identifiers", prefix + "users", prefix + "schema", prefix + "sessions", prefix + "refresh_tokens", prefix + "attempts", prefix + "signing_keys"}, ", ")+" CASCADE")
 	})
 	return prefix
 }

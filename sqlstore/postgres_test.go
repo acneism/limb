@@ -50,10 +50,18 @@ func uniquePrefix(t *testing.T) string {
 	return "t" + hex.EncodeToString(raw) + "_"
 }
 
+func tablesOf(prefix string) []string {
+	var names []string
+	for _, table := range []string{"identifiers", "users", "schema", "probe", "sessions", "refresh_tokens", "attempts", "signing_keys"} {
+		names = append(names, prefix+table)
+	}
+	return names
+}
+
 func dropTables(db *sql.DB, prefix string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	_, _ = db.ExecContext(ctx, "DROP TABLE IF EXISTS "+prefix+"identifiers, "+prefix+"users, "+prefix+"schema, "+prefix+"probe CASCADE")
+	_, _ = db.ExecContext(ctx, "DROP TABLE IF EXISTS "+strings.Join(tablesOf(prefix), ", ")+" CASCADE")
 }
 
 func newPostgresStore(t *testing.T, db *sql.DB) *Store {
@@ -106,7 +114,10 @@ func TestTablesUseThePrefix(t *testing.T) {
 	if err := s.Migrate(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{s.prefix + "identifiers", s.prefix + "schema", s.prefix + "users"}
+	want := []string{
+		s.prefix + "attempts", s.prefix + "identifiers", s.prefix + "refresh_tokens", s.prefix + "schema",
+		s.prefix + "sessions", s.prefix + "signing_keys", s.prefix + "users",
+	}
 	if got := tableNames(t, db, s.prefix); !slices.Equal(got, want) {
 		t.Fatalf("tables = %v, want %v", got, want)
 	}

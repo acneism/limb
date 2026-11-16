@@ -33,7 +33,7 @@ func TestNewValidatesItsArguments(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a nil option must be skipped: %v", err)
 	}
-	if s.prefix != "limb_" || s.latest != 1 || len(s.bootstrap) == 0 || s.lockTTL != 2*time.Minute {
+	if s.prefix != "limb_" || s.latest != 2 || len(s.bootstrap) == 0 || s.lockTTL != 2*time.Minute {
 		t.Fatalf("unexpected defaults: prefix=%q latest=%d bootstrap=%d lease=%v", s.prefix, s.latest, len(s.bootstrap), s.lockTTL)
 	}
 }
@@ -65,7 +65,7 @@ func TestPostgresMigrationsAreWellFormed(t *testing.T) {
 	if len(bootstrap) != 1 || !strings.Contains(bootstrap[0], "zz_schema") {
 		t.Fatalf("unexpected bootstrap: %q", bootstrap)
 	}
-	if len(versions) < 1 || versions[0].version != 1 || versions[0].name != "0001_init.sql" {
+	if len(versions) != 2 || versions[0].name != "0001_init.sql" || versions[1].version != 2 || versions[1].name != "0002_sessions_and_tokens.sql" {
 		t.Fatalf("unexpected migrations: %+v", versions)
 	}
 	all := slices.Clone(bootstrap)
@@ -78,7 +78,7 @@ func TestPostgresMigrationsAreWellFormed(t *testing.T) {
 			t.Fatalf("migrations must not contain %q after preparation", token)
 		}
 	}
-	for _, table := range []string{"zz_schema", "zz_users", "zz_identifiers"} {
+	for _, table := range []string{"zz_schema", "zz_users", "zz_identifiers", "zz_sessions", "zz_refresh_tokens", "zz_attempts", "zz_signing_keys"} {
 		if !strings.Contains(joined, "TABLE IF NOT EXISTS "+table+" ") {
 			t.Fatalf("table %s must be created idempotently", table)
 		}
