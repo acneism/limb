@@ -194,6 +194,11 @@ func TestQueriesUseThePrefixAndTheDialectPlaceholders(t *testing.T) {
 		"deleteIdentifier": {q.deleteIdentifier, 3}, "markVerified": {q.markVerified, 4}, "schemaVersion": {q.schemaVersion, 0},
 		"probeSchema": {q.probeSchema, 0}, "insertSchemaRow": {q.insertSchemaRow, 1}, "acquireLock": {q.acquireLock, 3},
 		"setVersion": {q.setVersion, 4}, "releaseLock": {q.releaseLock, 1},
+		"insertSession": {q.insertSession, 10}, "resolveByID": {q.resolveByID, 2}, "resolveBySecret": {q.resolveBySecret, 2},
+		"touchSession": {q.touchSession, 4}, "revokeSession": {q.revokeSession, 4}, "revokeAll": {q.revokeAll, 3},
+		"revokeAllExcept": {q.revokeAllExcept, 4}, "listSessions": {q.listSessions, 3}, "deleteSessions": {q.deleteSessions, 4},
+		"insertToken": {q.insertToken, 4}, "useToken": {q.useToken, 3}, "selectToken": {q.selectToken, 2},
+		"deleteTokens": {q.deleteTokens, 2},
 	}
 	marker := regexp.MustCompile(`\$\d+`)
 	for name, tc := range want {

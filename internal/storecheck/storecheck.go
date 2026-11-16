@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/acneism/limb/store"
@@ -51,6 +52,13 @@ func Identifier(i store.Identifier) error {
 		if err := required(f.name, f.value); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func Time(name string, t time.Time) error {
+	if t.IsZero() {
+		return invalid("%s is required", name)
 	}
 	return nil
 }

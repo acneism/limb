@@ -46,6 +46,10 @@ type Repositories interface {
 	Users() Users
 	// Identifiers returns the repository of login identifiers.
 	Identifiers() Identifiers
+	// Sessions returns the repository of sessions.
+	Sessions() Sessions
+	// RefreshTokens returns the repository of refresh tokens.
+	RefreshTokens() RefreshTokens
 }
 
 // Store is the storage that limb runs on. Implementations are safe for

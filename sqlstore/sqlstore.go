@@ -119,6 +119,16 @@ func (s *Store) Identifiers() store.Identifiers {
 	return identifiers{s: s, x: s.db}
 }
 
+// Sessions returns the repository of sessions.
+func (s *Store) Sessions() store.Sessions {
+	return sessions{s: s, x: s.db}
+}
+
+// RefreshTokens returns the repository of refresh tokens.
+func (s *Store) RefreshTokens() store.RefreshTokens {
+	return refreshTokens{s: s, x: s.db}
+}
+
 type repositories struct {
 	s *Store
 	x executor
@@ -130,6 +140,14 @@ func (r repositories) Users() store.Users {
 
 func (r repositories) Identifiers() store.Identifiers {
 	return identifiers(r)
+}
+
+func (r repositories) Sessions() store.Sessions {
+	return sessions(r)
+}
+
+func (r repositories) RefreshTokens() store.RefreshTokens {
+	return refreshTokens(r)
 }
 
 // InTx runs fn in a database transaction with the default isolation level. The

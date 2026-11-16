@@ -11,23 +11,35 @@ import (
 	"github.com/acneism/limb/store"
 )
 
-const latestVersion = 1
+const latestVersion = 2
 
 type userKey struct{ tenant, id string }
 
 type identKey struct{ tenant, typ, value string }
 
 type data struct {
-	users  map[userKey]store.User
-	idents map[identKey]store.Identifier
+	users    map[userKey]store.User
+	idents   map[identKey]store.Identifier
+	sessions map[sessionKey]store.Session
+	tokens   map[string]store.RefreshToken
 }
 
 func newData() *data {
-	return &data{users: map[userKey]store.User{}, idents: map[identKey]store.Identifier{}}
+	return &data{
+		users:    map[userKey]store.User{},
+		idents:   map[identKey]store.Identifier{},
+		sessions: map[sessionKey]store.Session{},
+		tokens:   map[string]store.RefreshToken{},
+	}
 }
 
 func (d *data) clone() *data {
-	return &data{users: maps.Clone(d.users), idents: maps.Clone(d.idents)}
+	return &data{
+		users:    maps.Clone(d.users),
+		idents:   maps.Clone(d.idents),
+		sessions: maps.Clone(d.sessions),
+		tokens:   maps.Clone(d.tokens),
+	}
 }
 
 type Store struct {
@@ -48,6 +60,14 @@ func (s *Store) Users() store.Users {
 
 func (s *Store) Identifiers() store.Identifiers {
 	return identifiers{d: func() *data { return s.data }, mu: &s.mu}
+}
+
+func (s *Store) Sessions() store.Sessions {
+	return sessions{d: func() *data { return s.data }, mu: &s.mu}
+}
+
+func (s *Store) RefreshTokens() store.RefreshTokens {
+	return refreshTokens{d: func() *data { return s.data }, mu: &s.mu}
 }
 
 func (s *Store) InTx(ctx context.Context, fn func(ctx context.Context, tx store.Repositories) error) error {
@@ -94,6 +114,14 @@ func (r txRepositories) Users() store.Users {
 
 func (r txRepositories) Identifiers() store.Identifiers {
 	return identifiers{d: func() *data { return r.d }}
+}
+
+func (r txRepositories) Sessions() store.Sessions {
+	return sessions{d: func() *data { return r.d }}
+}
+
+func (r txRepositories) RefreshTokens() store.RefreshTokens {
+	return refreshTokens{d: func() *data { return r.d }}
 }
 
 type users struct {
@@ -202,6 +230,11 @@ func (r users) Delete(ctx context.Context, tenantID, id string) error {
 	for k, i := range d.idents {
 		if i.TenantID == tenantID && i.UserID == id {
 			delete(d.idents, k)
+		}
+	}
+	for k, s := range d.sessions {
+		if s.TenantID == tenantID && s.UserID == id {
+			d.removeSession(k)
 		}
 	}
 	return nil

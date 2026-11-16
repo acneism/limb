@@ -9,6 +9,11 @@ const (
 	userColumns = "tenant_id, id, status, password_hash, must_change_password, blocked_reason, " +
 		"blocked_until, deleted_at, purge_after, created_at, last_login_at, version"
 	identifierColumns = "tenant_id, type, value, display_value, user_id, verified_at"
+	sessionColumns    = "tenant_id, id, kind, secret_hash, user_id, ip, user_agent, created_at, last_seen_at, expires_at, revoked_at"
+	resolveColumns    = "s.tenant_id, s.id, s.kind, s.secret_hash, s.user_id, s.ip, s.user_agent, s.created_at, s.last_seen_at, " +
+		"s.expires_at, s.revoked_at, u.status, u.blocked_until, u.must_change_password"
+	resolveFrom  = " FROM {sessions} s JOIN {users} u ON u.tenant_id = s.tenant_id AND u.id = s.user_id"
+	tokenColumns = "tenant_id, token_hash, session_id, expires_at, used_at"
 )
 
 type queries struct {
@@ -22,6 +27,19 @@ type queries struct {
 	listIdentifiers  string
 	deleteIdentifier string
 	markVerified     string
+	insertSession    string
+	resolveByID      string
+	resolveBySecret  string
+	touchSession     string
+	revokeSession    string
+	revokeAll        string
+	revokeAllExcept  string
+	listSessions     string
+	deleteSessions   string
+	insertToken      string
+	useToken         string
+	selectToken      string
+	deleteTokens     string
 	schemaVersion    string
 	probeSchema      string
 	insertSchemaRow  string
@@ -36,6 +54,8 @@ func newQueries(prefix string, d Dialect) queries {
 		text := strings.NewReplacer(
 			"{users}", prefix+"users",
 			"{identifiers}", prefix+"identifiers",
+			"{sessions}", prefix+"sessions",
+			"{refresh_tokens}", prefix+"refresh_tokens",
 			"{schema}", prefix+"schema",
 		).Replace(template)
 		var out strings.Builder
@@ -63,9 +83,28 @@ func newQueries(prefix string, d Dialect) queries {
 		listIdentifiers:  build("SELECT " + identifierColumns + " FROM {identifiers} WHERE tenant_id = ? AND user_id = ?"),
 		deleteIdentifier: build("DELETE FROM {identifiers} WHERE tenant_id = ? AND type = ? AND value = ?"),
 		markVerified:     build("UPDATE {identifiers} SET verified_at = ? WHERE tenant_id = ? AND type = ? AND value = ?"),
-		schemaVersion:    build("SELECT version FROM {schema} WHERE id = 1"),
-		probeSchema:      build("SELECT 1 FROM {schema} WHERE id = 1"),
-		insertSchemaRow:  build("INSERT INTO {schema} (id, version, applied_at) VALUES (1, 0, ?)"),
+		insertSession:    build("INSERT INTO {sessions} (" + sessionColumns + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)"),
+		resolveByID:      build("SELECT " + resolveColumns + resolveFrom + " WHERE s.tenant_id = ? AND s.id = ?"),
+		resolveBySecret:  build("SELECT " + resolveColumns + resolveFrom + " WHERE s.tenant_id = ? AND s.secret_hash = ?"),
+		touchSession:     build("UPDATE {sessions} SET last_seen_at = ? WHERE tenant_id = ? AND id = ? AND last_seen_at < ?"),
+		revokeSession: build("UPDATE {sessions} SET revoked_at = ? " +
+			"WHERE tenant_id = ? AND user_id = ? AND id = ? AND revoked_at IS NULL"),
+		revokeAll: build("UPDATE {sessions} SET revoked_at = ? " +
+			"WHERE tenant_id = ? AND user_id = ? AND revoked_at IS NULL"),
+		revokeAllExcept: build("UPDATE {sessions} SET revoked_at = ? " +
+			"WHERE tenant_id = ? AND user_id = ? AND revoked_at IS NULL AND id <> ?"),
+		listSessions: build("SELECT " + sessionColumns + " FROM {sessions} " +
+			"WHERE tenant_id = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?"),
+		deleteSessions: build("DELETE FROM {sessions} " +
+			"WHERE tenant_id = ? AND (expires_at < ? OR last_seen_at < ? OR revoked_at < ?)"),
+		insertToken: build("INSERT INTO {refresh_tokens} (token_hash, tenant_id, session_id, expires_at) VALUES (?, ?, ?, ?)"),
+		useToken: build("UPDATE {refresh_tokens} SET used_at = ? " +
+			"WHERE tenant_id = ? AND token_hash = ? AND used_at IS NULL"),
+		selectToken:     build("SELECT " + tokenColumns + " FROM {refresh_tokens} WHERE tenant_id = ? AND token_hash = ?"),
+		deleteTokens:    build("DELETE FROM {refresh_tokens} WHERE tenant_id = ? AND expires_at < ?"),
+		schemaVersion:   build("SELECT version FROM {schema} WHERE id = 1"),
+		probeSchema:     build("SELECT 1 FROM {schema} WHERE id = 1"),
+		insertSchemaRow: build("INSERT INTO {schema} (id, version, applied_at) VALUES (1, 0, ?)"),
 		acquireLock: build("UPDATE {schema} SET lock_holder = ?, lock_expires_at = ? " +
 			"WHERE id = 1 AND (lock_holder IS NULL OR lock_expires_at < ?)"),
 		renewLock: build("UPDATE {schema} SET lock_expires_at = ? WHERE id = 1 AND lock_holder = ?"),
@@ -85,6 +124,13 @@ func optionalTime(t time.Time) any {
 		return nil
 	}
 	return storedTime(t)
+}
+
+func optionalBytes(b []byte) any {
+	if len(b) == 0 {
+		return nil
+	}
+	return b
 }
 
 func optionalText(s string) any {

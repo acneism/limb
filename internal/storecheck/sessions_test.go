@@ -188,3 +188,12 @@ func TestCompareSessions(t *testing.T) {
 		t.Fatalf("sorted sessions = %v, want %v", got, want)
 	}
 }
+
+func TestTimeRule(t *testing.T) {
+	if err := Time("moment", time.Now()); err != nil {
+		t.Fatalf("a set time was rejected: %v", err)
+	}
+	if err := Time("moment", time.Time{}); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "moment") {
+		t.Fatalf("a zero time = %v, want ErrInvalid that names the field", err)
+	}
+}
