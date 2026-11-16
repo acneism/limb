@@ -99,7 +99,9 @@ type Identifiers interface {
 	// Find returns the identifier with the given value or ErrNotFound.
 	Find(ctx context.Context, tenantID, typ, value string) (Identifier, error)
 
-	// ListByUser returns the identifiers of the user ordered by type and value.
+	// ListByUser returns the identifiers of the user in byte order: sorted by
+	// type, and by value within a type, comparing the bytes of the strings
+	// whatever the collation of the database is.
 	ListByUser(ctx context.Context, tenantID, userID string) ([]Identifier, error)
 
 	// Remove deletes the identifier or returns ErrNotFound.

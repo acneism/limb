@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -43,6 +44,7 @@ var cases = []testCase{
 	{name: "Users/no lost updates", run: testNoLostUpdates},
 	{name: "Identifiers/lifecycle", run: testIdentifierLifecycle},
 	{name: "Identifiers/errors", run: testIdentifierErrors},
+	{name: "Identifiers/listed in byte order", run: testListByUserIsInByteOrder},
 	{name: "Identifiers/values are compared byte by byte", run: testBytewiseValues},
 	{name: "Identifiers/deleted with the user", run: testIdentifiersFollowTheUser},
 	{name: "Identifiers/concurrent Add of one value", run: testConcurrentAdd},
@@ -580,6 +582,51 @@ func testIdentifierErrors(t *testing.T, s store.Store) {
 	list, err := s.Identifiers().ListByUser(ctx, tenantA, id(99))
 	if err != nil || len(list) != 0 {
 		t.Fatalf("ListByUser of an unknown user = %v, %v; want an empty list", list, err)
+	}
+}
+
+func testListByUserIsInByteOrder(t *testing.T, s store.Store) {
+	ctx := t.Context()
+	mustCreate(t, s, newUser(tenantA, id(1)))
+	mustCreate(t, s, newUser(tenantA, id(2)))
+	given := []store.Identifier{
+		newIdentifier(tenantA, "nick", "ab", id(1)),
+		newIdentifier(tenantA, "nick", "\u044f", id(1)),
+		newIdentifier(tenantA, "email", "z@example.com", id(1)),
+		newIdentifier(tenantA, "nick", "Z", id(1)),
+		newIdentifier(tenantA, "nick", "a-c", id(1)),
+		newIdentifier(tenantA, "Phone", "+79261234567", id(1)),
+		newIdentifier(tenantA, "nick", "\u00e9", id(1)),
+		newIdentifier(tenantA, "nick", "a", id(1)),
+		newIdentifier(tenantA, "email", "A@example.com", id(1)),
+		newIdentifier(tenantA, "nick", "B", id(1)),
+		newIdentifier(tenantA, "nick", "of-another-user", id(2)),
+	}
+	for _, i := range given {
+		mustAdd(t, s, i)
+	}
+	want := [][2]string{
+		{"Phone", "+79261234567"},
+		{"email", "A@example.com"},
+		{"email", "z@example.com"},
+		{"nick", "B"},
+		{"nick", "Z"},
+		{"nick", "a"},
+		{"nick", "a-c"},
+		{"nick", "ab"},
+		{"nick", "\u00e9"},
+		{"nick", "\u044f"},
+	}
+	list, err := s.Identifiers().ListByUser(ctx, tenantA, id(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make([][2]string, 0, len(list))
+	for _, i := range list {
+		got = append(got, [2]string{i.Type, i.Value})
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("ListByUser must return the identifiers in byte order, whatever the collation of the database is:\n got %q\nwant %q", got, want)
 	}
 }
 

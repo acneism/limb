@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/acneism/limb/internal/storecheck"
@@ -67,6 +68,7 @@ func (r identifiers) ListByUser(ctx context.Context, tenantID, userID string) ([
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("sqlstore: list identifiers: %w", err)
 	}
+	slices.SortFunc(list, storecheck.CompareIdentifiers)
 	return list, nil
 }
 

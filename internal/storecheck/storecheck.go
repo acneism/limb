@@ -55,6 +55,13 @@ func Identifier(i store.Identifier) error {
 	return nil
 }
 
+func CompareIdentifiers(a, b store.Identifier) int {
+	if c := strings.Compare(a.Type, b.Type); c != 0 {
+		return c
+	}
+	return strings.Compare(a.Value, b.Value)
+}
+
 func ValidText(values ...string) bool {
 	for _, v := range values {
 		if !utf8.ValidString(v) || strings.IndexByte(v, 0) >= 0 {

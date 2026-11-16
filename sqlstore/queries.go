@@ -60,8 +60,7 @@ func newQueries(prefix string, d Dialect) queries {
 		deleteUser:       build("DELETE FROM {users} WHERE tenant_id = ? AND id = ?"),
 		insertIdentifier: build("INSERT INTO {identifiers} (" + identifierColumns + ") VALUES (?, ?, ?, ?, ?, ?)"),
 		selectIdentifier: build("SELECT " + identifierColumns + " FROM {identifiers} WHERE tenant_id = ? AND type = ? AND value = ?"),
-		listIdentifiers: build("SELECT " + identifierColumns + " FROM {identifiers} WHERE tenant_id = ? AND user_id = ? " +
-			"ORDER BY type, value"),
+		listIdentifiers:  build("SELECT " + identifierColumns + " FROM {identifiers} WHERE tenant_id = ? AND user_id = ?"),
 		deleteIdentifier: build("DELETE FROM {identifiers} WHERE tenant_id = ? AND type = ? AND value = ?"),
 		markVerified:     build("UPDATE {identifiers} SET verified_at = ? WHERE tenant_id = ? AND type = ? AND value = ?"),
 		schemaVersion:    build("SELECT version FROM {schema} WHERE id = 1"),

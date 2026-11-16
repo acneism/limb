@@ -4,7 +4,6 @@ import (
 	"context"
 	"maps"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -263,12 +262,7 @@ func (r identifiers) ListByUser(ctx context.Context, tenantID, userID string) ([
 			list = append(list, i)
 		}
 	}
-	slices.SortFunc(list, func(a, b store.Identifier) int {
-		if c := strings.Compare(a.Type, b.Type); c != 0 {
-			return c
-		}
-		return strings.Compare(a.Value, b.Value)
-	})
+	slices.SortFunc(list, storecheck.CompareIdentifiers)
 	return list, nil
 }
 

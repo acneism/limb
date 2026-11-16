@@ -107,3 +107,33 @@ func TestValidText(t *testing.T) {
 		t.Error("ValidText must require every value to be valid")
 	}
 }
+
+func TestCompareIdentifiersIsByteOrder(t *testing.T) {
+	typed := func(typ, value string) store.Identifier {
+		return store.Identifier{Type: typ, Value: value}
+	}
+	cases := []struct {
+		name string
+		a, b store.Identifier
+		want int
+	}{
+		{"equal", typed("email", "a"), typed("email", "a"), 0},
+		{"type decides first", typed("email", "z"), typed("nick", "a"), -1},
+		{"upper case sorts before lower case", typed("Phone", "x"), typed("email", "x"), -1},
+		{"value decides within a type", typed("nick", "B"), typed("nick", "a"), -1},
+		{"a hyphen sorts before a letter", typed("nick", "a-c"), typed("nick", "ab"), -1},
+		{"a prefix sorts first", typed("nick", "a"), typed("nick", "ab"), -1},
+		{"bytes of multibyte characters", typed("nick", "é"), typed("nick", "я"), -1},
+		{"non ASCII after ASCII", typed("nick", "z"), typed("nick", "é"), -1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := CompareIdentifiers(tc.a, tc.b); got != tc.want {
+				t.Fatalf("CompareIdentifiers(%v, %v) = %d, want %d", tc.a, tc.b, got, tc.want)
+			}
+			if got := CompareIdentifiers(tc.b, tc.a); got != -tc.want {
+				t.Fatalf("the reverse comparison = %d, want %d", got, -tc.want)
+			}
+		})
+	}
+}
