@@ -51,9 +51,12 @@ type Dialect interface {
 	// row and, when a row with the same values of the key columns exists, stores
 	// nothing and raises no error. The statement reports one row when it stored
 	// the row and none when it did not, so the caller learns which of several
-	// concurrent inserts won without a failed statement. The values are SQL
-	// expressions, one for every column, in which each parameter is written as a
-	// question mark, and the statement takes the parameters in their order.
+	// concurrent inserts won without a failed statement. A database may still
+	// fail the loser of two inserts that run at the very same time with an error
+	// that IsUniqueViolation recognizes, which the caller takes for no row. The
+	// values are SQL expressions, one for every column, in which each parameter
+	// is written as a question mark, and the statement takes the parameters in
+	// their order.
 	InsertIgnoring(table string, columns, values, key []string) string
 
 	// Check verifies that the connections of db are set up as the dialect needs,
