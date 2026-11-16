@@ -28,33 +28,45 @@ func (a *Auth) checkPassword(ctx context.Context, login, password string) (store
 	if err != nil {
 		return store.User{}, store.Identifier{}, fmt.Errorf("limb: get the user: %w", err)
 	}
-	if user.PasswordHash == "" {
-		return a.reject(ctx, password)
-	}
-	matched, needsRehash, err := a.hasher.Verify(ctx, password, user.PasswordHash)
-	switch {
-	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
-		return store.User{}, store.Identifier{}, fmt.Errorf("limb: verify the password: %w", err)
-	case err != nil:
-		a.logger.ErrorContext(ctx, "limb: the stored password hash cannot be used", "user_id", user.ID, "error", err)
-		return a.reject(ctx, password)
-	case !matched:
-		return store.User{}, store.Identifier{}, ErrInvalidCredentials
-	}
-	if err = a.usable(user); err != nil {
+	user, err = a.verifyPassword(ctx, user, password, true)
+	if err != nil {
 		return store.User{}, store.Identifier{}, err
-	}
-	if needsRehash {
-		user = a.rehash(ctx, user, password)
 	}
 	return user, found, nil
 }
 
-func (a *Auth) reject(ctx context.Context, password string) (store.User, store.Identifier, error) {
-	if err := a.hasher.DummyVerify(ctx, password); err != nil {
-		return store.User{}, store.Identifier{}, fmt.Errorf("limb: verify the password: %w", err)
+func (a *Auth) verifyPassword(ctx context.Context, user store.User, password string, upgrade bool) (store.User, error) {
+	if user.PasswordHash == "" {
+		return store.User{}, a.rejectPassword(ctx, password)
 	}
-	return store.User{}, store.Identifier{}, ErrInvalidCredentials
+	matched, needsRehash, err := a.hasher.Verify(ctx, password, user.PasswordHash)
+	switch {
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		return store.User{}, fmt.Errorf("limb: verify the password: %w", err)
+	case err != nil:
+		a.logger.ErrorContext(ctx, "limb: the stored password hash cannot be used", "user_id", user.ID, "error", err)
+		return store.User{}, a.rejectPassword(ctx, password)
+	case !matched:
+		return store.User{}, ErrInvalidCredentials
+	}
+	if err = a.usable(user); err != nil {
+		return store.User{}, err
+	}
+	if needsRehash && upgrade {
+		user = a.rehash(ctx, user, password)
+	}
+	return user, nil
+}
+
+func (a *Auth) reject(ctx context.Context, password string) (store.User, store.Identifier, error) {
+	return store.User{}, store.Identifier{}, a.rejectPassword(ctx, password)
+}
+
+func (a *Auth) rejectPassword(ctx context.Context, password string) error {
+	if err := a.hasher.DummyVerify(ctx, password); err != nil {
+		return fmt.Errorf("limb: verify the password: %w", err)
+	}
+	return ErrInvalidCredentials
 }
 
 func (a *Auth) usable(user store.User) error {

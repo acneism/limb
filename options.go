@@ -31,6 +31,7 @@ type config struct {
 	revocation  RevocationMode
 	issuer      string
 	audience    string
+	endSessions bool
 	err         error
 }
 
@@ -284,6 +285,23 @@ func checkClaim(name, value string) error {
 		return fmt.Errorf("limb: the token %s must be 1 to 256 characters without control characters", name)
 	}
 	return nil
+}
+
+// WithPasswordToEndSessions makes ending sessions other than the current one,
+// and ending all of them, ask for the current password again. It applies to
+// TerminateSession for a session other than that of the principal and to
+// LogoutAll. The password is checked under the same limits on failed attempts as
+// that of ChangePassword. Without the option the password is not needed and a
+// password that is given is ignored. Ending the current session never needs it.
+//
+// The option meets the requirement of OWASP ASVS 5.0, V7.5.2, that a user has to
+// authenticate again to end their sessions. It is recommended wherever the theft
+// of a session is a real risk, because a thief cannot then end the sessions of
+// the owner, who would otherwise lose track of the devices they are signed in on.
+func WithPasswordToEndSessions() Option {
+	return func(c *config) {
+		c.endSessions = true
+	}
 }
 
 // WithLogger sets the logger. Messages never contain passwords, hashes or

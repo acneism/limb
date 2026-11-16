@@ -61,6 +61,7 @@ type Auth struct {
 	revocation RevocationMode
 	issuer     string
 	audience   string
+	endNeeds   bool
 	ring       *keyring
 	now        func() time.Time
 	newID      func() (string, error)
@@ -182,6 +183,7 @@ func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
 		accessTTL:  cmp.Or(cfg.accessTTL, defaultAccessTTL),
 		revocation: cfg.revocation,
 		issuer:     cmp.Or(cfg.issuer, defaultIssuer),
+		endNeeds:   cfg.endSessions,
 	}
 	a.audience = cmp.Or(cfg.audience, a.issuer)
 	a.ring = newKeyring(a)

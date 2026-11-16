@@ -67,13 +67,9 @@ func (a *Auth) openCookieSession(ctx context.Context, user store.User, c Credent
 	if err != nil {
 		return Login{}, err
 	}
-	text, err := secret.New()
+	text, hash, err := newSecret()
 	if err != nil {
-		return Login{}, fmt.Errorf("limb: %w", err)
-	}
-	hash, err := secret.Hash(text)
-	if err != nil {
-		return Login{}, fmt.Errorf("limb: %w", err)
+		return Login{}, err
 	}
 	session := store.Session{
 		TenantID:   a.tenant,
@@ -167,14 +163,22 @@ type newRefresh struct {
 	record store.RefreshToken
 }
 
-func (a *Auth) newRefreshToken(session store.Session, now time.Time) (newRefresh, error) {
+func newSecret() (string, []byte, error) {
 	text, err := secret.New()
 	if err != nil {
-		return newRefresh{}, fmt.Errorf("limb: %w", err)
+		return "", nil, fmt.Errorf("limb: %w", err)
 	}
 	hash, err := secret.Hash(text)
 	if err != nil {
-		return newRefresh{}, fmt.Errorf("limb: %w", err)
+		return "", nil, fmt.Errorf("limb: %w", err)
+	}
+	return text, hash, nil
+}
+
+func (a *Auth) newRefreshToken(session store.Session, now time.Time) (newRefresh, error) {
+	text, hash, err := newSecret()
+	if err != nil {
+		return newRefresh{}, err
 	}
 	expires := now.Add(a.idle)
 	if expires.After(session.ExpiresAt) {
