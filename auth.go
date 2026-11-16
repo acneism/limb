@@ -3,6 +3,7 @@ package limb
 import (
 	"cmp"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -27,6 +28,7 @@ const (
 	defaultSessionAbsolute = 30 * 24 * time.Hour
 	defaultSessionIdle     = 7 * 24 * time.Hour
 	defaultAccessTTL       = 10 * time.Minute
+	minServiceKeyLength    = 32
 	defaultIssuer          = "limb"
 	touchInterval          = time.Minute
 )
@@ -62,6 +64,7 @@ type Auth struct {
 	issuer     string
 	audience   string
 	endNeeds   bool
+	services   []serviceKey
 	ring       *keyring
 	now        func() time.Time
 	newID      func() (string, error)
@@ -144,6 +147,9 @@ func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
 	if absolute == 0 {
 		absolute, idle = defaultSessionAbsolute, defaultSessionIdle
 	}
+	if err = checkServiceKeys(cfg.services); err != nil {
+		return nil, err
+	}
 	limits, err := cfg.limits.resolve()
 	if err != nil {
 		return nil, err
@@ -184,6 +190,7 @@ func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
 		revocation: cfg.revocation,
 		issuer:     cmp.Or(cfg.issuer, defaultIssuer),
 		endNeeds:   cfg.endSessions,
+		services:   cfg.services,
 	}
 	a.audience = cmp.Or(cfg.audience, a.issuer)
 	a.ring = newKeyring(a)
@@ -197,6 +204,21 @@ func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
 		return nil, err
 	}
 	return a, nil
+}
+
+func checkServiceKeys(services []serviceKey) error {
+	names := make(map[string]bool, len(services))
+	hashes := make(map[[sha256.Size]byte]bool, len(services))
+	for _, s := range services {
+		if names[s.name] {
+			return fmt.Errorf("limb: the service %q is given twice", s.name)
+		}
+		if hashes[s.hash] {
+			return fmt.Errorf("limb: the service %q has the key of another service", s.name)
+		}
+		names[s.name], hashes[s.hash] = true, true
+	}
+	return nil
 }
 
 func checkIdentifiers(declared []identifier.Type) ([]identifier.Type, map[string]identifier.Type, error) {

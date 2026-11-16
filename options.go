@@ -1,6 +1,7 @@
 package limb
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -32,7 +33,13 @@ type config struct {
 	issuer      string
 	audience    string
 	endSessions bool
+	services    []serviceKey
 	err         error
+}
+
+type serviceKey struct {
+	name string
+	hash [sha256.Size]byte
 }
 
 func (c *config) fail(err error) {
@@ -301,6 +308,29 @@ func checkClaim(name, value string) error {
 func WithPasswordToEndSessions() Option {
 	return func(c *config) {
 		c.endSessions = true
+	}
+}
+
+// WithServiceKey lets a service that checks access tokens outside the
+// application ask limb whether a token is still good, which gives it the instant
+// revocation that a signature alone cannot. The service sends the key as the
+// Bearer token of its request. The name only says in the log which service asked.
+// The key is made of printable ASCII characters without spaces and is at least 32
+// bytes long, for example the output of "openssl rand -base64 48"; limb keeps only
+// its hash. The option can be given for every service, each with its own key. New
+// fails for a name or a key that is invalid or used twice.
+func WithServiceKey(name, key string) Option {
+	return func(c *config) {
+		switch {
+		case name == "" || len(name) > 64 || strings.ContainsFunc(name, func(r rune) bool { return r < ' ' || r == 0x7f }):
+			c.fail(errors.New("limb: the name of a service must be 1 to 64 characters without control characters"))
+		case len(key) < minServiceKeyLength:
+			c.fail(fmt.Errorf("limb: the key of the service %q must be at least %d bytes long, got %d", name, minServiceKeyLength, len(key)))
+		case strings.ContainsFunc(key, func(r rune) bool { return r <= ' ' || r > '~' }):
+			c.fail(fmt.Errorf("limb: the key of the service %q must be printable ASCII without spaces", name))
+		default:
+			c.services = append(c.services, serviceKey{name: name, hash: sha256.Sum256([]byte(key))})
+		}
 	}
 }
 
