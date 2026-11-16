@@ -90,7 +90,11 @@ type Auth struct {
 //
 // New checks the configuration and the schema of the database. It returns an
 // error for a configuration that cannot work and for a database whose schema
-// is missing or outdated, unless WithAutoMigrate is given.
+// is missing or outdated, unless WithAutoMigrate is given. It also checks how
+// the connections of the database are set up, before it writes anything: the
+// error of a connection that the dialect cannot work with says what to change
+// in the way the database is opened, for example parseTime=true in the DSN of
+// MySQL.
 func New(db *sql.DB, dialect Dialect, masterKey []byte, opts ...Option) (*Auth, error) {
 	if db == nil {
 		return nil, errors.New("limb: the database is nil")
