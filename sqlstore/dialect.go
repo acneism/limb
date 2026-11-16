@@ -77,10 +77,14 @@ type Dialect interface {
 	Migrations() fs.FS
 }
 
-//go:embed migrations/postgres/*.sql
-var postgresFiles embed.FS
+//go:embed migrations
+var migrationFiles embed.FS
 
-var postgresMigrations = mustSub(postgresFiles, "migrations/postgres")
+var (
+	postgresMigrations = mustSub(migrationFiles, "migrations/postgres")
+	mysqlMigrations    = mustSub(migrationFiles, "migrations/mysql")
+	mariadbMigrations  = mustSub(migrationFiles, "migrations/mariadb")
+)
 
 func mustSub(fsys fs.FS, dir string) fs.FS {
 	sub, err := fs.Sub(fsys, dir)
