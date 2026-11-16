@@ -33,9 +33,7 @@ import (
 // instance.
 func (a *Auth) Login(ctx context.Context, c Credentials) (Login, error) {
 	switch c.Kind {
-	case SessionCookie:
-	case SessionToken:
-		return Login{}, &ValidationError{Field: "kind", Reason: "token sessions are not supported yet"}
+	case SessionCookie, SessionToken:
 	default:
 		return Login{}, &ValidationError{Field: "kind", Reason: "must be cookie or token"}
 	}
@@ -50,7 +48,12 @@ func (a *Auth) Login(ctx context.Context, c Credentials) (Login, error) {
 		return Login{}, err
 	}
 	now := a.now().UTC().Truncate(time.Microsecond)
-	login, err := a.openCookieSession(ctx, user, c, now)
+	var login Login
+	if c.Kind == SessionToken {
+		login, err = a.openTokenSession(ctx, user, c, now)
+	} else {
+		login, err = a.openCookieSession(ctx, user, c, now)
+	}
 	if err != nil {
 		return Login{}, err
 	}
@@ -101,6 +104,85 @@ func (a *Auth) openCookieSession(ctx context.Context, user store.User, c Credent
 		CSRFToken: a.keys.CSRFToken(id),
 		ExpiresAt: session.ExpiresAt,
 	}, nil
+}
+
+func (a *Auth) openTokenSession(ctx context.Context, user store.User, c Credentials, now time.Time) (Login, error) {
+	if _, err := a.ring.signer(ctx); err != nil {
+		return Login{}, err
+	}
+	id, err := a.newID()
+	if err != nil {
+		return Login{}, err
+	}
+	session := store.Session{
+		TenantID:   a.tenant,
+		ID:         id,
+		Kind:       store.SessionToken,
+		UserID:     user.ID,
+		IP:         addressText(c.IP),
+		UserAgent:  cleanUserAgent(c.UserAgent),
+		CreatedAt:  now,
+		LastSeenAt: now,
+		ExpiresAt:  now.Add(a.absolute),
+	}
+	refresh, err := a.newRefreshToken(session, now)
+	if err != nil {
+		return Login{}, err
+	}
+	err = a.store.InTx(ctx, func(ctx context.Context, tx store.Repositories) error {
+		if createErr := tx.Sessions().Create(ctx, session); createErr != nil {
+			return createErr
+		}
+		return tx.RefreshTokens().Add(ctx, refresh.record)
+	})
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return Login{}, ErrInvalidCredentials
+		}
+		return Login{}, fmt.Errorf("limb: create the session: %w", err)
+	}
+	access, accessExpires, err := a.issueAccessToken(ctx, user.ID, id, user.MustChangePassword, now)
+	if err != nil {
+		return Login{}, err
+	}
+	return Login{
+		Principal: Principal{
+			UserID:             UserID(user.ID),
+			SessionID:          id,
+			SessionKind:        store.SessionToken,
+			MustChangePassword: user.MustChangePassword,
+		},
+		Tokens: Tokens{
+			AccessToken:      access,
+			AccessExpiresAt:  accessExpires,
+			RefreshToken:     refresh.text,
+			RefreshExpiresAt: refresh.record.ExpiresAt,
+		},
+		ExpiresAt: session.ExpiresAt,
+	}, nil
+}
+
+type newRefresh struct {
+	text   string
+	record store.RefreshToken
+}
+
+func (a *Auth) newRefreshToken(session store.Session, now time.Time) (newRefresh, error) {
+	text, err := secret.New()
+	if err != nil {
+		return newRefresh{}, fmt.Errorf("limb: %w", err)
+	}
+	hash, err := secret.Hash(text)
+	if err != nil {
+		return newRefresh{}, fmt.Errorf("limb: %w", err)
+	}
+	expires := now.Add(a.idle)
+	if expires.After(session.ExpiresAt) {
+		expires = session.ExpiresAt
+	}
+	return newRefresh{text: text, record: store.RefreshToken{
+		TenantID: a.tenant, Hash: hash, SessionID: session.ID, ExpiresAt: expires,
+	}}, nil
 }
 
 func (a *Auth) recordLogin(ctx context.Context, user store.User, at time.Time) {

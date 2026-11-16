@@ -39,8 +39,8 @@ func sessionCookieName(development bool) string {
 // code that only looks at the error stays closed.
 func (a *Auth) Authenticate(r *http.Request) (Principal, error) {
 	ctx := r.Context()
-	if _, bearer := bearerToken(r); bearer {
-		return Principal{}, ErrUnauthenticated
+	if token, bearer := bearerToken(r); bearer {
+		return a.authenticateToken(ctx, token)
 	}
 	cookie, err := r.Cookie(a.cookie)
 	if err != nil {
@@ -70,6 +70,43 @@ func (a *Auth) Authenticate(r *http.Request) (Principal, error) {
 		return principal, ErrPasswordChangeRequired
 	}
 	return principal, nil
+}
+
+func (a *Auth) authenticateToken(ctx context.Context, token string) (Principal, error) {
+	claims, err := a.verifyAccessToken(ctx, token)
+	if err != nil {
+		return Principal{}, err
+	}
+	principal := Principal{
+		UserID:             UserID(claims.Subject),
+		SessionID:          claims.SessionID,
+		SessionKind:        store.SessionToken,
+		MustChangePassword: claims.ChangePassword,
+	}
+	if a.revocation == RevocationInstant {
+		principal, err = a.checkTokenSession(ctx, claims)
+		if err != nil {
+			return Principal{}, err
+		}
+	}
+	if principal.MustChangePassword {
+		return principal, ErrPasswordChangeRequired
+	}
+	return principal, nil
+}
+
+func (a *Auth) checkTokenSession(ctx context.Context, claims accessClaims) (Principal, error) {
+	resolved, err := a.store.Sessions().ResolveByID(ctx, a.tenant, claims.SessionID)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return Principal{}, ErrUnauthenticated
+	case err != nil:
+		return Principal{}, fmt.Errorf("limb: read the session: %w", err)
+	}
+	if resolved.Session.UserID != claims.Subject || resolved.Session.Kind != store.SessionToken {
+		return Principal{}, ErrUnauthenticated
+	}
+	return a.activePrincipal(ctx, resolved)
 }
 
 func bearerToken(r *http.Request) (string, bool) {
