@@ -316,6 +316,19 @@ func waitForLease(t *testing.T, db *sql.DB, prefix string) {
 	t.Fatal("the migration never took the lease")
 }
 
+func waitForSlowStatement(t *testing.T, db *sql.DB, prefix string) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		var rows int
+		if err := db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+prefix+"probe").Scan(&rows); err == nil && rows > 0 {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("the migration never reached its slow statement")
+}
+
 func leaseExpiry(t *testing.T, db *sql.DB, prefix string) time.Time {
 	t.Helper()
 	var expiry sql.NullTime
@@ -419,6 +432,7 @@ func TestMigrateIsAbandonedWhenTheLeaseCannotBeRenewed(t *testing.T) {
 	finished := make(chan error, 1)
 	go func() { finished <- s.Migrate(t.Context()) }()
 	waitForLease(t, db, prefix)
+	waitForSlowStatement(t, db, prefix)
 	if _, err := db.ExecContext(t.Context(), "DROP TABLE "+prefix+"schema"); err != nil {
 		t.Fatal(err)
 	}
