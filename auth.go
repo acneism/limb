@@ -1,6 +1,7 @@
 package limb
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"errors"
@@ -25,6 +26,8 @@ const (
 
 	defaultSessionAbsolute = 30 * 24 * time.Hour
 	defaultSessionIdle     = 7 * 24 * time.Hour
+	defaultAccessTTL       = 10 * time.Minute
+	defaultIssuer          = "limb"
 	touchInterval          = time.Minute
 )
 
@@ -49,12 +52,18 @@ type Auth struct {
 	limits  loginLimits
 	slots   chan struct{}
 
-	absolute time.Duration
-	idle     time.Duration
-	origins  map[string]struct{}
-	cookie   string
-	now      func() time.Time
-	newID    func() (string, error)
+	absolute   time.Duration
+	idle       time.Duration
+	origins    map[string]struct{}
+	cookie     string
+	algorithm  SigningAlgorithm
+	accessTTL  time.Duration
+	revocation RevocationMode
+	issuer     string
+	audience   string
+	ring       *keyring
+	now        func() time.Time
+	newID      func() (string, error)
 }
 
 // New creates the service on top of the database db, which the application
@@ -165,11 +174,17 @@ func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
 		now:     time.Now,
 		newID:   newUserID,
 
-		absolute: absolute,
-		idle:     idle,
-		origins:  make(map[string]struct{}, len(cfg.origins)),
-		cookie:   sessionCookieName(cfg.development),
+		absolute:   absolute,
+		idle:       idle,
+		origins:    make(map[string]struct{}, len(cfg.origins)),
+		cookie:     sessionCookieName(cfg.development),
+		algorithm:  cmp.Or(cfg.algorithm, SigningEdDSA),
+		accessTTL:  cmp.Or(cfg.accessTTL, defaultAccessTTL),
+		revocation: cfg.revocation,
+		issuer:     cmp.Or(cfg.issuer, defaultIssuer),
 	}
+	a.audience = cmp.Or(cfg.audience, a.issuer)
+	a.ring = newKeyring(a)
 	for _, origin := range cfg.origins {
 		a.origins[origin] = struct{}{}
 	}

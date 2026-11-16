@@ -26,6 +26,11 @@ type config struct {
 	idle        time.Duration
 	origins     []string
 	development bool
+	algorithm   SigningAlgorithm
+	accessTTL   time.Duration
+	revocation  RevocationMode
+	issuer      string
+	audience    string
 	err         error
 }
 
@@ -189,6 +194,96 @@ func parseOrigin(origin string) (string, bool) {
 		return scheme + "://" + host, true
 	}
 	return scheme + "://" + host + ":" + port, true
+}
+
+// WithSigningAlgorithm sets the algorithm that signs access tokens: SigningEdDSA,
+// the default, SigningES256 or SigningRS256, which is there for services that
+// cannot verify the others. limb makes the keys itself. Changing the algorithm
+// of a running application gives it a new key at once, and the tokens signed
+// with the old algorithm stop working.
+func WithSigningAlgorithm(algorithm SigningAlgorithm) Option {
+	return func(c *config) {
+		switch algorithm {
+		case SigningEdDSA, SigningES256, SigningRS256:
+			c.algorithm = algorithm
+		default:
+			c.fail(fmt.Errorf("limb: unknown signing algorithm %q", algorithm))
+		}
+	}
+}
+
+// WithAccessTokenTTL sets how long an access token is valid, 10 minutes by
+// default. It must be between a minute and a day. The shorter it is, the sooner
+// a token stops working after the session ends when WithRevocation is
+// RevocationAfterTTL.
+func WithAccessTokenTTL(d time.Duration) Option {
+	return func(c *config) {
+		if d < time.Minute || d > 24*time.Hour {
+			c.fail(errors.New("limb: the lifetime of an access token must be between a minute and a day"))
+			return
+		}
+		c.accessTTL = d
+	}
+}
+
+// RevocationMode tells how soon ending a session or blocking a user stops its
+// access tokens from working.
+type RevocationMode int
+
+// The modes of revocation.
+const (
+	// RevocationInstant checks every access token against the database: the
+	// session must be in use and the user must not be blocked or deleted. It is
+	// the default and costs one query by index per request.
+	RevocationInstant RevocationMode = iota
+	// RevocationAfterTTL checks an access token by its signature only, without
+	// the database, so it works until it expires. Sessions that live in a cookie
+	// are always checked against the database.
+	RevocationAfterTTL
+)
+
+// WithRevocation sets the revocation mode, RevocationInstant by default.
+func WithRevocation(mode RevocationMode) Option {
+	return func(c *config) {
+		switch mode {
+		case RevocationInstant, RevocationAfterTTL:
+			c.revocation = mode
+		default:
+			c.fail(fmt.Errorf("limb: unknown revocation mode %d", mode))
+		}
+	}
+}
+
+// WithTokenIssuer sets the iss claim of access tokens and the value that is
+// required in it, "limb" by default. Services that verify the tokens expect it.
+func WithTokenIssuer(issuer string) Option {
+	return func(c *config) {
+		if err := checkClaim("issuer", issuer); err != nil {
+			c.fail(err)
+			return
+		}
+		c.issuer = issuer
+	}
+}
+
+// WithTokenAudience sets the aud claim of access tokens and the value that is
+// required in it, the issuer by default. A token that does not name the
+// audience is refused, so a token made for another service is not accepted.
+func WithTokenAudience(audience string) Option {
+	return func(c *config) {
+		if err := checkClaim("audience", audience); err != nil {
+			c.fail(err)
+			return
+		}
+		c.audience = audience
+	}
+}
+
+func checkClaim(name, value string) error {
+	if value == "" || len(value) > 256 || strings.ContainsFunc(value, func(r rune) bool { return r < ' ' || r == 0x7f }) {
+		return fmt.Errorf("limb: the token %s must be 1 to 256 characters without control characters", name)
+	}
+	return nil
 }
 
 // WithLogger sets the logger. Messages never contain passwords, hashes or
