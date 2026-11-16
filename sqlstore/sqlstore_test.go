@@ -154,14 +154,18 @@ func TestPostgresDialect(t *testing.T) {
 		unique bool
 		fk     bool
 		table  bool
+		exists bool
 	}{
-		{"unique violation", stateError{"23505"}, true, false, false},
-		{"wrapped unique violation", fmt.Errorf("insert: %w", stateError{"23505"}), true, false, false},
-		{"foreign key violation", stateError{"23503"}, false, true, false},
-		{"missing table", fmt.Errorf("a: %w", fmt.Errorf("b: %w", stateError{"42P01"})), false, false, true},
-		{"other state", stateError{"23514"}, false, false, false},
-		{"plain error", errors.New("boom"), false, false, false},
-		{"nil", nil, false, false, false},
+		{"unique violation", stateError{"23505"}, true, false, false, false},
+		{"wrapped unique violation", fmt.Errorf("insert: %w", stateError{"23505"}), true, false, false, false},
+		{"foreign key violation", stateError{"23503"}, false, true, false, false},
+		{"missing table", fmt.Errorf("a: %w", fmt.Errorf("b: %w", stateError{"42P01"})), false, false, true, false},
+		{"duplicate table", stateError{"42P07"}, false, false, false, true},
+		{"duplicate object", fmt.Errorf("create: %w", stateError{"42710"}), false, false, false, true},
+		{"duplicate column", stateError{"42701"}, false, false, false, true},
+		{"other state", stateError{"23514"}, false, false, false, false},
+		{"plain error", errors.New("boom"), false, false, false, false},
+		{"nil", nil, false, false, false, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -174,10 +178,14 @@ func TestPostgresDialect(t *testing.T) {
 			if got := Postgres.IsMissingTable(tc.err); got != tc.table {
 				t.Errorf("IsMissingTable = %v", got)
 			}
+			if got := Postgres.IsAlreadyExists(tc.err); got != tc.exists {
+				t.Errorf("IsAlreadyExists = %v", got)
+			}
 		})
 	}
-	if got := Postgres.IgnoreConflict("INSERT INTO t (a) VALUES ($1)"); got != "INSERT INTO t (a) VALUES ($1) ON CONFLICT DO NOTHING" {
-		t.Fatalf("IgnoreConflict = %q", got)
+	insert := Postgres.InsertIgnoring("t", []string{"a", "b", "c"}, []string{"?", "?", "1"}, []string{"a", "b"})
+	if want := "INSERT INTO t (a, b, c) VALUES (?, ?, 1) ON CONFLICT (a, b) DO NOTHING"; insert != want {
+		t.Fatalf("InsertIgnoring = %q, want %q", insert, want)
 	}
 	entries, err := fs.ReadDir(Postgres.Migrations(), ".")
 	if err != nil || len(entries) < 2 {

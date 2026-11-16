@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"io"
 	"sync"
 	"testing"
 )
@@ -17,6 +18,8 @@ type stub struct {
 	rollbacks int
 	queries   []string
 	script    func(query string, n int) error
+	affect    func(query string, n int) int64
+	rows      func(query string, n int) ([]string, [][]driver.Value)
 	counts    map[string]int
 }
 
@@ -69,14 +72,59 @@ func (c *stubConn) ExecContext(_ context.Context, query string, _ []driver.Named
 	c.s.queries = append(c.s.queries, query)
 	c.s.counts[query]++
 	n := c.s.counts[query]
-	script := c.s.script
+	script, affect := c.s.script, c.s.affect
 	c.s.mu.Unlock()
 	if script != nil {
 		if err := script(query, n); err != nil {
 			return nil, err
 		}
 	}
+	if affect != nil {
+		return driver.RowsAffected(affect(query, n)), nil
+	}
 	return driver.RowsAffected(1), nil
+}
+
+func (c *stubConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
+	c.s.mu.Lock()
+	c.s.queries = append(c.s.queries, query)
+	c.s.counts[query]++
+	n := c.s.counts[query]
+	script, rows := c.s.script, c.s.rows
+	c.s.mu.Unlock()
+	if script != nil {
+		if err := script(query, n); err != nil {
+			return nil, err
+		}
+	}
+	if rows == nil {
+		return &stubRows{}, nil
+	}
+	columns, data := rows(query, n)
+	return &stubRows{columns: columns, data: data}, nil
+}
+
+type stubRows struct {
+	columns []string
+	data    [][]driver.Value
+	next    int
+}
+
+func (r *stubRows) Columns() []string {
+	return r.columns
+}
+
+func (r *stubRows) Close() error {
+	return nil
+}
+
+func (r *stubRows) Next(dest []driver.Value) error {
+	if r.next >= len(r.data) {
+		return io.EOF
+	}
+	copy(dest, r.data[r.next])
+	r.next++
+	return nil
 }
 
 type stubTx struct{ s *stub }

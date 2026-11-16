@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io/fs"
 	"strconv"
+	"strings"
 )
 
 // Dialect describes how a database differs from the others: how parameters are
@@ -41,11 +42,18 @@ type Dialect interface {
 	// read before.
 	TxOptions() *sql.TxOptions
 
-	// IgnoreConflict turns an INSERT statement into one that inserts nothing and
-	// raises no error when the row conflicts with an existing one. Its result is
-	// the number of rows inserted, so the caller learns which of several
-	// concurrent inserts won without a failed statement.
-	IgnoreConflict(insert string) string
+	// IsAlreadyExists reports whether err means that what a statement creates, a
+	// table, an index or a constraint, exists already.
+	IsAlreadyExists(err error) bool
+
+	// InsertIgnoring returns an INSERT statement for the table that stores one
+	// row and, when a row with the same values of the key columns exists, stores
+	// nothing and raises no error. The statement reports one row when it stored
+	// the row and none when it did not, so the caller learns which of several
+	// concurrent inserts won without a failed statement. The values are SQL
+	// expressions, one for every column, in which each parameter is written as a
+	// question mark, and the statement takes the parameters in their order.
+	InsertIgnoring(table string, columns, values, key []string) string
 
 	// Migrations returns the files of the schema: bootstrap.sql, which creates
 	// the table that records the schema version and the migration lock, and the
@@ -105,8 +113,17 @@ func (postgres) TxOptions() *sql.TxOptions {
 	return &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 }
 
-func (postgres) IgnoreConflict(insert string) string {
-	return insert + " ON CONFLICT DO NOTHING"
+func (postgres) IsAlreadyExists(err error) bool {
+	switch sqlState(err) {
+	case "42P07", "42710", "42701":
+		return true
+	}
+	return false
+}
+
+func (postgres) InsertIgnoring(table string, columns, values, key []string) string {
+	return "INSERT INTO " + table + " (" + strings.Join(columns, ", ") + ") VALUES (" + strings.Join(values, ", ") +
+		") ON CONFLICT (" + strings.Join(key, ", ") + ") DO NOTHING"
 }
 
 func (postgres) Migrations() fs.FS {

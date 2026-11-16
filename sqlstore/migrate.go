@@ -237,7 +237,7 @@ func (s *Store) acquire(ctx context.Context, holder string) error {
 
 func (s *Store) apply(ctx context.Context, holder string, m migration) error {
 	for _, statement := range m.statements {
-		if _, err := s.db.ExecContext(ctx, statement); err != nil {
+		if _, err := s.db.ExecContext(ctx, statement); err != nil && !s.dialect.IsAlreadyExists(err) {
 			return err
 		}
 	}

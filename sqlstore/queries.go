@@ -118,9 +118,10 @@ func newQueries(prefix string, d Dialect) queries {
 		insertToken: build("INSERT INTO {refresh_tokens} (token_hash, tenant_id, session_id, expires_at) VALUES (?, ?, ?, ?)"),
 		useToken: build("UPDATE {refresh_tokens} SET used_at = ? " +
 			"WHERE tenant_id = ? AND token_hash = ? AND used_at IS NULL"),
-		selectToken:    build("SELECT " + tokenColumns + " FROM {refresh_tokens} WHERE tenant_id = ? AND token_hash = ?"),
-		deleteTokens:   build("DELETE FROM {refresh_tokens} WHERE tenant_id = ? AND expires_at < ?"),
-		insertAttempt:  d.IgnoreConflict(build("INSERT INTO {attempts} (attempt_key, window_start, hit_count) VALUES (?, ?, 1)")),
+		selectToken:  build("SELECT " + tokenColumns + " FROM {refresh_tokens} WHERE tenant_id = ? AND token_hash = ?"),
+		deleteTokens: build("DELETE FROM {refresh_tokens} WHERE tenant_id = ? AND expires_at < ?"),
+		insertAttempt: build(d.InsertIgnoring("{attempts}",
+			[]string{"attempt_key", "window_start", "hit_count"}, []string{"?", "?", "1"}, []string{"attempt_key"})),
 		bumpAttempt:    build("UPDATE {attempts} SET hit_count = hit_count + 1 WHERE attempt_key = ? AND window_start > ?"),
 		restartAttempt: build("UPDATE {attempts} SET hit_count = 1, window_start = ? WHERE attempt_key = ? AND window_start <= ?"),
 		selectAttempt:  build("SELECT " + attemptColumns + " FROM {attempts} WHERE attempt_key = ?"),
