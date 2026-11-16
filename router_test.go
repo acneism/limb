@@ -8,10 +8,15 @@ import (
 )
 
 var routeMethods = map[string][]string{
-	"/login":         {http.MethodPost},
-	"/token":         {http.MethodPost},
-	"/token/refresh": {http.MethodPost},
-	"/logout":        {http.MethodPost},
+	"/login":            {http.MethodPost},
+	"/token":            {http.MethodPost},
+	"/token/refresh":    {http.MethodPost},
+	"/logout":           {http.MethodPost},
+	"/logout/all":       {http.MethodPost},
+	"/password/change":  {http.MethodPost},
+	"/sessions":         {http.MethodGet, http.MethodHead},
+	"/sessions/current": {http.MethodGet, http.MethodHead, http.MethodDelete},
+	"/sessions/someone": {http.MethodDelete},
 }
 
 var everyMethod = []string{
@@ -92,6 +97,9 @@ var endpointRoutes = []struct {
 	{"token", EndpointToken, []string{"/token"}},
 	{"refresh", EndpointRefresh, []string{"/token/refresh"}},
 	{"logout", EndpointLogout, []string{"/logout"}},
+	{"logout all", EndpointLogoutAll, []string{"/logout/all"}},
+	{"password change", EndpointPasswordChange, []string{"/password/change"}},
+	{"sessions", EndpointSessions, []string{"/sessions", "/sessions/current", "/sessions/someone"}},
 }
 
 func TestEndpointsCanBeTurnedOff(t *testing.T) {

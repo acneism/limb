@@ -81,8 +81,9 @@ func (f *sessionFixture) sameOrigin(login Login) map[string]string {
 
 type sessionsFault struct {
 	store.Sessions
-	createErr, resolveErr, touchErr, revokeErr, listErr error
-	touched                                             *[]string
+	listEmpty                                                         bool
+	createErr, resolveErr, touchErr, revokeErr, revokeAllErr, listErr error
+	touched                                                           *[]string
 }
 
 func (s sessionsFault) Create(ctx context.Context, sess store.Session) error {
@@ -123,9 +124,19 @@ func (s sessionsFault) Revoke(ctx context.Context, tenantID, userID, id string, 
 	return s.Sessions.Revoke(ctx, tenantID, userID, id, at)
 }
 
+func (s sessionsFault) RevokeAllForUser(ctx context.Context, tenantID, userID, exceptID string, at time.Time) (int, error) {
+	if s.revokeAllErr != nil {
+		return 0, s.revokeAllErr
+	}
+	return s.Sessions.RevokeAllForUser(ctx, tenantID, userID, exceptID, at)
+}
+
 func (s sessionsFault) ListByUser(ctx context.Context, tenantID, userID string, now time.Time) ([]store.Session, error) {
 	if s.listErr != nil {
 		return nil, s.listErr
+	}
+	if s.listEmpty {
+		return nil, nil
 	}
 	return s.Sessions.ListByUser(ctx, tenantID, userID, now)
 }
