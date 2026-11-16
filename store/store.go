@@ -65,6 +65,12 @@ type Store interface {
 	// InTx runs fn in a transaction. The transaction is committed if fn returns
 	// nil and rolled back if fn returns an error or panics; the error of fn is
 	// returned as is. Inside fn only the Repositories argument may be used.
+	//
+	// A store may call fn again, after the first transaction was rolled back,
+	// when the database aborts the transaction because of a deadlock or a
+	// failure to serialize, so fn must be safe to repeat: it must not have an
+	// effect outside the transaction that cannot be undone, and what it sets
+	// when it succeeds it must set again.
 	InTx(ctx context.Context, fn func(ctx context.Context, tx Repositories) error) error
 
 	// SchemaVersion returns the schema version recorded in the database, or 0

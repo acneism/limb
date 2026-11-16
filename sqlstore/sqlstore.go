@@ -60,6 +60,7 @@ type executor interface {
 // Store is a store.Store that keeps its records in a SQL database.
 type Store struct {
 	db        *sql.DB
+	auto      executor
 	dialect   Dialect
 	prefix    string
 	q         queries
@@ -105,38 +106,39 @@ func New(db *sql.DB, dialect Dialect, opts ...Option) (*Store, error) {
 		lockTTL:   defaultLockTTL,
 		now:       time.Now,
 	}
+	s.auto = retryingDB{db: db, s: s}
 	s.q = newQueries(s.prefix, dialect)
 	return s, nil
 }
 
 // Users returns the repository of user accounts.
 func (s *Store) Users() store.Users {
-	return users{s: s, x: s.db}
+	return users{s: s, x: s.auto}
 }
 
 // Identifiers returns the repository of login identifiers.
 func (s *Store) Identifiers() store.Identifiers {
-	return identifiers{s: s, x: s.db}
+	return identifiers{s: s, x: s.auto}
 }
 
 // Sessions returns the repository of sessions.
 func (s *Store) Sessions() store.Sessions {
-	return sessions{s: s, x: s.db}
+	return sessions{s: s, x: s.auto}
 }
 
 // RefreshTokens returns the repository of refresh tokens.
 func (s *Store) RefreshTokens() store.RefreshTokens {
-	return refreshTokens{s: s, x: s.db}
+	return refreshTokens{s: s, x: s.auto}
 }
 
 // Attempts returns the repository of counters of failed attempts.
 func (s *Store) Attempts() store.Attempts {
-	return attempts{s: s, x: s.db}
+	return attempts{s: s, x: s.auto}
 }
 
 // SigningKeys returns the repository of the keys that sign access tokens.
 func (s *Store) SigningKeys() store.SigningKeys {
-	return signingKeys{s: s, x: s.db}
+	return signingKeys{s: s, x: s.auto}
 }
 
 type repositories struct {
@@ -170,8 +172,14 @@ func (r repositories) SigningKeys() store.SigningKeys {
 
 // InTx runs fn in a database transaction at the isolation level that the dialect
 // asks for, READ COMMITTED. The transaction is committed if fn returns nil and
-// rolled back if fn returns an error or panics.
+// rolled back if fn returns an error or panics. When the database aborts the
+// transaction because of a deadlock or a failure to serialize, the whole
+// transaction is run again, at most three times in all.
 func (s *Store) InTx(ctx context.Context, fn func(ctx context.Context, tx store.Repositories) error) error {
+	return s.retrying(ctx, func() error { return s.runTx(ctx, fn) })
+}
+
+func (s *Store) runTx(ctx context.Context, fn func(ctx context.Context, tx store.Repositories) error) error {
 	tx, err := s.db.BeginTx(ctx, s.dialect.TxOptions())
 	if err != nil {
 		return fmt.Errorf("sqlstore: begin transaction: %w", err)

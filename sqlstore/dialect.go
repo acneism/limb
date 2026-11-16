@@ -29,6 +29,12 @@ type Dialect interface {
 	// IsMissingTable reports whether err means that a table does not exist.
 	IsMissingTable(err error) bool
 
+	// IsRetryable reports whether err means that the database gave up a
+	// statement or a transaction because of a conflict with another one, a
+	// deadlock or a failure to serialize, and that running it again may well
+	// succeed.
+	IsRetryable(err error) bool
+
 	// TxOptions returns the options of the transactions of the store, or nil for
 	// the default of the driver. They have to give READ COMMITTED: a statement
 	// must see what was committed before it began, whatever the transaction has
@@ -85,6 +91,14 @@ func (postgres) IsForeignKeyViolation(err error) bool {
 
 func (postgres) IsMissingTable(err error) bool {
 	return sqlState(err) == "42P01"
+}
+
+func (postgres) IsRetryable(err error) bool {
+	switch sqlState(err) {
+	case "40P01", "40001":
+		return true
+	}
+	return false
 }
 
 func (postgres) TxOptions() *sql.TxOptions {

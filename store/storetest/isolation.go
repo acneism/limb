@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -140,5 +141,49 @@ func testUpdateTellsAMissingUserFromAStaleOne(t *testing.T, s store.Store) {
 	outside.await(t, "the Delete outside the transaction")
 	if updateErr != nil && !errors.Is(updateErr, store.ErrNotFound) {
 		t.Fatalf("Update of a user who was deleted after the first read = %v, want ErrNotFound: a statement must see what was committed before it began", updateErr)
+	}
+}
+
+func testCrossingTransactionsAllSucceed(t *testing.T, s store.Store) {
+	ctx := t.Context()
+	keys := [2]string{attemptKey(1), attemptKey(2)}
+	for _, key := range keys {
+		mustHit(t, s, key, attemptBase, attemptWindow)
+	}
+	var arrived atomic.Int32
+	both := make(chan struct{})
+	crossing := func(one, other string) error {
+		waited := false
+		return s.InTx(ctx, func(ctx context.Context, tx store.Repositories) error {
+			if _, err := tx.Attempts().Hit(ctx, one, attemptBase, attemptWindow); err != nil {
+				return err
+			}
+			if !waited {
+				waited = true
+				if arrived.Add(1) == 2 {
+					close(both)
+				}
+				select {
+				case <-both:
+				case <-time.After(aWhile):
+				}
+			}
+			_, err := tx.Attempts().Hit(ctx, other, attemptBase, attemptWindow)
+			return err
+		})
+	}
+	var errs [2]error
+	parallel(2, func(i int) {
+		errs[i] = crossing(keys[i], keys[1-i])
+	})
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("transaction %d failed: %v: a deadlock must make the store run the transaction again", i, err)
+		}
+	}
+	for _, key := range keys {
+		if counter := mustGetOne(t, s, key); counter.Count != 3 {
+			t.Fatalf("the counter %s = %+v, want 3 hits: one before and one from each of the two transactions", key, counter)
+		}
 	}
 }

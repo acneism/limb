@@ -100,6 +100,7 @@ var cases = []testCase{
 	{name: "InTx/Use sees a commit made after the first read", run: testUseSeesACommitAfterTheFirstRead},
 	{name: "InTx/Hit sees a commit made after the first read", run: testHitSeesACommitAfterTheFirstRead},
 	{name: "InTx/Update tells a missing user from a stale one", run: testUpdateTellsAMissingUserFromAStaleOne},
+	{name: "InTx/crossing transactions all succeed", run: testCrossingTransactionsAllSucceed},
 	{name: "Context/canceled", run: testCanceledContext},
 }
 

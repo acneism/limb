@@ -94,3 +94,18 @@ func (t *stubTx) Rollback() error {
 	t.s.rollbacks++
 	return nil
 }
+
+type stubError struct{ state string }
+
+func (e stubError) Error() string {
+	return "stub error " + e.state
+}
+
+func (e stubError) SQLState() string {
+	return e.state
+}
+
+var (
+	errDeadlock = stubError{state: "40P01"}
+	errOther    = stubError{state: "23505"}
+)
