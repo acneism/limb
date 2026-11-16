@@ -134,6 +134,9 @@ func TestEveryAnswerIsMarkedAsNotToBeCachedOrSniffed(t *testing.T) {
 	if h.Get("Cache-Control") != "no-store" || h.Get("X-Content-Type-Options") != "nosniff" || h.Get("Content-Type") != "application/json; charset=utf-8" {
 		t.Fatalf("headers = %v", h)
 	}
+	if h.Get("Content-Security-Policy") != "default-src 'none'; frame-ancestors 'none'" || h.Get("Referrer-Policy") != "no-referrer" {
+		t.Fatalf("headers = %v", h)
+	}
 }
 
 func TestAPolicyErrorCarriesItsRulesAndAnotherHeaderCanBeAdded(t *testing.T) {

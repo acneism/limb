@@ -116,6 +116,8 @@ type errorFields struct {
 func setCommonHeaders(h http.Header) {
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+	h.Set("Referrer-Policy", "no-referrer")
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

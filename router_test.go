@@ -79,6 +79,12 @@ func TestEveryAnswerIsMarkedAsNotToBeStoredOrSniffed(t *testing.T) {
 			if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
 				t.Errorf("%s %s: X-Content-Type-Options = %q", method, path, got)
 			}
+			if got := rec.Header().Get("Content-Security-Policy"); got != "default-src 'none'; frame-ancestors 'none'" {
+				t.Errorf("%s %s: Content-Security-Policy = %q", method, path, got)
+			}
+			if got := rec.Header().Get("Referrer-Policy"); got != "no-referrer" {
+				t.Errorf("%s %s: Referrer-Policy = %q", method, path, got)
+			}
 			cacheControl := rec.Header().Get("Cache-Control")
 			if path == "/.well-known/jwks.json" && rec.Code == http.StatusOK {
 				continue

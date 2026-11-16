@@ -64,7 +64,10 @@ type router struct {
 // request with a body must have the content type application/json, may not be
 // larger than 64 KiB and may not have a field that the route does not know. Every
 // response is marked Cache-Control: no-store, except the key set, which clients
-// may keep for five minutes. The bodies of the requests are
+// may keep for five minutes, and carries the headers that tell a browser to do
+// nothing with it: X-Content-Type-Options: nosniff, a Content-Security-Policy
+// that allows nothing and forbids framing, and Referrer-Policy: no-referrer. The
+// bodies of the requests are
 //
 //	/login, /token             {"login", "password"}
 //	/token/refresh             {"refresh_token"}, or none with WithRefreshCookie
