@@ -1,19 +1,20 @@
 package limb
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/netip"
+	"runtime"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/acneism/limb/identifier"
 	"github.com/acneism/limb/internal/password"
+	"github.com/acneism/limb/internal/secret"
 	"github.com/acneism/limb/sqlstore"
 	"github.com/acneism/limb/store"
 )
@@ -32,17 +33,19 @@ type passwordHasher interface {
 // Auth is the authentication service of an application. It is safe for
 // concurrent use and is meant to be created once.
 type Auth struct {
-	store     store.Store
-	types     []identifier.Type
-	known     map[string]identifier.Type
-	hasher    passwordHasher
-	policy    password.Policy
-	logger    *slog.Logger
-	masterKey []byte
-	tenant    string
-	proxies   []netip.Prefix
-	now       func() time.Time
-	newID     func() (string, error)
+	store   store.Store
+	types   []identifier.Type
+	known   map[string]identifier.Type
+	hasher  passwordHasher
+	policy  password.Policy
+	logger  *slog.Logger
+	keys    *secret.Keys
+	tenant  string
+	proxies []netip.Prefix
+	limits  loginLimits
+	slots   chan struct{}
+	now     func() time.Time
+	newID   func() (string, error)
 }
 
 // New creates the service on top of the database db, which the application
@@ -118,6 +121,14 @@ func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
 	if err = policy.Validate(); err != nil {
 		return nil, fmt.Errorf("limb: %w", err)
 	}
+	limits, err := cfg.limits.resolve()
+	if err != nil {
+		return nil, err
+	}
+	keys, err := secret.NewKeys(masterKey)
+	if err != nil {
+		return nil, fmt.Errorf("limb: %w", err)
+	}
 	hasher, err := password.NewHasher()
 	if err != nil {
 		return nil, fmt.Errorf("limb: %w", err)
@@ -127,17 +138,19 @@ func create(s store.Store, masterKey []byte, cfg config) (*Auth, error) {
 		logger = slog.Default()
 	}
 	a := &Auth{
-		store:     s,
-		types:     types,
-		known:     known,
-		hasher:    hasher,
-		policy:    policy,
-		logger:    logger,
-		masterKey: bytes.Clone(masterKey),
-		tenant:    store.DefaultTenant,
-		proxies:   cfg.proxies,
-		now:       time.Now,
-		newID:     newUserID,
+		store:   s,
+		types:   types,
+		known:   known,
+		hasher:  hasher,
+		policy:  policy,
+		logger:  logger,
+		keys:    keys,
+		tenant:  store.DefaultTenant,
+		proxies: cfg.proxies,
+		limits:  limits,
+		slots:   make(chan struct{}, runtime.GOMAXPROCS(0)),
+		now:     time.Now,
+		newID:   newUserID,
 	}
 	if err = a.ensureSchema(cfg.autoMigrate); err != nil {
 		return nil, err

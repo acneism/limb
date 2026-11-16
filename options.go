@@ -16,6 +16,7 @@ type config struct {
 	prefixSet   bool
 	autoMigrate bool
 	proxies     []netip.Prefix
+	limits      LoginLimits
 	err         error
 }
 
@@ -91,6 +92,14 @@ func WithTrustedProxies(prefixes ...netip.Prefix) Option {
 				c.proxies = append(c.proxies, p.Masked())
 			}
 		}
+	}
+}
+
+// WithLoginLimits sets the limits on failed sign-in attempts. A field that is
+// zero keeps its default, see LoginLimits. New fails for a negative value.
+func WithLoginLimits(l LoginLimits) Option {
+	return func(c *config) {
+		c.limits = l
 	}
 }
 

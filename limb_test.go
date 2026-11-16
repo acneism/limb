@@ -212,8 +212,12 @@ func TestMasterKeyLength(t *testing.T) {
 		t.Fatal(err)
 	}
 	key[0] = 'X'
-	if a.masterKey[0] != '0' {
-		t.Fatal("the master key must be copied: changing the caller's slice changed the service")
+	same, err := NewWithStore(memstore.New(), []byte(testKey), WithAutoMigrate())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.keys.CSRFToken("session") != same.keys.CSRFToken("session") {
+		t.Fatal("the keys must be derived when the service is created: changing the caller's slice changed the service")
 	}
 }
 
