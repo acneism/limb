@@ -146,6 +146,13 @@ type router struct {
 // request as /login does, /token/refresh takes no token in its body, and the
 // cookie is cleared when a refresh fails.
 //
+// POST /logout ends the session of the request. A request that has no session
+// at all, no cookie or a cookie that does not mean anything, is answered as if
+// it had ended one, so signing out can be repeated. A request that carries a
+// Bearer token that is no good, an access token that has expired for one, is
+// answered with 401 and nothing is ended, because the client must not take
+// itself for signed out: it asks /token/refresh for a new access token first.
+//
 // While a user has to choose a new password, every session of theirs can only be
 // used to change it, to read the current session and to sign out. Any other route
 // of the handler, and any handler behind RequireAuth, answers 403

@@ -228,7 +228,7 @@ func (a *Auth) handleLogout(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		a.clearCredentials(w, principal.SessionKind)
-	case errors.Is(err, ErrUnauthenticated):
+	case errors.Is(err, ErrUnauthenticated) && !bearerPresented(r):
 		a.clearSessionCookie(w)
 		if a.refreshJar {
 			a.clearRefreshCookie(w)
@@ -238,4 +238,9 @@ func (a *Auth) handleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func bearerPresented(r *http.Request) bool {
+	_, presented := bearerToken(r)
+	return presented
 }

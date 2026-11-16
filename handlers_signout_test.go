@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLogoutEndsACookieSessionAndClearsItsCookie(t *testing.T) {
@@ -35,16 +36,43 @@ func TestLogoutIsTheSameWhenThereIsNothingToEnd(t *testing.T) {
 		t.Fatalf("the first POST /logout = %d", first.Code)
 	}
 	answers := map[string]*httptest.ResponseRecorder{
-		"again":      f.send(t, http.MethodPost, "/logout", nil, f.signed(login)...),
-		"nothing":    f.send(t, http.MethodPost, "/logout", nil),
-		"damaged":    f.send(t, http.MethodPost, "/logout", nil, f.sessionCookie("damaged"), sameOrigin()),
-		"bad bearer": f.send(t, http.MethodPost, "/logout", nil, bearer("not a token")),
+		"again":   f.send(t, http.MethodPost, "/logout", nil, f.signed(login)...),
+		"nothing": f.send(t, http.MethodPost, "/logout", nil),
+		"damaged": f.send(t, http.MethodPost, "/logout", nil, f.sessionCookie("damaged"), sameOrigin()),
 	}
 	for name, rec := range answers {
 		if rec.Code != http.StatusNoContent || rec.Body.Len() != 0 {
 			t.Errorf("%s: POST /logout = %d: %s", name, rec.Code, rec.Body.String())
 		}
 		requireCleared(t, rec, f.a.cookie, "/")
+	}
+}
+
+func TestLogoutDoesNotPretendToEndASessionWhoseTokenIsNoGood(t *testing.T) {
+	f := newAPIFixture(t)
+	tokens, _ := f.signInWithTokens(t)
+	f.clock.advance(11 * time.Minute)
+	for name, token := range map[string]string{"an expired token": tokens.AccessToken, "a damaged token": "not a token"} {
+		t.Run(name, func(t *testing.T) {
+			rec := f.send(t, http.MethodPost, "/logout", nil, bearer(token))
+			f.expectError(t, rec, http.StatusUnauthorized, "unauthenticated")
+			if got := rec.Header().Get("WWW-Authenticate"); got != `Bearer error="invalid_token"` {
+				t.Fatalf("WWW-Authenticate = %q", got)
+			}
+			if got := rec.Header().Values("Set-Cookie"); len(got) != 0 {
+				t.Fatalf("a refused sign-out changes the cookies: %v", got)
+			}
+			if !f.sessionWorks(t, tokens.SessionID) {
+				t.Fatal("the session must go on, and the client has to ask for a new access token first")
+			}
+		})
+	}
+	renewed := decodeBody[tokensBody](t, f.send(t, http.MethodPost, "/token/refresh", map[string]string{"refresh_token": tokens.RefreshToken}))
+	if rec := f.send(t, http.MethodPost, "/logout", nil, bearer(renewed.AccessToken)); rec.Code != http.StatusNoContent {
+		t.Fatalf("POST /logout with a new access token = %d: %s", rec.Code, rec.Body.String())
+	}
+	if f.sessionWorks(t, tokens.SessionID) {
+		t.Fatal("the session must end")
 	}
 }
 
