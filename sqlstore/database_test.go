@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io/fs"
 	"slices"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/sijms/go-ora/v2"
 
 	"github.com/acneism/limb/internal/dbtest"
 	"github.com/acneism/limb/store"
@@ -30,6 +32,7 @@ var dialects = map[string]Dialect{
 	"postgres": Postgres,
 	"mysql":    MySQL,
 	"mariadb":  MariaDB,
+	"oracle":   Oracle,
 }
 
 func eachDatabase(t *testing.T, run func(t *testing.T, d *database), only ...string) {
@@ -594,7 +597,7 @@ func TestMigrateKeepsTheLeaseWhileMigrationsRun(t *testing.T) {
 func TestMigrateIsAbandonedWhenTheLeaseIsTaken(t *testing.T) {
 	eachDatabase(t, func(t *testing.T, d *database) {
 		prefix := d.Prefix(t)
-		d.closedGate(t, prefix)
+		slow := d.closedGate(t, prefix)
 		s := d.slowStore(t, prefix)
 
 		started := time.Now()
@@ -603,6 +606,9 @@ func TestMigrateIsAbandonedWhenTheLeaseIsTaken(t *testing.T) {
 		d.waitForLease(t, prefix)
 		d.waitForSlowStatement(t, prefix)
 		d.setLease(t, prefix, "thief", time.Now().Add(time.Hour))
+		if !d.Cancels {
+			slow.open()
+		}
 		var err error
 		select {
 		case err = <-finished:
@@ -627,7 +633,7 @@ func TestMigrateIsAbandonedWhenTheLeaseIsTaken(t *testing.T) {
 func TestMigrateIsAbandonedWhenTheLeaseCannotBeRenewed(t *testing.T) {
 	eachDatabase(t, func(t *testing.T, d *database) {
 		prefix := d.Prefix(t)
-		d.closedGate(t, prefix)
+		slow := d.closedGate(t, prefix)
 		s := d.slowStore(t, prefix)
 
 		finished := make(chan error, 1)
@@ -635,6 +641,10 @@ func TestMigrateIsAbandonedWhenTheLeaseCannotBeRenewed(t *testing.T) {
 		d.waitForLease(t, prefix)
 		d.waitForSlowStatement(t, prefix)
 		d.exec(t, "DROP TABLE "+prefix+"schema")
+		if !d.Cancels {
+			time.Sleep(3 * s.lockTTL / 2)
+			slow.open()
+		}
 		select {
 		case err := <-finished:
 			if !errors.Is(err, errLeaseLost) {
@@ -642,6 +652,63 @@ func TestMigrateIsAbandonedWhenTheLeaseCannotBeRenewed(t *testing.T) {
 			}
 		case <-time.After(15 * time.Second):
 			t.Fatal("the migration kept running although its lease could not be renewed")
+		}
+	})
+}
+
+func TestTheTimeZoneOfTheProcessDoesNotMatter(t *testing.T) {
+	eachDatabase(t, func(t *testing.T, d *database) {
+		ctx := t.Context()
+		first := d.newStore(t)
+		if err := first.Migrate(ctx); err != nil {
+			t.Fatal(err)
+		}
+		instant := time.Date(2026, 6, 7, 8, 9, 10, 123456000, time.UTC)
+		for n, offset := range []int{9 * 60 * 60, -5 * 60 * 60} {
+			func() {
+				previous := time.Local
+				time.Local = time.FixedZone("elsewhere", offset)
+				defer func() { time.Local = previous }()
+				db, err := sql.Open(d.Driver, d.DSN)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer func() { _ = db.Close() }()
+				s, err := New(db, d.dialect, WithTablePrefix(first.prefix))
+				if err != nil {
+					t.Fatal(err)
+				}
+				userID := fmt.Sprintf("00000000-0000-7000-8000-%012d", n+1)
+				if err = s.Users().Create(ctx, store.User{TenantID: store.DefaultTenant, ID: userID, Status: store.StatusActive, CreatedAt: instant}); err != nil {
+					t.Fatalf("offset %d: %v", offset, err)
+				}
+				sess := store.Session{
+					TenantID: store.DefaultTenant, ID: userID, Kind: store.SessionToken, UserID: userID,
+					CreatedAt: instant, LastSeenAt: instant, ExpiresAt: instant.Add(time.Hour),
+				}
+				if err = s.Sessions().Create(ctx, sess); err != nil {
+					t.Fatalf("offset %d: %v", offset, err)
+				}
+				for moment, want := range map[time.Time]int{instant.Add(time.Hour - time.Second): 1, instant.Add(time.Hour + time.Second): 0} {
+					if list, listErr := s.Sessions().ListByUser(ctx, store.DefaultTenant, userID, moment); listErr != nil || len(list) != want {
+						t.Fatalf("offset %d: ListByUser at %v = %d sessions, %v; want %d", offset, moment, len(list), listErr, want)
+					}
+				}
+				key := fmt.Sprintf("zone-%d", n)
+				for step, hit := range []struct {
+					at   time.Time
+					want int
+				}{
+					{instant, 1},
+					{instant.Add(time.Minute - time.Microsecond), 2},
+					{instant.Add(time.Minute), 1},
+				} {
+					counter, hitErr := s.Attempts().Hit(ctx, key, hit.at, time.Minute)
+					if hitErr != nil || counter.Count != hit.want {
+						t.Fatalf("offset %d: hit %d = %+v, %v; want a count of %d", offset, step+1, counter, hitErr, hit.want)
+					}
+				}
+			}()
 		}
 	})
 }

@@ -4,9 +4,10 @@
 // library.
 //
 // A database takes part when the variable of its engine holds a DSN:
-// LIMB_TEST_POSTGRES_DSN for PostgreSQL, LIMB_TEST_MYSQL_DSN for MySQL and
-// LIMB_TEST_MARIADB_DSN for MariaDB. Tests that use Each run once for every
-// database that is configured, as a subtest named after the engine.
+// LIMB_TEST_POSTGRES_DSN for PostgreSQL, LIMB_TEST_MYSQL_DSN for MySQL,
+// LIMB_TEST_MARIADB_DSN for MariaDB and LIMB_TEST_ORACLE_DSN for Oracle. Tests
+// that use Each run once for every database that is configured, as a subtest
+// named after the engine.
 package dbtest
 
 import (
@@ -32,6 +33,7 @@ type engine struct {
 	variable string
 	driver   string
 	reported int64
+	cancels  bool
 	list     func(ctx context.Context, db *sql.DB, prefix string) ([]string, error)
 	drop     func(table string) string
 }
@@ -42,6 +44,7 @@ var engines = []engine{
 		variable: "LIMB_TEST_POSTGRES_DSN",
 		driver:   "pgx",
 		reported: 1,
+		cancels:  true,
 		list: func(ctx context.Context, db *sql.DB, prefix string) ([]string, error) {
 			return listTables(ctx, db, "SELECT table_name FROM information_schema.tables "+
 				"WHERE table_schema = current_schema() AND left(table_name, $2) = $1 ORDER BY table_name", prefix, len(prefix))
@@ -52,6 +55,7 @@ var engines = []engine{
 		name:     "mysql",
 		variable: "LIMB_TEST_MYSQL_DSN",
 		driver:   "mysql",
+		cancels:  true,
 		list:     listMySQLTables,
 		drop:     func(table string) string { return "DROP TABLE " + table },
 	},
@@ -59,8 +63,20 @@ var engines = []engine{
 		name:     "mariadb",
 		variable: "LIMB_TEST_MARIADB_DSN",
 		driver:   "mysql",
+		cancels:  true,
 		list:     listMySQLTables,
 		drop:     func(table string) string { return "DROP TABLE " + table },
+	},
+	{
+		name:     "oracle",
+		variable: "LIMB_TEST_ORACLE_DSN",
+		driver:   "oracle",
+		reported: 1,
+		list: func(ctx context.Context, db *sql.DB, prefix string) ([]string, error) {
+			return listTables(ctx, db, "SELECT LOWER(table_name) FROM user_tables "+
+				"WHERE SUBSTR(LOWER(table_name), 1, :1) = :2 ORDER BY 1", len(prefix), prefix)
+		},
+		drop: func(table string) string { return "DROP TABLE " + table + " CASCADE CONSTRAINTS PURGE" },
 	},
 }
 
@@ -71,11 +87,14 @@ func listMySQLTables(ctx context.Context, db *sql.DB, prefix string) ([]string, 
 
 // Live is a database that a test runs on.
 type Live struct {
-	// Name is the name of the engine: postgres, mysql or mariadb.
+	// Name is the name of the engine: postgres, mysql, mariadb or oracle.
 	Name string
 
 	// DB is the connection pool of the database.
 	DB *sql.DB
+
+	// Driver is the name of the driver that DB was opened with.
+	Driver string
 
 	// DSN is the data source name that DB was opened with.
 	DSN string
@@ -85,6 +104,11 @@ type Live struct {
 	// report the rows an UPDATE matched, 0 for those that report the rows it
 	// changed.
 	Reported int64
+
+	// Cancels tells whether the driver interrupts a statement that waits for
+	// the server when its context ends. The driver of Oracle does not: it
+	// notices the end of the context between two statements.
+	Cancels bool
 
 	engine engine
 }
@@ -138,7 +162,7 @@ func open(t *testing.T, e engine) *Live {
 	if err = db.PingContext(ctx); err != nil {
 		t.Fatalf("the %s database is not reachable: %v", e.name, err)
 	}
-	return &Live{Name: e.name, DB: db, DSN: dsn, Reported: e.reported, engine: e}
+	return &Live{Name: e.name, DB: db, Driver: e.driver, DSN: dsn, Reported: e.reported, Cancels: e.cancels, engine: e}
 }
 
 // Prefix returns a table prefix that no other test uses and drops the tables

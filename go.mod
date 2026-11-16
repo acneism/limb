@@ -10,6 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/nyaruka/phonenumbers v1.8.1
+	github.com/sijms/go-ora/v2 v2.9.0
 	golang.org/x/crypto v0.59.0
 	golang.org/x/net v0.62.0
 	golang.org/x/text v0.44.0

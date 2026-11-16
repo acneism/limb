@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/sijms/go-ora/v2"
 
 	"github.com/acneism/limb/internal/dbtest"
 	"github.com/acneism/limb/store"
@@ -25,6 +26,7 @@ var dialects = map[string]Dialect{
 	"postgres": Postgres,
 	"mysql":    MySQL,
 	"mariadb":  MariaDB,
+	"oracle":   Oracle,
 }
 
 func eachDatabase(t *testing.T, run func(t *testing.T, d *database), only ...string) {
