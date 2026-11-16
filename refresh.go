@@ -61,6 +61,7 @@ func (a *Auth) refresh(ctx context.Context, refreshToken string) (Tokens, refres
 		current store.ResolvedSession
 	)
 	err = a.store.InTx(ctx, func(ctx context.Context, tx store.Repositories) error {
+		outcome, fresh, current = refreshRefused, newRefresh{}, store.ResolvedSession{}
 		use, useErr := tx.RefreshTokens().Use(ctx, a.tenant, hash, now)
 		if errors.Is(useErr, store.ErrNotFound) {
 			return nil

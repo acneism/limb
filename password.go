@@ -84,6 +84,7 @@ func (a *Auth) replaceSession(ctx context.Context, p Principal, verifiedHash, ne
 	now := a.now().UTC().Truncate(time.Microsecond)
 	var login Login
 	err := a.store.InTx(ctx, func(ctx context.Context, tx store.Repositories) error {
+		login = Login{}
 		user, getErr := tx.Users().Get(ctx, a.tenant, string(p.UserID))
 		if getErr != nil {
 			return getErr
