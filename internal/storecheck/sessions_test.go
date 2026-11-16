@@ -122,6 +122,12 @@ func TestAttemptKeyRules(t *testing.T) {
 		if err := AttemptKey(key); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%s: AttemptKey = %v, want ErrInvalid", name, err)
 		}
+		if ValidAttemptKey(key) {
+			t.Errorf("%s: ValidAttemptKey = true", name)
+		}
+	}
+	if !ValidAttemptKey("k") {
+		t.Error("ValidAttemptKey rejected a good key")
 	}
 }
 
@@ -195,5 +201,16 @@ func TestTimeRule(t *testing.T) {
 	}
 	if err := Time("moment", time.Time{}); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "moment") {
 		t.Fatalf("a zero time = %v, want ErrInvalid that names the field", err)
+	}
+}
+
+func TestWindowRule(t *testing.T) {
+	if err := Window(time.Nanosecond); err != nil {
+		t.Fatalf("a positive window was rejected: %v", err)
+	}
+	for _, window := range []time.Duration{0, -time.Second} {
+		if err := Window(window); !errors.Is(err, ErrInvalid) {
+			t.Fatalf("Window(%v) = %v, want ErrInvalid", window, err)
+		}
 	}
 }

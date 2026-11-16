@@ -50,6 +50,8 @@ type Repositories interface {
 	Sessions() Sessions
 	// RefreshTokens returns the repository of refresh tokens.
 	RefreshTokens() RefreshTokens
+	// Attempts returns the repository of counters of failed attempts.
+	Attempts() Attempts
 }
 
 // Store is the storage that limb runs on. Implementations are safe for

@@ -28,6 +28,12 @@ type Dialect interface {
 	// IsMissingTable reports whether err means that a table does not exist.
 	IsMissingTable(err error) bool
 
+	// IgnoreConflict turns an INSERT statement into one that inserts nothing and
+	// raises no error when the row conflicts with an existing one. Its result is
+	// the number of rows inserted, so the caller learns which of several
+	// concurrent inserts won without a failed statement.
+	IgnoreConflict(insert string) string
+
 	// Migrations returns the files of the schema: bootstrap.sql, which creates
 	// the table that records the schema version and the migration lock, and the
 	// numbered migrations such as 0001_init.sql. They are made of statements
@@ -72,6 +78,10 @@ func (postgres) IsForeignKeyViolation(err error) bool {
 
 func (postgres) IsMissingTable(err error) bool {
 	return sqlState(err) == "42P01"
+}
+
+func (postgres) IgnoreConflict(insert string) string {
+	return insert + " ON CONFLICT DO NOTHING"
 }
 
 func (postgres) Migrations() fs.FS {

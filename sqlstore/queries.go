@@ -14,6 +14,8 @@ const (
 		"s.expires_at, s.revoked_at, u.status, u.blocked_until, u.must_change_password"
 	resolveFrom  = " FROM {sessions} s JOIN {users} u ON u.tenant_id = s.tenant_id AND u.id = s.user_id"
 	tokenColumns = "tenant_id, token_hash, session_id, expires_at, used_at"
+
+	attemptColumns = "attempt_key, window_start, hit_count, blocked_until, next_allowed_at"
 )
 
 type queries struct {
@@ -40,6 +42,14 @@ type queries struct {
 	useToken         string
 	selectToken      string
 	deleteTokens     string
+	insertAttempt    string
+	bumpAttempt      string
+	restartAttempt   string
+	selectAttempt    string
+	holdBlock        string
+	holdDelay        string
+	resetAttempt     string
+	deleteAttempts   string
 	schemaVersion    string
 	probeSchema      string
 	insertSchemaRow  string
@@ -56,6 +66,7 @@ func newQueries(prefix string, d Dialect) queries {
 			"{identifiers}", prefix+"identifiers",
 			"{sessions}", prefix+"sessions",
 			"{refresh_tokens}", prefix+"refresh_tokens",
+			"{attempts}", prefix+"attempts",
 			"{schema}", prefix+"schema",
 		).Replace(template)
 		var out strings.Builder
@@ -100,8 +111,19 @@ func newQueries(prefix string, d Dialect) queries {
 		insertToken: build("INSERT INTO {refresh_tokens} (token_hash, tenant_id, session_id, expires_at) VALUES (?, ?, ?, ?)"),
 		useToken: build("UPDATE {refresh_tokens} SET used_at = ? " +
 			"WHERE tenant_id = ? AND token_hash = ? AND used_at IS NULL"),
-		selectToken:     build("SELECT " + tokenColumns + " FROM {refresh_tokens} WHERE tenant_id = ? AND token_hash = ?"),
-		deleteTokens:    build("DELETE FROM {refresh_tokens} WHERE tenant_id = ? AND expires_at < ?"),
+		selectToken:    build("SELECT " + tokenColumns + " FROM {refresh_tokens} WHERE tenant_id = ? AND token_hash = ?"),
+		deleteTokens:   build("DELETE FROM {refresh_tokens} WHERE tenant_id = ? AND expires_at < ?"),
+		insertAttempt:  d.IgnoreConflict(build("INSERT INTO {attempts} (attempt_key, window_start, hit_count) VALUES (?, ?, 1)")),
+		bumpAttempt:    build("UPDATE {attempts} SET hit_count = hit_count + 1 WHERE attempt_key = ? AND window_start > ?"),
+		restartAttempt: build("UPDATE {attempts} SET hit_count = 1, window_start = ? WHERE attempt_key = ? AND window_start <= ?"),
+		selectAttempt:  build("SELECT " + attemptColumns + " FROM {attempts} WHERE attempt_key = ?"),
+		holdBlock: build("UPDATE {attempts} SET blocked_until = ? " +
+			"WHERE attempt_key = ? AND (blocked_until IS NULL OR blocked_until < ?)"),
+		holdDelay: build("UPDATE {attempts} SET next_allowed_at = ? " +
+			"WHERE attempt_key = ? AND (next_allowed_at IS NULL OR next_allowed_at < ?)"),
+		resetAttempt: build("DELETE FROM {attempts} WHERE attempt_key = ?"),
+		deleteAttempts: build("DELETE FROM {attempts} WHERE window_start < ? " +
+			"AND (blocked_until IS NULL OR blocked_until < ?) AND (next_allowed_at IS NULL OR next_allowed_at < ?)"),
 		schemaVersion:   build("SELECT version FROM {schema} WHERE id = 1"),
 		probeSchema:     build("SELECT 1 FROM {schema} WHERE id = 1"),
 		insertSchemaRow: build("INSERT INTO {schema} (id, version, applied_at) VALUES (1, 0, ?)"),

@@ -2,6 +2,7 @@ package storecheck
 
 import (
 	"strings"
+	"time"
 
 	"github.com/acneism/limb/store"
 )
@@ -90,6 +91,17 @@ func AttemptKey(key string) error {
 		return invalid("attempt key is longer than %d bytes", maxKeyLength)
 	}
 	return nil
+}
+
+func Window(window time.Duration) error {
+	if window <= 0 {
+		return invalid("the counting window must be positive")
+	}
+	return nil
+}
+
+func ValidAttemptKey(key string) bool {
+	return AttemptKey(key) == nil
 }
 
 func NewSigningKey(k store.SigningKey) error {

@@ -176,6 +176,9 @@ func TestPostgresDialect(t *testing.T) {
 			}
 		})
 	}
+	if got := Postgres.IgnoreConflict("INSERT INTO t (a) VALUES ($1)"); got != "INSERT INTO t (a) VALUES ($1) ON CONFLICT DO NOTHING" {
+		t.Fatalf("IgnoreConflict = %q", got)
+	}
 	entries, err := fs.ReadDir(Postgres.Migrations(), ".")
 	if err != nil || len(entries) < 2 {
 		t.Fatalf("the embedded migrations are missing: %v, %v", entries, err)
@@ -198,7 +201,9 @@ func TestQueriesUseThePrefixAndTheDialectPlaceholders(t *testing.T) {
 		"touchSession": {q.touchSession, 4}, "revokeSession": {q.revokeSession, 4}, "revokeAll": {q.revokeAll, 3},
 		"revokeAllExcept": {q.revokeAllExcept, 4}, "listSessions": {q.listSessions, 3}, "deleteSessions": {q.deleteSessions, 4},
 		"insertToken": {q.insertToken, 4}, "useToken": {q.useToken, 3}, "selectToken": {q.selectToken, 2},
-		"deleteTokens": {q.deleteTokens, 2},
+		"deleteTokens": {q.deleteTokens, 2}, "insertAttempt": {q.insertAttempt, 2}, "bumpAttempt": {q.bumpAttempt, 2},
+		"restartAttempt": {q.restartAttempt, 3}, "selectAttempt": {q.selectAttempt, 1}, "holdBlock": {q.holdBlock, 3},
+		"holdDelay": {q.holdDelay, 3}, "resetAttempt": {q.resetAttempt, 1}, "deleteAttempts": {q.deleteAttempts, 3},
 	}
 	marker := regexp.MustCompile(`\$\d+`)
 	for name, tc := range want {

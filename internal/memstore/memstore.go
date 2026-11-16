@@ -22,6 +22,7 @@ type data struct {
 	idents   map[identKey]store.Identifier
 	sessions map[sessionKey]store.Session
 	tokens   map[string]store.RefreshToken
+	attempts map[string]store.Attempt
 }
 
 func newData() *data {
@@ -30,6 +31,7 @@ func newData() *data {
 		idents:   map[identKey]store.Identifier{},
 		sessions: map[sessionKey]store.Session{},
 		tokens:   map[string]store.RefreshToken{},
+		attempts: map[string]store.Attempt{},
 	}
 }
 
@@ -39,6 +41,7 @@ func (d *data) clone() *data {
 		idents:   maps.Clone(d.idents),
 		sessions: maps.Clone(d.sessions),
 		tokens:   maps.Clone(d.tokens),
+		attempts: maps.Clone(d.attempts),
 	}
 }
 
@@ -68,6 +71,10 @@ func (s *Store) Sessions() store.Sessions {
 
 func (s *Store) RefreshTokens() store.RefreshTokens {
 	return refreshTokens{d: func() *data { return s.data }, mu: &s.mu}
+}
+
+func (s *Store) Attempts() store.Attempts {
+	return attempts{d: func() *data { return s.data }, mu: &s.mu}
 }
 
 func (s *Store) InTx(ctx context.Context, fn func(ctx context.Context, tx store.Repositories) error) error {
@@ -122,6 +129,10 @@ func (r txRepositories) Sessions() store.Sessions {
 
 func (r txRepositories) RefreshTokens() store.RefreshTokens {
 	return refreshTokens{d: func() *data { return r.d }}
+}
+
+func (r txRepositories) Attempts() store.Attempts {
+	return attempts{d: func() *data { return r.d }}
 }
 
 type users struct {

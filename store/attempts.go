@@ -53,7 +53,9 @@ type Attempts interface {
 	// Reset removes the counter, and does nothing if there is none.
 	Reset(ctx context.Context, key string) error
 
-	// DeleteStale removes the counters whose window and holds all ended before
-	// the given time and returns how many it removed.
+	// DeleteStale removes the counters whose window began before the given time
+	// and whose holds, if they have any, ended before it, and returns how many it
+	// removed. The store does not know how long a window lasts, so the caller
+	// passes a time that is older than the longest window it uses.
 	DeleteStale(ctx context.Context, before time.Time) (int, error)
 }

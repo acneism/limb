@@ -129,6 +129,11 @@ func (s *Store) RefreshTokens() store.RefreshTokens {
 	return refreshTokens{s: s, x: s.db}
 }
 
+// Attempts returns the repository of counters of failed attempts.
+func (s *Store) Attempts() store.Attempts {
+	return attempts{s: s, x: s.db}
+}
+
 type repositories struct {
 	s *Store
 	x executor
@@ -148,6 +153,10 @@ func (r repositories) Sessions() store.Sessions {
 
 func (r repositories) RefreshTokens() store.RefreshTokens {
 	return refreshTokens(r)
+}
+
+func (r repositories) Attempts() store.Attempts {
+	return attempts(r)
 }
 
 // InTx runs fn in a database transaction with the default isolation level. The
