@@ -102,9 +102,10 @@ func testSigningKeyInvalidRecords(t *testing.T, s store.Store) {
 	ctx := t.Context()
 	edits := map[string]func(*store.SigningKey){
 		"no kid":            func(k *store.SigningKey) { k.KID = "" },
-		"long kid":          func(k *store.SigningKey) { k.KID = strings.Repeat("k", 129) },
+		"long kid":          func(k *store.SigningKey) { k.KID = strings.Repeat("k", store.MaxKIDLength+1) },
 		"NUL in the kid":    func(k *store.SigningKey) { k.KID = "a\x00" },
 		"no algorithm":      func(k *store.SigningKey) { k.Algorithm = "" },
+		"long algorithm":    func(k *store.SigningKey) { k.Algorithm = strings.Repeat("a", store.MaxAlgorithmLength+1) },
 		"zero generation":   func(k *store.SigningKey) { k.Generation = 0 },
 		"negative":          func(k *store.SigningKey) { k.Generation = -5 },
 		"no private key":    func(k *store.SigningKey) { k.PrivateKey = nil },
@@ -124,7 +125,8 @@ func testSigningKeyInvalidRecords(t *testing.T, s store.Store) {
 		t.Fatalf("a rejected key was stored: %v", list)
 	}
 	longest := newSigningKey(2, 2)
-	longest.KID = strings.Repeat("k", 128)
+	longest.KID = strings.Repeat("k", store.MaxKIDLength)
+	longest.Algorithm = strings.Repeat("a", store.MaxAlgorithmLength)
 	mustAddKey(t, s, longest)
 }
 

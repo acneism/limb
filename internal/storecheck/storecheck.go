@@ -23,10 +23,10 @@ func NewUser(u store.User) error {
 }
 
 func User(u store.User) error {
-	if err := required("user tenant_id", u.TenantID); err != nil {
+	if err := required("user tenant_id", u.TenantID, store.MaxTenantIDLength); err != nil {
 		return err
 	}
-	if err := required("user id", u.ID); err != nil {
+	if err := required("user id", u.ID, store.MaxIDLength); err != nil {
 		return err
 	}
 	switch u.Status {
@@ -34,22 +34,25 @@ func User(u store.User) error {
 	default:
 		return invalid("user status %q is unknown", string(u.Status))
 	}
-	if err := text("user password_hash", u.PasswordHash); err != nil {
+	if err := optional("user password_hash", u.PasswordHash, store.MaxPasswordHashLength); err != nil {
 		return err
 	}
-	return text("user blocked_reason", u.BlockedReason)
+	return optional("user blocked_reason", u.BlockedReason, store.MaxBlockedReasonLength)
 }
 
 func Identifier(i store.Identifier) error {
-	fields := []struct{ name, value string }{
-		{"identifier tenant_id", i.TenantID},
-		{"identifier type", i.Type},
-		{"identifier value", i.Value},
-		{"identifier display_value", i.DisplayValue},
-		{"identifier user_id", i.UserID},
+	fields := []struct {
+		name, value string
+		limit       int
+	}{
+		{"identifier tenant_id", i.TenantID, store.MaxTenantIDLength},
+		{"identifier type", i.Type, store.MaxIdentifierTypeLength},
+		{"identifier value", i.Value, store.MaxIdentifierValueLength},
+		{"identifier display_value", i.DisplayValue, store.MaxDisplayValueLength},
+		{"identifier user_id", i.UserID, store.MaxIDLength},
 	}
 	for _, f := range fields {
-		if err := required(f.name, f.value); err != nil {
+		if err := required(f.name, f.value, f.limit); err != nil {
 			return err
 		}
 	}
@@ -72,23 +75,26 @@ func CompareIdentifiers(a, b store.Identifier) int {
 
 func ValidText(values ...string) bool {
 	for _, v := range values {
-		if !utf8.ValidString(v) || strings.IndexByte(v, 0) >= 0 {
+		if !utf8.ValidString(v) || strings.IndexByte(v, 0) >= 0 || len(v) > store.MaxIdentifierValueLength {
 			return false
 		}
 	}
 	return true
 }
 
-func required(name, value string) error {
+func required(name, value string, limit int) error {
 	if value == "" {
 		return invalid("%s is required", name)
 	}
-	return text(name, value)
+	return optional(name, value, limit)
 }
 
-func text(name, value string) error {
-	if !utf8.ValidString(value) || strings.IndexByte(value, 0) >= 0 {
+func optional(name, value string, limit int) error {
+	switch {
+	case !utf8.ValidString(value) || strings.IndexByte(value, 0) >= 0:
 		return invalid("%s is not valid text", name)
+	case len(value) > limit:
+		return invalid("%s is longer than %d bytes", name, limit)
 	}
 	return nil
 }

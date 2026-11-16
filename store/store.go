@@ -9,6 +9,11 @@
 // Times are stored in UTC with microsecond precision, and an unset time is the
 // zero time.Time. Strings are never stored empty: an empty optional string
 // means that there is no value.
+//
+// Every text has a longest length in bytes, given by the Max constants of the
+// package, so that a record that one store accepts is accepted by all of them.
+// A record that is over a limit is invalid, and a lookup by a value that is
+// over a limit finds nothing.
 package store
 
 import (

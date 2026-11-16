@@ -17,7 +17,7 @@ const attemptWindow = 15 * time.Minute
 var attemptBase = time.Date(2026, 7, 8, 9, 10, 11, 123456789, time.UTC)
 
 func attemptKey(n int) string {
-	return strings.Repeat("k", 40) + id(n)
+	return strings.Repeat("k", 20) + id(n)
 }
 
 func mustHit(t *testing.T, s store.Store, key string, at time.Time, window time.Duration) store.Attempt {
@@ -275,7 +275,7 @@ func testAttemptsInvalidInput(t *testing.T, s store.Store) {
 		"a NUL byte":    func() error { _, err := s.Attempts().Hit(ctx, "a\x00", attemptBase, attemptWindow); return err },
 		"invalid UTF-8": func() error { _, err := s.Attempts().Hit(ctx, "\xff", attemptBase, attemptWindow); return err },
 		"a long key": func() error {
-			_, err := s.Attempts().Hit(ctx, strings.Repeat("k", 256), attemptBase, attemptWindow)
+			_, err := s.Attempts().Hit(ctx, strings.Repeat("k", store.MaxAttemptKeyLength+1), attemptBase, attemptWindow)
 			return err
 		},
 		"no time":        func() error { _, err := s.Attempts().Hit(ctx, key, time.Time{}, attemptWindow); return err },
@@ -289,7 +289,7 @@ func testAttemptsInvalidInput(t *testing.T, s store.Store) {
 	if list, err := s.Attempts().Get(ctx, key); err != nil || len(list) != 0 {
 		t.Fatalf("a rejected Hit must not store a counter: %v, %v", list, err)
 	}
-	longest := strings.Repeat("k", 255)
+	longest := strings.Repeat("k", store.MaxAttemptKeyLength)
 	if counter := mustHit(t, s, longest, attemptBase, attemptWindow); counter.Key != longest || counter.Count != 1 {
 		t.Fatalf("the longest allowed key = %+v", counter)
 	}

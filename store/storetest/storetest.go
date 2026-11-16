@@ -49,6 +49,14 @@ var cases = []testCase{
 	{name: "Identifiers/deleted with the user", run: testIdentifiersFollowTheUser},
 	{name: "Identifiers/concurrent Add of one value", run: testConcurrentAdd},
 	{name: "Tenants/isolation", run: testTenantIsolation},
+	{name: "Limits/the longest values are stored", run: testLongestValuesAreStored},
+	{name: "Limits/the longest Argon2id hash is stored", run: testLongestArgon2idHash},
+	{name: "Limits/values over the limit are invalid", run: testValuesOverTheLimitAreInvalid},
+	{name: "Limits/signing keys over the limit are invalid", run: testSigningKeyMaterialLimit},
+	{name: "Limits/long values are not found", run: testLongValuesAreNotFound},
+	{name: "Bytes/keys are compared byte by byte", run: testKeysAreComparedByteByByte},
+	{name: "Bytes/signing keys are stored exactly", run: testBinaryValuesAreExact},
+	{name: "Bytes/hashes are stored exactly", run: testHashesAreExact},
 	{name: "Sessions/lifecycle", run: testSessionLifecycle},
 	{name: "Sessions/times are UTC with microseconds", run: testSessionTimes},
 	{name: "Sessions/conflicts and missing users", run: testSessionConflictsAndMissingUsers},
@@ -683,7 +691,7 @@ func testBytewiseValues(t *testing.T, s store.Store) {
 	values := []string{
 		"alice", "Alice", "ALICE", "alice ", " alice", "alice\u00a0", "alice\t",
 		"café", "cafe\u0301", "straße", "strasse", "\u0430dmin", "admin",
-		"ǅ", "ǆ", "a_b", "a%b", "axb", "a\\b", "100%", "x\u202e", strings.Repeat("y", 1000),
+		"ǅ", "ǆ", "a_b", "a%b", "axb", "a\\b", "100%", "x\u202e", strings.Repeat("y", store.MaxIdentifierValueLength),
 	}
 	for _, v := range values {
 		mustAdd(t, s, newIdentifier(tenantA, "nick", v, id(1)))

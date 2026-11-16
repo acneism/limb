@@ -7,29 +7,23 @@ import (
 	"github.com/acneism/limb/store"
 )
 
-const (
-	maxKeyLength    = 255
-	maxKIDLength    = 128
-	maxAlgorithmLen = 32
-)
-
 func NewSession(s store.Session) error {
 	for _, f := range []struct{ name, value string }{
 		{"session tenant_id", s.TenantID},
 		{"session id", s.ID},
 		{"session user_id", s.UserID},
 	} {
-		if err := required(f.name, f.value); err != nil {
+		if err := required(f.name, f.value, store.MaxIDLength); err != nil {
 			return err
 		}
 	}
 	if err := sessionSecret(s); err != nil {
 		return err
 	}
-	if err := optionalText("session ip", s.IP, store.MaxIPLength); err != nil {
+	if err := optional("session ip", s.IP, store.MaxIPLength); err != nil {
 		return err
 	}
-	if err := optionalText("session user_agent", s.UserAgent, store.MaxUserAgentLength); err != nil {
+	if err := optional("session user_agent", s.UserAgent, store.MaxUserAgentLength); err != nil {
 		return err
 	}
 	switch {
@@ -62,10 +56,10 @@ func sessionSecret(s store.Session) error {
 }
 
 func NewRefreshToken(t store.RefreshToken) error {
-	if err := required("refresh token tenant_id", t.TenantID); err != nil {
+	if err := required("refresh token tenant_id", t.TenantID, store.MaxTenantIDLength); err != nil {
 		return err
 	}
-	if err := required("refresh token session_id", t.SessionID); err != nil {
+	if err := required("refresh token session_id", t.SessionID, store.MaxIDLength); err != nil {
 		return err
 	}
 	switch {
@@ -84,13 +78,7 @@ func ValidHash(hash []byte) bool {
 }
 
 func AttemptKey(key string) error {
-	if err := required("attempt key", key); err != nil {
-		return err
-	}
-	if len(key) > maxKeyLength {
-		return invalid("attempt key is longer than %d bytes", maxKeyLength)
-	}
-	return nil
+	return required("attempt key", key, store.MaxAttemptKeyLength)
 }
 
 func Window(window time.Duration) error {
@@ -105,35 +93,23 @@ func ValidAttemptKey(key string) bool {
 }
 
 func NewSigningKey(k store.SigningKey) error {
-	if err := required("signing key kid", k.KID); err != nil {
+	if err := required("signing key kid", k.KID, store.MaxKIDLength); err != nil {
 		return err
 	}
-	if err := required("signing key algorithm", k.Algorithm); err != nil {
+	if err := required("signing key algorithm", k.Algorithm, store.MaxAlgorithmLength); err != nil {
 		return err
 	}
 	switch {
-	case len(k.KID) > maxKIDLength:
-		return invalid("signing key kid is longer than %d bytes", maxKIDLength)
-	case len(k.Algorithm) > maxAlgorithmLen:
-		return invalid("signing key algorithm is longer than %d bytes", maxAlgorithmLen)
 	case k.Generation < 1:
 		return invalid("signing key generation must be positive")
 	case len(k.PrivateKey) == 0 || len(k.PublicKey) == 0:
 		return invalid("signing key needs both its private and its public key")
+	case len(k.PrivateKey) > store.MaxKeyMaterialLength || len(k.PublicKey) > store.MaxKeyMaterialLength:
+		return invalid("a signing key is longer than %d bytes", store.MaxKeyMaterialLength)
 	case k.CreatedAt.IsZero():
 		return invalid("signing key created_at is required")
 	case !k.RetireAfter.IsZero():
 		return invalid("a new signing key cannot be retired")
-	}
-	return nil
-}
-
-func optionalText(name, value string, limit int) error {
-	if err := text(name, value); err != nil {
-		return err
-	}
-	if len(value) > limit {
-		return invalid("%s is longer than %d bytes", name, limit)
 	}
 	return nil
 }

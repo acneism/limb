@@ -5,17 +5,6 @@ import (
 	"time"
 )
 
-const (
-	// SecretHashLength is the length in bytes of the hash of a secret: SHA-256.
-	SecretHashLength = 32
-
-	// MaxIPLength is the longest text form of a client address that is stored.
-	MaxIPLength = 45
-
-	// MaxUserAgentLength is the longest user agent that is stored, in bytes.
-	MaxUserAgentLength = 512
-)
-
 // SessionKind tells how the client of a session proves that it owns it.
 type SessionKind string
 

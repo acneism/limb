@@ -92,6 +92,97 @@ func TestIdentifierRules(t *testing.T) {
 	}
 }
 
+func TestFieldLimitsCountBytes(t *testing.T) {
+	user := func(edit func(*store.User, string)) func(string) error {
+		return func(v string) error {
+			u := validUser()
+			edit(&u, v)
+			return NewUser(u)
+		}
+	}
+	identifier := func(edit func(*store.Identifier, string)) func(string) error {
+		return func(v string) error {
+			i := validIdentifier()
+			edit(&i, v)
+			return Identifier(i)
+		}
+	}
+	session := func(edit func(*store.Session, string)) func(string) error {
+		return func(v string) error {
+			s := validCookieSession()
+			edit(&s, v)
+			return NewSession(s)
+		}
+	}
+	refreshToken := func(edit func(*store.RefreshToken, string)) func(string) error {
+		return func(v string) error {
+			r := store.RefreshToken{TenantID: "default", Hash: make([]byte, store.SecretHashLength), SessionID: "s1", ExpiresAt: time.Now()}
+			edit(&r, v)
+			return NewRefreshToken(r)
+		}
+	}
+	signingKey := func(edit func(*store.SigningKey, string)) func(string) error {
+		return func(v string) error {
+			k := store.SigningKey{
+				KID: "kid-1", Algorithm: "EdDSA", Generation: 1, PrivateKey: []byte{1}, PublicKey: []byte{2}, CreatedAt: time.Now(),
+			}
+			edit(&k, v)
+			return NewSigningKey(k)
+		}
+	}
+	fields := []struct {
+		name  string
+		check func(string) error
+		limit int
+	}{
+		{"user tenant_id", user(func(u *store.User, v string) { u.TenantID = v }), store.MaxTenantIDLength},
+		{"user id", user(func(u *store.User, v string) { u.ID = v }), store.MaxIDLength},
+		{"user password_hash", user(func(u *store.User, v string) { u.PasswordHash = v }), store.MaxPasswordHashLength},
+		{"user blocked_reason", user(func(u *store.User, v string) { u.BlockedReason = v }), store.MaxBlockedReasonLength},
+		{"identifier tenant_id", identifier(func(i *store.Identifier, v string) { i.TenantID = v }), store.MaxTenantIDLength},
+		{"identifier type", identifier(func(i *store.Identifier, v string) { i.Type = v }), store.MaxIdentifierTypeLength},
+		{"identifier value", identifier(func(i *store.Identifier, v string) { i.Value = v }), store.MaxIdentifierValueLength},
+		{"identifier display_value", identifier(func(i *store.Identifier, v string) { i.DisplayValue = v }), store.MaxDisplayValueLength},
+		{"identifier user_id", identifier(func(i *store.Identifier, v string) { i.UserID = v }), store.MaxIDLength},
+		{"session tenant_id", session(func(s *store.Session, v string) { s.TenantID = v }), store.MaxTenantIDLength},
+		{"session id", session(func(s *store.Session, v string) { s.ID = v }), store.MaxIDLength},
+		{"session user_id", session(func(s *store.Session, v string) { s.UserID = v }), store.MaxIDLength},
+		{"session ip", session(func(s *store.Session, v string) { s.IP = v }), store.MaxIPLength},
+		{"session user_agent", session(func(s *store.Session, v string) { s.UserAgent = v }), store.MaxUserAgentLength},
+		{"refresh token tenant_id", refreshToken(func(r *store.RefreshToken, v string) { r.TenantID = v }), store.MaxTenantIDLength},
+		{"refresh token session_id", refreshToken(func(r *store.RefreshToken, v string) { r.SessionID = v }), store.MaxIDLength},
+		{"attempt key", AttemptKey, store.MaxAttemptKeyLength},
+		{"signing key kid", signingKey(func(k *store.SigningKey, v string) { k.KID = v }), store.MaxKIDLength},
+		{"signing key algorithm", signingKey(func(k *store.SigningKey, v string) { k.Algorithm = v }), store.MaxAlgorithmLength},
+	}
+	for _, f := range fields {
+		t.Run(f.name, func(t *testing.T) {
+			accepted := map[string]string{
+				"the limit in ASCII":                strings.Repeat("a", f.limit),
+				"the limit in two byte characters":  strings.Repeat("é", f.limit/2),
+				"the limit in four byte characters": strings.Repeat("\U0001F600", f.limit/4),
+			}
+			for name, value := range accepted {
+				if err := f.check(value); err != nil {
+					t.Errorf("%s (%d bytes) was rejected: %v", name, len(value), err)
+				}
+			}
+			rejected := map[string]string{
+				"one byte over the limit":                     strings.Repeat("a", f.limit+1),
+				"two byte characters over the limit":          strings.Repeat("é", f.limit/2+1),
+				"four byte characters over the limit":         strings.Repeat("\U0001F600", f.limit/4+1),
+				"characters that would fit if counted as one": strings.Repeat("я", f.limit),
+			}
+			for name, value := range rejected {
+				err := f.check(value)
+				if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "bytes") {
+					t.Errorf("%s (%d bytes): %v, want ErrInvalid that names the limit", name, len(value), err)
+				}
+			}
+		})
+	}
+}
+
 func TestValidText(t *testing.T) {
 	for _, ok := range []string{"", "plain", "пароль", "tab\tand\nnewline", "emoji \U0001F600"} {
 		if !ValidText(ok) {
@@ -105,6 +196,28 @@ func TestValidText(t *testing.T) {
 	}
 	if !ValidText() || !ValidText("a", "b") || ValidText("a", "b\x00") {
 		t.Error("ValidText must require every value to be valid")
+	}
+}
+
+func TestValidTextHasALimitInBytes(t *testing.T) {
+	longest := store.MaxIdentifierValueLength
+	for name, ok := range map[string]string{
+		"ASCII":                strings.Repeat("a", longest),
+		"two byte characters":  strings.Repeat("é", longest/2),
+		"four byte characters": strings.Repeat("\U0001F600", longest/4),
+	} {
+		if !ValidText(ok) || !ValidText("a", ok) {
+			t.Errorf("%s (%d bytes) must be valid text", name, len(ok))
+		}
+	}
+	for name, bad := range map[string]string{
+		"ASCII":                strings.Repeat("a", longest+1),
+		"two byte characters":  strings.Repeat("é", longest/2+1),
+		"four byte characters": strings.Repeat("\U0001F600", longest/4+1),
+	} {
+		if ValidText(bad) || ValidText("a", bad) {
+			t.Errorf("%s (%d bytes) must not be valid text", name, len(bad))
+		}
 	}
 }
 

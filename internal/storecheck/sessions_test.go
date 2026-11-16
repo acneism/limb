@@ -111,13 +111,13 @@ func TestValidHash(t *testing.T) {
 }
 
 func TestAttemptKeyRules(t *testing.T) {
-	for _, key := range []string{"k", strings.Repeat("k", maxKeyLength)} {
+	for _, key := range []string{"k", strings.Repeat("k", store.MaxAttemptKeyLength)} {
 		if err := AttemptKey(key); err != nil {
 			t.Fatalf("AttemptKey(%d bytes) failed: %v", len(key), err)
 		}
 	}
 	for name, key := range map[string]string{
-		"empty": "", "too long": strings.Repeat("k", maxKeyLength+1), "NUL": "a\x00", "bad UTF-8": "\xff",
+		"empty": "", "too long": strings.Repeat("k", store.MaxAttemptKeyLength+1), "NUL": "a\x00", "bad UTF-8": "\xff",
 	} {
 		if err := AttemptKey(key); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%s: AttemptKey = %v, want ErrInvalid", name, err)
@@ -140,14 +140,16 @@ func TestSigningKeyRules(t *testing.T) {
 	}
 	cases := map[string]func(*store.SigningKey){
 		"no kid":              func(k *store.SigningKey) { k.KID = "" },
-		"long kid":            func(k *store.SigningKey) { k.KID = strings.Repeat("k", maxKIDLength+1) },
+		"long kid":            func(k *store.SigningKey) { k.KID = strings.Repeat("k", store.MaxKIDLength+1) },
 		"NUL in the kid":      func(k *store.SigningKey) { k.KID = "a\x00" },
 		"no algorithm":        func(k *store.SigningKey) { k.Algorithm = "" },
-		"long algorithm":      func(k *store.SigningKey) { k.Algorithm = strings.Repeat("a", maxAlgorithmLen+1) },
+		"long algorithm":      func(k *store.SigningKey) { k.Algorithm = strings.Repeat("a", store.MaxAlgorithmLength+1) },
 		"zero generation":     func(k *store.SigningKey) { k.Generation = 0 },
 		"negative":            func(k *store.SigningKey) { k.Generation = -1 },
 		"no private key":      func(k *store.SigningKey) { k.PrivateKey = nil },
 		"no public key":       func(k *store.SigningKey) { k.PublicKey = []byte{} },
+		"long private key":    func(k *store.SigningKey) { k.PrivateKey = make([]byte, store.MaxKeyMaterialLength+1) },
+		"long public key":     func(k *store.SigningKey) { k.PublicKey = make([]byte, store.MaxKeyMaterialLength+1) },
 		"no creation time":    func(k *store.SigningKey) { k.CreatedAt = time.Time{} },
 		"already retired":     func(k *store.SigningKey) { k.RetireAfter = time.Now() },
 		"bad UTF-8 algorithm": func(k *store.SigningKey) { k.Algorithm = "\xff" },
@@ -162,8 +164,10 @@ func TestSigningKeyRules(t *testing.T) {
 		})
 	}
 	longest := valid
-	longest.KID = strings.Repeat("k", maxKIDLength)
-	longest.Algorithm = strings.Repeat("a", maxAlgorithmLen)
+	longest.KID = strings.Repeat("k", store.MaxKIDLength)
+	longest.Algorithm = strings.Repeat("a", store.MaxAlgorithmLength)
+	longest.PrivateKey = make([]byte, store.MaxKeyMaterialLength)
+	longest.PublicKey = make([]byte, store.MaxKeyMaterialLength)
 	if err := NewSigningKey(longest); err != nil {
 		t.Fatalf("the longest allowed kid and algorithm were rejected: %v", err)
 	}
