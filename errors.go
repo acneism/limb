@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 var (
@@ -20,7 +21,47 @@ var (
 	// ErrIdentifierTaken is returned by Register when a value is already used
 	// by another user. The error text names the type of the identifier.
 	ErrIdentifierTaken = errors.New("limb: identifier is taken")
+
+	// ErrUnauthenticated is returned when a request has no valid session or
+	// token. It is the same whatever the reason is: no cookie, a damaged or
+	// expired token, a session that was ended, a user who is blocked or deleted.
+	ErrUnauthenticated = errors.New("limb: unauthenticated")
+
+	// ErrRateLimited is the error that matches a *RateLimitError, which says
+	// when to try again. Compare with errors.Is.
+	ErrRateLimited = errors.New("limb: too many attempts")
+
+	// ErrPasswordChangeRequired is returned when the user must choose a new
+	// password before doing anything else.
+	ErrPasswordChangeRequired = errors.New("limb: password change required")
+
+	// ErrCSRF is returned when a request that changes data with a cookie session
+	// does not pass the check that it comes from the page of the application.
+	ErrCSRF = errors.New("limb: cross-site request check failed")
+
+	// ErrSessionNotFound is returned when the user has no active session with the
+	// given ID. It is the same for a session that belongs to someone else.
+	ErrSessionNotFound = errors.New("limb: session not found")
 )
+
+// RateLimitError reports that there were too many failed attempts and says how
+// long to wait. It matches ErrRateLimited with errors.Is. Functions return it as
+// a *RateLimitError, so use errors.As with a variable of that type.
+type RateLimitError struct {
+	// RetryAfter is how long to wait before the next attempt, rounded up to a
+	// whole second.
+	RetryAfter time.Duration
+}
+
+// Error implements the error interface.
+func (e *RateLimitError) Error() string {
+	return fmt.Sprintf("limb: too many attempts, try again in %s", e.RetryAfter)
+}
+
+// Is makes a *RateLimitError match ErrRateLimited.
+func (e *RateLimitError) Is(target error) bool {
+	return target == ErrRateLimited
+}
 
 // ValidationError reports a value that was rejected. Field is the name of the
 // identifier type, or "identifiers" when the set of values as a whole is wrong,
