@@ -29,6 +29,10 @@ const (
 	maxKeyLength     = 128
 )
 
+// MaxEncodedLength is the length in bytes of the longest encoded hash that a
+// Hasher produces: the one with the largest parameters that it accepts.
+const MaxEncodedLength = 292
+
 var (
 	ErrInvalidHash = errors.New("password: invalid hash")
 	ErrTooLong     = errors.New("password: password is too long")

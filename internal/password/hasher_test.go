@@ -392,6 +392,48 @@ func TestDecodeRoundTrip(t *testing.T) {
 	}
 }
 
+func TestLongestEncodedHash(t *testing.T) {
+	largest := Params{
+		Memory: maxMemory, Iterations: maxIterations, Parallelism: maxParallelism,
+		SaltLength: maxSaltLength, KeyLength: maxKeyLength,
+	}
+	if err := largest.validate(); err != nil {
+		t.Fatalf("the largest parameters are not valid: %v", err)
+	}
+	encoded := encode(largest, make([]byte, maxSaltLength), make([]byte, maxKeyLength))
+	if len(encoded) != MaxEncodedLength {
+		t.Fatalf("the longest encoded hash has %d bytes, MaxEncodedLength says %d", len(encoded), MaxEncodedLength)
+	}
+	if params, _, _, err := decode(encoded); err != nil || params != largest {
+		t.Fatalf("the longest encoded hash does not decode: %+v, %v", params, err)
+	}
+}
+
+func TestNoEncodedHashIsLongerThanTheMaximum(t *testing.T) {
+	memories := []uint32{minMemoryPerLane * maxParallelism, 9, 1000, 19456, maxMemory}
+	iterations := []uint32{1, 9, 10, maxIterations}
+	parallelisms := []uint8{1, 9, 10, maxParallelism}
+	salts := []uint32{minSaltLength, 16, maxSaltLength}
+	keys := []uint32{minKeyLength, 32, maxKeyLength}
+	for _, memory := range memories {
+		for _, iteration := range iterations {
+			for _, parallelism := range parallelisms {
+				for _, salt := range salts {
+					for _, key := range keys {
+						p := Params{Memory: memory, Iterations: iteration, Parallelism: parallelism, SaltLength: salt, KeyLength: key}
+						if p.validate() != nil {
+							continue
+						}
+						if n := len(encode(p, make([]byte, salt), make([]byte, key))); n > MaxEncodedLength {
+							t.Fatalf("%+v encodes to %d bytes, more than MaxEncodedLength", p, n)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 func FuzzHashVerify(f *testing.F) {
 	h := newTestHasher(f, Params{Memory: 8, Iterations: 1, Parallelism: 1, SaltLength: 8, KeyLength: 16}, 4)
 	for _, seed := range []string{"", "a", "password", "пароль", "ｐａｓｓ", "\x00\xff", strings.Repeat("x", 300), "ﬁ"} {
