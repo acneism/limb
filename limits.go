@@ -16,6 +16,7 @@ import (
 )
 
 const (
+	maxRawLoginInput = 1024
 	maxRawLoginKey   = 256
 	maxDelayExponent = 6
 	recordTimeout    = 5 * time.Second
@@ -141,11 +142,15 @@ func (a *Auth) accountLabel(login string) (string, string) {
 }
 
 func rawLoginKey(login string) string {
-	text := strings.ToLower(norm.NFKC.String(strings.TrimSpace(login)))
-	if len(text) <= maxRawLoginKey {
+	text := strings.ToLower(norm.NFKC.String(cutAtRune(strings.TrimSpace(cutAtRune(login, maxRawLoginInput)), maxRawLoginInput)))
+	return cutAtRune(text, maxRawLoginKey)
+}
+
+func cutAtRune(text string, limit int) string {
+	if len(text) <= limit {
 		return text
 	}
-	cut := maxRawLoginKey
+	cut := limit
 	for cut > 0 && !utf8.RuneStart(text[cut]) {
 		cut--
 	}

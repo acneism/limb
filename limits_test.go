@@ -370,6 +370,12 @@ func TestRawLoginKey(t *testing.T) {
 			t.Errorf("rawLoginKey(%q) = %q, want %q", in, got, want)
 		}
 	}
+	if key := rawLoginKey(strings.Repeat("a", 5<<20)); key != strings.Repeat("a", maxRawLoginKey) {
+		t.Fatalf("a login of 5 MiB must be cut before it is normalized, got a key of %d bytes", len(key))
+	}
+	if key := rawLoginKey(strings.Repeat(" ", 3000) + "Tail"); key != "" {
+		t.Fatalf("only the first %d bytes of a login are looked at, got %q", maxRawLoginInput, key)
+	}
 	got := rawLoginKey(long)
 	if len(got) > maxRawLoginKey || !strings.HasPrefix(long, got) || len(got) < maxRawLoginKey-1 {
 		t.Fatalf("a long login must be cut at a character boundary below %d bytes, got %d bytes", maxRawLoginKey, len(got))
