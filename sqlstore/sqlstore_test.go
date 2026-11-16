@@ -204,6 +204,8 @@ func TestQueriesUseThePrefixAndTheDialectPlaceholders(t *testing.T) {
 		"deleteTokens": {q.deleteTokens, 2}, "insertAttempt": {q.insertAttempt, 2}, "bumpAttempt": {q.bumpAttempt, 2},
 		"restartAttempt": {q.restartAttempt, 3}, "selectAttempt": {q.selectAttempt, 1}, "holdBlock": {q.holdBlock, 3},
 		"holdDelay": {q.holdDelay, 3}, "resetAttempt": {q.resetAttempt, 1}, "deleteAttempts": {q.deleteAttempts, 3},
+		"insertKey": {q.insertKey, 6}, "listKeys": {q.listKeys, 0}, "retireKey": {q.retireKey, 2}, "keyExists": {q.keyExists, 1},
+		"deleteKeys": {q.deleteKeys, 1},
 	}
 	marker := regexp.MustCompile(`\$\d+`)
 	for name, tc := range want {

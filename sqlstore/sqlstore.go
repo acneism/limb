@@ -134,6 +134,11 @@ func (s *Store) Attempts() store.Attempts {
 	return attempts{s: s, x: s.db}
 }
 
+// SigningKeys returns the repository of the keys that sign access tokens.
+func (s *Store) SigningKeys() store.SigningKeys {
+	return signingKeys{s: s, x: s.db}
+}
+
 type repositories struct {
 	s *Store
 	x executor
@@ -157,6 +162,10 @@ func (r repositories) RefreshTokens() store.RefreshTokens {
 
 func (r repositories) Attempts() store.Attempts {
 	return attempts(r)
+}
+
+func (r repositories) SigningKeys() store.SigningKeys {
+	return signingKeys(r)
 }
 
 // InTx runs fn in a database transaction with the default isolation level. The

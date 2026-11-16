@@ -52,6 +52,8 @@ type Repositories interface {
 	RefreshTokens() RefreshTokens
 	// Attempts returns the repository of counters of failed attempts.
 	Attempts() Attempts
+	// SigningKeys returns the repository of the keys that sign access tokens.
+	SigningKeys() SigningKeys
 }
 
 // Store is the storage that limb runs on. Implementations are safe for

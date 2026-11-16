@@ -16,6 +16,7 @@ const (
 	tokenColumns = "tenant_id, token_hash, session_id, expires_at, used_at"
 
 	attemptColumns = "attempt_key, window_start, hit_count, blocked_until, next_allowed_at"
+	keyColumns     = "kid, algorithm, generation, private_key, public_key, created_at, retire_after"
 )
 
 type queries struct {
@@ -50,6 +51,11 @@ type queries struct {
 	holdDelay        string
 	resetAttempt     string
 	deleteAttempts   string
+	insertKey        string
+	listKeys         string
+	retireKey        string
+	keyExists        string
+	deleteKeys       string
 	schemaVersion    string
 	probeSchema      string
 	insertSchemaRow  string
@@ -67,6 +73,7 @@ func newQueries(prefix string, d Dialect) queries {
 			"{sessions}", prefix+"sessions",
 			"{refresh_tokens}", prefix+"refresh_tokens",
 			"{attempts}", prefix+"attempts",
+			"{signing_keys}", prefix+"signing_keys",
 			"{schema}", prefix+"schema",
 		).Replace(template)
 		var out strings.Builder
@@ -124,6 +131,12 @@ func newQueries(prefix string, d Dialect) queries {
 		resetAttempt: build("DELETE FROM {attempts} WHERE attempt_key = ?"),
 		deleteAttempts: build("DELETE FROM {attempts} WHERE window_start < ? " +
 			"AND (blocked_until IS NULL OR blocked_until < ?) AND (next_allowed_at IS NULL OR next_allowed_at < ?)"),
+		insertKey: build("INSERT INTO {signing_keys} (kid, algorithm, generation, private_key, public_key, created_at) " +
+			"VALUES (?, ?, ?, ?, ?, ?)"),
+		listKeys:        build("SELECT " + keyColumns + " FROM {signing_keys} ORDER BY generation"),
+		retireKey:       build("UPDATE {signing_keys} SET retire_after = ? WHERE kid = ? AND retire_after IS NULL"),
+		keyExists:       build("SELECT 1 FROM {signing_keys} WHERE kid = ?"),
+		deleteKeys:      build("DELETE FROM {signing_keys} WHERE retire_after < ?"),
 		schemaVersion:   build("SELECT version FROM {schema} WHERE id = 1"),
 		probeSchema:     build("SELECT 1 FROM {schema} WHERE id = 1"),
 		insertSchemaRow: build("INSERT INTO {schema} (id, version, applied_at) VALUES (1, 0, ?)"),

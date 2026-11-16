@@ -23,6 +23,7 @@ type data struct {
 	sessions map[sessionKey]store.Session
 	tokens   map[string]store.RefreshToken
 	attempts map[string]store.Attempt
+	keys     map[string]store.SigningKey
 }
 
 func newData() *data {
@@ -32,6 +33,7 @@ func newData() *data {
 		sessions: map[sessionKey]store.Session{},
 		tokens:   map[string]store.RefreshToken{},
 		attempts: map[string]store.Attempt{},
+		keys:     map[string]store.SigningKey{},
 	}
 }
 
@@ -42,6 +44,7 @@ func (d *data) clone() *data {
 		sessions: maps.Clone(d.sessions),
 		tokens:   maps.Clone(d.tokens),
 		attempts: maps.Clone(d.attempts),
+		keys:     maps.Clone(d.keys),
 	}
 }
 
@@ -75,6 +78,10 @@ func (s *Store) RefreshTokens() store.RefreshTokens {
 
 func (s *Store) Attempts() store.Attempts {
 	return attempts{d: func() *data { return s.data }, mu: &s.mu}
+}
+
+func (s *Store) SigningKeys() store.SigningKeys {
+	return signingKeys{d: func() *data { return s.data }, mu: &s.mu}
 }
 
 func (s *Store) InTx(ctx context.Context, fn func(ctx context.Context, tx store.Repositories) error) error {
@@ -133,6 +140,10 @@ func (r txRepositories) RefreshTokens() store.RefreshTokens {
 
 func (r txRepositories) Attempts() store.Attempts {
 	return attempts{d: func() *data { return r.d }}
+}
+
+func (r txRepositories) SigningKeys() store.SigningKeys {
+	return signingKeys{d: func() *data { return r.d }}
 }
 
 type users struct {
