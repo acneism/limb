@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/acneism/limb/internal/dbtest"
@@ -22,9 +23,11 @@ type database struct {
 
 var dialects = map[string]Dialect{
 	"postgres": Postgres,
+	"mysql":    MySQL,
+	"mariadb":  MariaDB,
 }
 
-func eachDatabase(t *testing.T, run func(t *testing.T, d *database)) {
+func eachDatabase(t *testing.T, run func(t *testing.T, d *database), only ...string) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, live *dbtest.Live) {
 		t.Helper()
@@ -33,7 +36,7 @@ func eachDatabase(t *testing.T, run func(t *testing.T, d *database)) {
 			t.Fatalf("the database %q has no dialect", live.Name)
 		}
 		run(t, &database{Live: live, dialect: dialect})
-	})
+	}, only...)
 }
 
 func newClosedDB(t *testing.T) *sql.DB {
@@ -165,4 +168,28 @@ func TestUpgradesAHashOnlyOnce(t *testing.T) {
 			t.Fatalf("the upgraded hash must match the password: %v %v", ok, verifyErr)
 		}
 	})
+}
+
+func TestNewRejectsAConnectionOfMySQLThatIsSetUpWrongly(t *testing.T) {
+	eachDatabase(t, func(t *testing.T, d *database) {
+		cfg, err := mysql.ParseDSN(d.DSN)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg.ParseTime = false
+		connector, err := mysql.NewConnector(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		db := sql.OpenDB(connector)
+		t.Cleanup(func() { _ = db.Close() })
+		prefix := d.Prefix(t)
+		_, err = New(db, d.dialect, []byte(testKey), WithTablePrefix(prefix), WithAutoMigrate(), WithLogger(discardingLogger()))
+		if err == nil || !strings.Contains(err.Error(), "parseTime=true") || !strings.Contains(err.Error(), "check the database connection") {
+			t.Fatalf("New = %v, want an error that tells to add parseTime=true to the DSN", err)
+		}
+		if tables := d.Tables(t, prefix); len(tables) != 0 {
+			t.Fatalf("New wrote %v to a database whose connection is wrong", tables)
+		}
+	}, "mysql", "mariadb")
 }

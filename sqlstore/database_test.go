@@ -13,6 +13,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/acneism/limb/internal/dbtest"
@@ -27,9 +28,11 @@ type database struct {
 
 var dialects = map[string]Dialect{
 	"postgres": Postgres,
+	"mysql":    MySQL,
+	"mariadb":  MariaDB,
 }
 
-func eachDatabase(t *testing.T, run func(t *testing.T, d *database)) {
+func eachDatabase(t *testing.T, run func(t *testing.T, d *database), only ...string) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, live *dbtest.Live) {
 		t.Helper()
@@ -38,7 +41,7 @@ func eachDatabase(t *testing.T, run func(t *testing.T, d *database)) {
 			t.Fatalf("the database %q has no dialect", live.Name)
 		}
 		run(t, &database{Live: live, dialect: dialect})
-	})
+	}, only...)
 }
 
 func (d *database) newStore(t *testing.T) *Store {
