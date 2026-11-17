@@ -38,6 +38,10 @@ type Admin struct {
 // log and the settings. It is returned by Auth.Admin. What it changes is written
 // to the audit log as done by the code of the application, the actor "system"
 // named "api".
+//
+// An operation on a user that lost a race with other changes of the same user
+// every time it tried returns ErrConcurrentChange. Nothing was changed, and the
+// call can be repeated.
 type AdminAPI struct {
 	a *Auth
 }

@@ -268,9 +268,9 @@ func TestAChangeThatLosesTheRaceIsMadeAgain(t *testing.T) {
 		t.Fatalf("the block was recorded %d times, want once", got)
 	}
 	wantTypes(t, log.take(), EventUserBlocked)
-	stale.Store(changeAttempts)
-	if err := f.a.Admin().UnblockUser(t.Context(), f.user.ID); !errors.Is(err, store.ErrStale) {
-		t.Fatalf("UnblockUser = %v, want the error of a race that was lost every time", err)
+	stale.Store(userEditAttempts)
+	if err := f.a.Admin().UnblockUser(t.Context(), f.user.ID); !errors.Is(err, ErrConcurrentChange) || !errors.Is(err, store.ErrStale) {
+		t.Fatalf("UnblockUser = %v, want ErrConcurrentChange for a race that was lost every time", err)
 	}
 	if f.stored(t).Status != store.StatusBlocked {
 		t.Fatal("a change that lost every race was made")

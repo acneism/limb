@@ -14,6 +14,8 @@ import (
 	"github.com/acneism/limb/store"
 )
 
+const userEditAttempts = 8
+
 type userEdit struct {
 	next   store.User
 	update bool
@@ -34,7 +36,7 @@ func (a *Auth) editDeletedUser(ctx context.Context, by actorRef, id UserID, edit
 
 func (a *Auth) editUserWith(ctx context.Context, by actorRef, id UserID, allowDeleted bool, edit userEditor) error {
 	var err error
-	for range changeAttempts {
+	for range userEditAttempts {
 		var applied userEdit
 		var ended int
 		now := a.now().UTC().Truncate(time.Microsecond)
@@ -84,7 +86,7 @@ func (a *Auth) editUserWith(ctx context.Context, by actorRef, id UserID, allowDe
 			return err
 		}
 	}
-	return fmt.Errorf("limb: change the user: %w", err)
+	return fmt.Errorf("%w: %w", ErrConcurrentChange, err)
 }
 
 func withCount(details map[string]any, key string, count int) map[string]any {

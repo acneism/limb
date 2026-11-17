@@ -88,6 +88,11 @@ var (
 	// the page where the user chooses the password.
 	ErrInvitationsDisabled = errors.New("limb: an invitation needs a Sender, a delivery channel and WithResetURL")
 
+	// ErrConcurrentChange is returned by the operations on users of the
+	// administration that lost a race with other changes of the same user every
+	// time they tried. Nothing was changed: try again.
+	ErrConcurrentChange = errors.New("limb: the user kept changing under the call, try again")
+
 	// ErrDeletionRefused is returned by DeleteUser when the hook BeforeDelete
 	// refused the deletion or panicked. When the hook returned an error, the error
 	// is wrapped too, so that the administrator can be told why.
