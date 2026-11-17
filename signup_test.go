@@ -122,6 +122,7 @@ func TestAnAddressThatIsTakenGetsANoticeAndTheVisitorSeesNothingOfIt(t *testing.
 	}
 	f.messages(t, 1)
 	f.sender.clear()
+	eventually(t, "the event of the first registration", func() bool { return len(f.events.peek()) > 0 })
 	f.events.take()
 	err := f.a.Signup(t.Context(), SignupRequest{
 		Registration: Registration{Identifiers: map[string]string{"email": " NINA@example.com ", "username": "other_o"}, Password: goodPassword},
