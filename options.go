@@ -48,6 +48,8 @@ type config struct {
 	sending     SendingOptions
 	hooks       Hooks
 	recovery    RecoveryLimits
+	resetURL    string
+	verifyURL   string
 	err         error
 }
 

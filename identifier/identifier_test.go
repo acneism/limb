@@ -442,3 +442,51 @@ func TestBuiltInFormatsDoNotOverlap(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveDelivery(t *testing.T) {
+	types := []identifier.Type{
+		identifier.Username(),
+		identifier.Custom("sms", identifier.Pattern(`\+[0-9]{10,14}`), identifier.Delivery()),
+		identifier.Email(),
+		identifier.Custom("badge", identifier.Pattern(`[a-z]{3}\d{3}`)),
+	}
+	tests := []struct {
+		name     string
+		value    string
+		wantType string
+		want     string
+		fail     bool
+	}{
+		{name: "e-mail", value: " Bob@Example.com ", wantType: "email", want: "bob@example.com"},
+		{name: "a channel that is not a login", value: "+79991234567", wantType: "sms", want: "+79991234567"},
+		{name: "a nickname is not a channel", value: "bobby", fail: true},
+		{name: "a badge is not a channel", value: "abc123", fail: true},
+		{name: "empty", value: "", fail: true},
+		{name: "nothing matches", value: "12345", fail: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			typ, value, err := identifier.ResolveDelivery(types, tc.value)
+			if tc.fail {
+				if err == nil {
+					t.Fatalf("ResolveDelivery(%q) = %q %q, want an error", tc.value, typ.Name(), value)
+				}
+				return
+			}
+			if err != nil || typ.Name() != tc.wantType || value != tc.want {
+				t.Fatalf("ResolveDelivery(%q) = %q %q %v, want %q %q", tc.value, typ.Name(), value, err, tc.wantType, tc.want)
+			}
+		})
+	}
+}
+
+func TestResolveDeliveryFindsNothingWithoutTypes(t *testing.T) {
+	if typ, value, err := identifier.ResolveDelivery(nil, "bob@example.com"); err == nil {
+		t.Fatalf("ResolveDelivery without types = %q %q, want an error", typ.Name(), value)
+	}
+	broken := identifier.Custom("broken", identifier.Delivery(), identifier.Pattern("["))
+	typ, value, err := identifier.ResolveDelivery([]identifier.Type{broken, identifier.Email()}, "Bob@Example.com")
+	if err != nil || typ.Name() != "email" || value != "bob@example.com" {
+		t.Fatalf("a misconfigured type must be skipped: %q %q %v", typ.Name(), value, err)
+	}
+}

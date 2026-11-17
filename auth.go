@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/netip"
 	"runtime"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -82,6 +83,9 @@ type Auth struct {
 	renderer   *renderer
 	dispatcher *dispatcher
 	hooks      Hooks
+	delivers   bool
+	resetURL   string
+	verifyURL  string
 }
 
 // New creates the service on top of the database db, which the application
@@ -182,6 +186,12 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 	if err != nil {
 		return nil, err
 	}
+	if err = checkBaseURL("WithResetURL", cfg.resetURL, cfg.development); err != nil {
+		return nil, err
+	}
+	if err = checkBaseURL("WithVerifyURL", cfg.verifyURL, cfg.development); err != nil {
+		return nil, err
+	}
 	sending, err := cfg.sending.resolve()
 	if err != nil {
 		return nil, err
@@ -236,9 +246,12 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 		refreshCookie: refreshCookieName(cfg.development),
 		refreshPath:   refreshCookiePath(cfg.mountPath),
 
-		sender:   cfg.sender,
-		renderer: messages,
-		hooks:    cfg.hooks,
+		sender:    cfg.sender,
+		renderer:  messages,
+		hooks:     cfg.hooks,
+		delivers:  slices.ContainsFunc(types, identifier.Type.IsDelivery),
+		resetURL:  cfg.resetURL,
+		verifyURL: cfg.verifyURL,
 	}
 	if cfg.sender != nil {
 		a.dispatcher = newDispatcher(sending, logger, a.reportMessageFailure)

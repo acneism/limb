@@ -33,6 +33,7 @@ var (
 	errNotCanonical = errors.New("value is not in canonical form")
 	errPattern      = errors.New("value has an invalid format")
 	errNoLoginType  = errors.New("no login type accepts the value")
+	errNoChannel    = errors.New("no delivery channel accepts the value")
 )
 
 type step func(string) (string, error)
@@ -158,4 +159,22 @@ func Resolve(types []Type, login string) (Type, string, error) {
 		}
 	}
 	return Type{}, "", errNoLoginType
+}
+
+// ResolveDelivery finds the delivery channel that accepts value. It tries the
+// types that are delivery channels in the order they are given and returns the
+// first one whose Normalize accepts the value, together with the normalized
+// value. Unlike Resolve it does not ask whether the type allows signing in, so
+// it finds a phone number that is only a place to send messages to.
+func ResolveDelivery(types []Type, value string) (Type, string, error) {
+	for _, t := range types {
+		if !t.delivery {
+			continue
+		}
+		normalized, err := t.Normalize(value)
+		if err == nil {
+			return t, normalized, nil
+		}
+	}
+	return Type{}, "", errNoChannel
 }
