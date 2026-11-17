@@ -183,7 +183,10 @@ func WithServiceName(name string) Option {
 
 // WithMessageTemplate replaces the texts of one kind of message in one language,
 // "ru" or "en". The fields of the template that are empty keep the built-in
-// text. The option can be given for every kind and language, but once for each.
+// text. An HTML template that gives nothing but white space, for example a
+// single space, leaves the HTML part out: Message.HTML is then empty and the
+// message has only its plain text. The option can be given for every kind and
+// language, but once for each.
 // New fails for a kind or a language that does not exist, for a template that
 // does not parse or cannot be run, and for a Subject or a Short text that is not
 // one line without control characters.
