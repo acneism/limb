@@ -152,7 +152,7 @@ func (r *renderer) check(key templateKey, set templateSet) error {
 		samples = []MessageData{{Link: link, Code: sampleCode}, {Code: sampleCode}}
 	case MessageInvitation:
 		samples = []MessageData{{Link: link}}
-	case MessagePasswordChanged, MessageSignupAttempt:
+	case MessagePasswordChanged, MessageSignupAttempt, MessageIdentifierChanged:
 	}
 	for _, data := range samples {
 		data.LinkExpiresIn, data.CodeExpiresIn = describeDuration(key.language, 30*time.Minute), describeDuration(key.language, 10*time.Minute)

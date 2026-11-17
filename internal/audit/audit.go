@@ -30,8 +30,13 @@ const (
 	AdminTOTPReset     = "admin.totp_reset"
 	SettingChanged     = "setting.changed"
 
-	UserInvited          = "user.invited"
-	UserInvitationResent = "user.invitation_resent"
+	UserCreated            = "user.created"
+	UserInvited            = "user.invited"
+	UserInvitationResent   = "user.invitation_resent"
+	UserIdentifierAdded    = "user.identifier_added"
+	UserIdentifierChanged  = "user.identifier_changed"
+	UserIdentifierRemoved  = "user.identifier_removed"
+	UserIdentifierVerified = "user.identifier_verified"
 
 	UserBlocked           = "user.blocked"
 	UserUnblocked         = "user.unblocked"

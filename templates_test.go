@@ -117,7 +117,7 @@ func TestBuiltInMessagesCarryTheLinkAndTheCode(t *testing.T) {
 			}
 		}
 	}
-	for _, kind := range []MessageKind{MessagePasswordChanged, MessageSignupAttempt} {
+	for _, kind := range []MessageKind{MessagePasswordChanged, MessageSignupAttempt, MessageIdentifierChanged} {
 		for _, language := range supportedLanguages {
 			out, err := r.render(kind, language, "email", dataFor(language, false, false))
 			if err != nil {

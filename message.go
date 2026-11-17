@@ -51,10 +51,15 @@ const (
 	// administrator made an account for them, and carries the link that lets them
 	// choose the password. It has no code.
 	MessageInvitation MessageKind = "invitation"
+	// MessageIdentifierChanged tells the user that an administrator changed an
+	// address, a phone number or a name that they sign in with or are reached at.
+	// It goes to the channels that were confirmed before the change, and it
+	// carries no secret.
+	MessageIdentifierChanged MessageKind = "identifier_changed"
 )
 
 var messageKinds = []MessageKind{
-	MessageVerification, MessagePasswordReset, MessagePasswordChanged, MessageSignupAttempt, MessageInvitation,
+	MessageVerification, MessagePasswordReset, MessagePasswordChanged, MessageSignupAttempt, MessageInvitation, MessageIdentifierChanged,
 }
 
 // Message is what a Sender delivers. It comes ready to send, with the texts that
