@@ -30,6 +30,7 @@ type listedUser struct {
 	via        store.CreatedVia
 	login      int
 	purgeDays  int
+	blocked    int
 	identifier []listedIdentifier
 }
 
@@ -46,7 +47,7 @@ var listedUsers = []listedUser{
 		identifier: []listedIdentifier{{"nick", "axb", false}, {"email", "axb@example.com", true}}},
 	{n: 6, created: 6, status: store.StatusDeleted, via: store.CreatedViaSignup, purgeDays: 10,
 		identifier: []listedIdentifier{{"nick", "50%", false}}},
-	{n: 7, created: 7, status: store.StatusBlocked, via: store.CreatedViaAPI, login: 20,
+	{n: 7, created: 7, status: store.StatusBlocked, via: store.CreatedViaAPI, login: 20, blocked: 60,
 		identifier: []listedIdentifier{{"nick", "500", false}}},
 	{n: 8, created: 8, status: store.StatusActive, via: store.CreatedViaSignup,
 		identifier: []listedIdentifier{{"nick", "a!b", false}}},
@@ -62,6 +63,9 @@ func seedListedUsers(t *testing.T, s store.Store) {
 		u.Status, u.CreatedVia, u.CreatedAt = l.status, l.via, minutes(l.created)
 		if l.login != 0 {
 			u.LastLoginAt = minutes(l.login)
+		}
+		if l.blocked != 0 {
+			u.BlockedReason, u.BlockedUntil = "reason", minutes(l.blocked)
 		}
 		if l.status == store.StatusDeleted {
 			u.DeletedAt = minutes(l.created)
@@ -151,6 +155,9 @@ func testUserListFilters(t *testing.T, s store.Store) {
 		{"to be removed before a later moment", store.UserQuery{PurgeBefore: listBase.Add(40 * 24 * time.Hour)}, []int{3, 6}},
 		{"to be removed at the moment itself", store.UserQuery{PurgeBefore: listBase.Add(10 * 24 * time.Hour)}, nil},
 		{"deleted and to be removed", store.UserQuery{Statuses: []store.Status{store.StatusDeleted}, PurgeBefore: listBase.Add(20 * 24 * time.Hour)}, []int{6}},
+		{"a block that ends before a moment", store.UserQuery{BlockedBefore: minutes(61)}, []int{7}},
+		{"a block that ends at the moment itself", store.UserQuery{BlockedBefore: minutes(60)}, nil},
+		{"blocked users whose block ends", store.UserQuery{Statuses: []store.Status{store.StatusBlocked}, BlockedBefore: minutes(1000)}, []int{7}},
 		{"every condition at once", store.UserQuery{
 			Statuses: []store.Status{store.StatusActive}, CreatedVia: store.CreatedViaAPI, Confirmed: yes(),
 			CreatedFrom: minutes(1), CreatedBefore: minutes(10), LastLoginFrom: minutes(10), ValuePrefix: "a",

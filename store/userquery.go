@@ -57,6 +57,9 @@ type UserQuery struct {
 	// PurgeBefore keeps the users whose time of removal is before this moment, the
 	// zero time sets no bound. A user that has no time of removal does not match.
 	PurgeBefore time.Time
+	// BlockedBefore keeps the users whose block ends before this moment, the zero
+	// time sets no bound. A user whose block has no end does not match.
+	BlockedBefore time.Time
 	// Identifiers keeps the users that have at least one of these identifiers,
 	// at most MaxUserIdentifierRefs of them.
 	Identifiers []IdentifierRef

@@ -31,7 +31,7 @@ func TestTheListOfUsersNumbersItsParametersInTheOrderOfTheConditions(t *testing.
 	_, err = s.Users().List(t.Context(), store.UserQuery{
 		TenantID: "t", Statuses: []store.Status{store.StatusActive, store.StatusBlocked}, CreatedVia: store.CreatedViaSignup,
 		CreatedFrom: at, CreatedBefore: at.Add(time.Hour), LastLoginFrom: at, LastLoginBefore: at.Add(time.Hour), NeverLoggedIn: true,
-		PurgeBefore: at, Confirmed: &confirmed, Identifiers: []store.IdentifierRef{{Type: "email", Value: "a@example.com"}, {Type: "nick", Value: "a"}},
+		PurgeBefore: at, BlockedBefore: at, Confirmed: &confirmed, Identifiers: []store.IdentifierRef{{Type: "email", Value: "a@example.com"}, {Type: "nick", Value: "a"}},
 		ValuePrefix: "a_", After: &store.User{ID: "u", CreatedAt: at}, Descending: true, Limit: 11,
 	})
 	if err != nil {
@@ -42,8 +42,8 @@ func TestTheListOfUsersNumbersItsParametersInTheOrderOfTheConditions(t *testing.
 	}
 	query := probe.queries[0]
 	found := regexp.MustCompile(`:\d+`).FindAllString(query, -1)
-	if len(found) != 17 || strings.Contains(query, "?") {
-		t.Fatalf("the query has %d parameters, want 17, or a mark that was not replaced:\n%s", len(found), query)
+	if len(found) != 18 || strings.Contains(query, "?") {
+		t.Fatalf("the query has %d parameters, want 18, or a mark that was not replaced:\n%s", len(found), query)
 	}
 	for n, mark := range found {
 		if mark != fmt.Sprintf(":%d", n+1) {

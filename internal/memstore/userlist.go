@@ -58,7 +58,8 @@ func matchesUser(u store.User, identifiers []store.Identifier, q store.UserQuery
 		!q.LastLoginFrom.IsZero() && (u.LastLoginAt.IsZero() || u.LastLoginAt.Before(normalizeTime(q.LastLoginFrom))),
 		!q.LastLoginBefore.IsZero() && (u.LastLoginAt.IsZero() || !u.LastLoginAt.Before(normalizeTime(q.LastLoginBefore))),
 		q.NeverLoggedIn && !u.LastLoginAt.IsZero(),
-		!q.PurgeBefore.IsZero() && (u.PurgeAfter.IsZero() || !u.PurgeAfter.Before(normalizeTime(q.PurgeBefore))):
+		!q.PurgeBefore.IsZero() && (u.PurgeAfter.IsZero() || !u.PurgeAfter.Before(normalizeTime(q.PurgeBefore))),
+		!q.BlockedBefore.IsZero() && (u.BlockedUntil.IsZero() || !u.BlockedUntil.Before(normalizeTime(q.BlockedBefore))):
 		return false
 	case q.Confirmed != nil && slices.ContainsFunc(identifiers, func(i store.Identifier) bool { return !i.VerifiedAt.IsZero() }) != *q.Confirmed:
 		return false

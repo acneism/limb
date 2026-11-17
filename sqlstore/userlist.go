@@ -44,6 +44,9 @@ func (r users) List(ctx context.Context, q store.UserQuery) ([]store.User, error
 	if !q.PurgeBefore.IsZero() {
 		c.add("u.purge_after < ?", storedTime(q.PurgeBefore))
 	}
+	if !q.BlockedBefore.IsZero() {
+		c.add("u.blocked_until < ?", storedTime(q.BlockedBefore))
+	}
 	if q.Confirmed != nil {
 		exists := "EXISTS (SELECT 1 " + identifierOfUser + " AND i.verified_at IS NOT NULL)"
 		if !*q.Confirmed {
