@@ -19,11 +19,17 @@ type instances struct {
 
 func newInstances(t *testing.T, d *database) *instances {
 	t.Helper()
+	return newInstancesWith(t, d)
+}
+
+func newInstancesWith(t *testing.T, d *database, opts ...Option) *instances {
+	t.Helper()
 	db := d.DB
 	prefix := d.Prefix(t)
 	clock := newFakeClock()
 	build := func() *Auth {
-		a, err := New(db, d.dialect, []byte(testKey), WithTablePrefix(prefix), WithAutoMigrate(), WithLogger(discardingLogger()), emailAndUsername())
+		all := append([]Option{WithTablePrefix(prefix), WithAutoMigrate(), WithLogger(discardingLogger()), emailAndUsername()}, opts...)
+		a, err := New(db, d.dialect, []byte(testKey), all...)
 		if err != nil {
 			t.Fatalf("New failed: %v", err)
 		}
