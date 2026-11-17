@@ -34,10 +34,10 @@ type Admin struct {
 }
 
 // AdminAPI does what the administration does, from the code of the
-// application: it manages the administrators, and the operations on users are
-// added to it. It is returned by Auth.Admin. What it does is written to the
-// audit log as done by the code of the application, the actor "system" named
-// "api".
+// application: it manages the administrators and the users, and reads the audit
+// log and the settings. It is returned by Auth.Admin. What it changes is written
+// to the audit log as done by the code of the application, the actor "system"
+// named "api".
 type AdminAPI struct {
 	a *Auth
 }

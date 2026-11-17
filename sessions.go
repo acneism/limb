@@ -12,28 +12,7 @@ import (
 // expired and not idle for longer than the idle lifetime. The oldest comes
 // first, and the one that made the request is marked as current.
 func (a *Auth) Sessions(ctx context.Context, p Principal) ([]Session, error) {
-	now := a.now()
-	listed, err := a.store.Sessions().ListByUser(ctx, a.tenant, string(p.UserID), now)
-	if err != nil {
-		return nil, fmt.Errorf("limb: list the sessions: %w", err)
-	}
-	sessions := make([]Session, 0, len(listed))
-	for _, s := range listed {
-		if !a.sessionActive(s, now) {
-			continue
-		}
-		sessions = append(sessions, Session{
-			ID:         s.ID,
-			Kind:       s.Kind,
-			IP:         s.IP,
-			UserAgent:  s.UserAgent,
-			CreatedAt:  s.CreatedAt,
-			LastSeenAt: s.LastSeenAt,
-			ExpiresAt:  s.ExpiresAt,
-			Current:    s.ID == p.SessionID,
-		})
-	}
-	return sessions, nil
+	return a.userSessions(ctx, string(p.UserID), p.SessionID)
 }
 
 // Logout ends the session of the principal. Ending a session that has ended

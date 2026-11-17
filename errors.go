@@ -73,6 +73,10 @@ var (
 	// ErrAdminLoginTaken is returned by CreateAdmin when another administrator has
 	// the login.
 	ErrAdminLoginTaken = errors.New("limb: the login of an administrator is taken")
+
+	// ErrUserNotFound is returned by the operations on users of the
+	// administration when there is no user with the ID, or the ID cannot be one.
+	ErrUserNotFound = errors.New("limb: the user does not exist")
 )
 
 // RateLimitError reports that there were too many failed attempts and says how
