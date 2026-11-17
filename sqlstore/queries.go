@@ -7,7 +7,7 @@ import (
 
 const (
 	userColumns = "tenant_id, id, status, password_hash, must_change_password, blocked_reason, " +
-		"blocked_until, deleted_at, purge_after, created_at, last_login_at, version"
+		"blocked_until, deleted_at, purge_after, created_at, last_login_at, version, created_via"
 	identifierColumns = "tenant_id, type, value, display_value, user_id, verified_at"
 	sessionColumns    = "tenant_id, id, kind, secret_hash, user_id, ip, user_agent, created_at, last_seen_at, expires_at, revoked_at"
 	resolveColumns    = "s.tenant_id, s.id, s.kind, s.secret_hash, s.user_id, s.ip, s.user_agent, s.created_at, s.last_seen_at, " +
@@ -147,7 +147,7 @@ func newQueries(prefix string, d Dialect) queries {
 		return out.String()
 	}
 	return queries{
-		insertUser: build("INSERT INTO {users} (" + userColumns + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)"),
+		insertUser: build("INSERT INTO {users} (" + userColumns + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)"),
 		selectUser: build("SELECT " + userColumns + " FROM {users} WHERE tenant_id = ? AND id = ?"),
 		updateUser: build("UPDATE {users} SET status = ?, password_hash = ?, must_change_password = ?, " +
 			"blocked_reason = ?, blocked_until = ?, deleted_at = ?, purge_after = ?, last_login_at = ?, " +

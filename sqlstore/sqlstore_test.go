@@ -204,7 +204,7 @@ func TestQueriesUseThePrefixAndTheDialectPlaceholders(t *testing.T) {
 		text   string
 		params int
 	}{
-		"insertUser": {q.insertUser, 11}, "selectUser": {q.selectUser, 2}, "updateUser": {q.updateUser, 11},
+		"insertUser": {q.insertUser, 12}, "selectUser": {q.selectUser, 2}, "updateUser": {q.updateUser, 11},
 		"userExists": {q.userExists, 2}, "deleteUser": {q.deleteUser, 2}, "insertIdentifier": {q.insertIdentifier, 6},
 		"selectIdentifier": {q.selectIdentifier, 3}, "listIdentifiers": {q.listIdentifiers, 2},
 		"deleteIdentifier": {q.deleteIdentifier, 3}, "markVerified": {q.markVerified, 4}, "schemaVersion": {q.schemaVersion, 0},
@@ -218,7 +218,21 @@ func TestQueriesUseThePrefixAndTheDialectPlaceholders(t *testing.T) {
 		"restartAttempt": {q.restartAttempt, 3}, "selectAttempt": {q.selectAttempt, 1}, "holdBlock": {q.holdBlock, 3},
 		"holdDelay": {q.holdDelay, 3}, "resetAttempt": {q.resetAttempt, 1}, "deleteAttempts": {q.deleteAttempts, 3},
 		"insertKey": {q.insertKey, 6}, "listKeys": {q.listKeys, 0}, "retireKey": {q.retireKey, 2}, "keyExists": {q.keyExists, 1},
-		"deleteKeys": {q.deleteKeys, 1},
+		"deleteKeys":    {q.deleteKeys, 1},
+		"selectSetting": {q.selectSetting, 2}, "listSettings": {q.listSettings, 1}, "updateSetting": {q.updateSetting, 5},
+		"insertSetting": {q.insertSetting, 5}, "settingExists": {q.settingExists, 2}, "deleteSetting": {q.deleteSetting, 2},
+		"insertAudit": {q.insertAudit, 9},
+		"insertAdmin": {q.insertAdmin, 10}, "selectAdmin": {q.selectAdmin, 2}, "selectAdminByLogin": {q.selectAdminByLogin, 2},
+		"listAdmins": {q.listAdmins, 1}, "updateAdmin": {q.updateAdmin, 7}, "deleteAdmin": {q.deleteAdmin, 2},
+		"adminMark": {q.adminMark, 2}, "adminExists": {q.adminExists, 2}, "acceptStep": {q.acceptStep, 6},
+		"recordLogin": {q.recordLogin, 4}, "deleteRecoveryCodes": {q.deleteRecoveryCodes, 2},
+		"insertRecoveryCode": {q.insertRecoveryCode, 3}, "useRecoveryCode": {q.useRecoveryCode, 4},
+		"countRecoveryCodes": {q.countRecoveryCodes, 2},
+		"insertAdminSession": {q.insertAdminSession, 11}, "resolveAdminSession": {q.resolveAdminSession, 2},
+		"touchAdminSession": {q.touchAdminSession, 4}, "tryAdminAttempt": {q.tryAdminAttempt, 3},
+		"rebindAdminSession": {q.rebindAdminSession, 4}, "deleteAdminSession": {q.deleteAdminSession, 3},
+		"deleteAdminSessions": {q.deleteAdminSessions, 2}, "deleteAdminSessionsExcept": {q.deleteAdminSessionsExcept, 3},
+		"listAdminSessions": {q.listAdminSessions, 3}, "deleteStaleAdminSessions": {q.deleteStaleAdminSessions, 3},
 	}
 	marker := regexp.MustCompile(`\$\d+`)
 	for name, tc := range want {

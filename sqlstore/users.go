@@ -27,7 +27,7 @@ func (r users) Create(ctx context.Context, u store.User) error {
 	_, err := r.x.ExecContext(ctx, r.s.q.insertUser,
 		u.TenantID, u.ID, string(u.Status), optionalText(u.PasswordHash), u.MustChangePassword,
 		optionalText(u.BlockedReason), optionalTime(u.BlockedUntil), optionalTime(u.DeletedAt),
-		optionalTime(u.PurgeAfter), storedTime(u.CreatedAt), optionalTime(u.LastLoginAt))
+		optionalTime(u.PurgeAfter), storedTime(u.CreatedAt), optionalTime(u.LastLoginAt), string(createdVia(u)))
 	if err != nil {
 		if r.s.dialect.IsUniqueViolation(err) {
 			return store.ErrConflict
@@ -35,6 +35,13 @@ func (r users) Create(ctx context.Context, u store.User) error {
 		return fmt.Errorf("sqlstore: create user: %w", err)
 	}
 	return nil
+}
+
+func createdVia(u store.User) store.CreatedVia {
+	if u.CreatedVia == "" {
+		return store.CreatedViaAPI
+	}
+	return u.CreatedVia
 }
 
 func (r users) Get(ctx context.Context, tenantID, id string) (store.User, error) {
@@ -129,9 +136,10 @@ func scanUser(row scanner) (store.User, error) {
 		purgeAfter   sql.NullTime
 		lastLogin    sql.NullTime
 		createdAt    time.Time
+		via          string
 	)
 	err := row.Scan(&u.TenantID, &u.ID, &status, &hash, &u.MustChangePassword, &reason,
-		&blockedUntil, &deletedAt, &purgeAfter, &createdAt, &lastLogin, &u.Version)
+		&blockedUntil, &deletedAt, &purgeAfter, &createdAt, &lastLogin, &u.Version, &via)
 	if err != nil {
 		return store.User{}, err
 	}
@@ -143,6 +151,7 @@ func scanUser(row scanner) (store.User, error) {
 	u.PurgeAfter = utcOrZero(purgeAfter)
 	u.LastLoginAt = utcOrZero(lastLogin)
 	u.CreatedAt = createdAt.UTC()
+	u.CreatedVia = store.CreatedVia(via)
 	return u, nil
 }
 

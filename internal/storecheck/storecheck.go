@@ -37,6 +37,9 @@ func User(u store.User) error {
 	if err := optional("user password_hash", u.PasswordHash, store.MaxPasswordHashLength); err != nil {
 		return err
 	}
+	if err := CreatedVia(u.CreatedVia); err != nil {
+		return err
+	}
 	return optional("user blocked_reason", u.BlockedReason, store.MaxBlockedReasonLength)
 }
 
@@ -101,4 +104,71 @@ func optional(name, value string, limit int) error {
 
 func invalid(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, args...))
+}
+
+func CreatedVia(via store.CreatedVia) error {
+	switch via {
+	case "", store.CreatedViaAPI, store.CreatedViaSignup, store.CreatedViaAdmin, store.CreatedViaInvite:
+		return nil
+	}
+	return invalid("user created_via %q is unknown", string(via))
+}
+
+func UserQuery(q store.UserQuery) error {
+	if q.Limit < 1 || q.Limit > store.MaxUsersPage {
+		return invalid("a page of users has from 1 to %d users, not %d", store.MaxUsersPage, q.Limit)
+	}
+	for _, status := range q.Statuses {
+		switch status {
+		case store.StatusActive, store.StatusBlocked, store.StatusDeleted:
+		default:
+			return invalid("user status %q is unknown", string(status))
+		}
+	}
+	if err := CreatedVia(q.CreatedVia); err != nil {
+		return err
+	}
+	switch q.Order {
+	case "", store.OrderUsersByCreation, store.OrderUsersByLastLogin, store.OrderUsersByStatus:
+	default:
+		return invalid("the order of users %q is unknown", string(q.Order))
+	}
+	if len(q.Identifiers) > store.MaxUserIdentifierRefs {
+		return invalid("a query of users asks for at most %d identifiers", store.MaxUserIdentifierRefs)
+	}
+	if q.After == nil {
+		return nil
+	}
+	if q.After.ID == "" {
+		return invalid("the user that a listing continues after has no ID")
+	}
+	switch q.Order {
+	case "", store.OrderUsersByCreation:
+		if q.After.CreatedAt.IsZero() {
+			return invalid("the user that a listing continues after has no creation time")
+		}
+	case store.OrderUsersByStatus:
+		if q.After.Status == "" {
+			return invalid("the user that a listing continues after has no status")
+		}
+	case store.OrderUsersByLastLogin:
+	}
+	return nil
+}
+
+func IdentifierRefs(refs []store.IdentifierRef) []store.IdentifierRef {
+	var valid []store.IdentifierRef
+	for _, ref := range refs {
+		if ref.Type != "" && ref.Value != "" && len(ref.Type) <= store.MaxIdentifierTypeLength && ValidText(ref.Type, ref.Value) {
+			valid = append(valid, ref)
+		}
+	}
+	return valid
+}
+
+func ValidUserQuery(q store.UserQuery) bool {
+	if !ValidText(q.TenantID, q.ValuePrefix) || (q.After != nil && !ValidText(q.After.ID, string(q.After.Status))) {
+		return false
+	}
+	return len(q.Identifiers) == 0 || len(IdentifierRefs(q.Identifiers)) > 0
 }

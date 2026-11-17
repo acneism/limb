@@ -20,6 +20,23 @@ const (
 	StatusDeleted Status = "deleted"
 )
 
+// CreatedVia tells how an account came to be.
+type CreatedVia string
+
+// The ways an account comes to be.
+const (
+	// CreatedViaAPI is an account that the code of the application made with
+	// Register. It is what an account is when nothing else is said.
+	CreatedViaAPI CreatedVia = "api"
+	// CreatedViaSignup is an account that a visitor made with Signup.
+	CreatedViaSignup CreatedVia = "signup"
+	// CreatedViaAdmin is an account that an administrator made with a password.
+	CreatedViaAdmin CreatedVia = "admin"
+	// CreatedViaInvite is an account that an administrator made by inviting its
+	// holder to a channel.
+	CreatedViaInvite CreatedVia = "invite"
+)
+
 // User is an account. The pair of TenantID and ID identifies it.
 type User struct {
 	// TenantID is the tenant the user belongs to.
@@ -43,6 +60,9 @@ type User struct {
 	PurgeAfter time.Time
 	// CreatedAt is when the account was created.
 	CreatedAt time.Time
+	// CreatedVia is how the account was made. Create stores CreatedViaAPI for an
+	// empty value, and Update does not change it.
+	CreatedVia CreatedVia
 	// LastLoginAt is the time of the last sign-in, the zero time if there was
 	// none.
 	LastLoginAt time.Time
@@ -75,6 +95,10 @@ type Users interface {
 	// Create stores a new user with version 1, whatever u.Version is. It
 	// returns ErrConflict if the user already exists.
 	Create(ctx context.Context, u User) error
+
+	// List returns the users that match the query in the order that it asks for.
+	// A value to match that cannot be stored matches nothing.
+	List(ctx context.Context, q UserQuery) ([]User, error)
 
 	// Get returns the user or ErrNotFound.
 	Get(ctx context.Context, tenantID, id string) (User, error)

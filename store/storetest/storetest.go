@@ -33,6 +33,13 @@ var cases = []testCase{
 	{name: "Schema/Migrate is idempotent", run: testMigrateIsIdempotent},
 	{name: "Schema/concurrent Migrate", fresh: true, run: testConcurrentMigrate},
 	{name: "Users/lifecycle", run: testUserLifecycle},
+	{name: "Users/created via", run: testUserCreatedVia},
+	{name: "Users/List filters", run: testUserListFilters},
+	{name: "Users/List search", run: testUserListSearch},
+	{name: "Users/List order", run: testUserListOrder},
+	{name: "Users/List pages", run: testUserListPages},
+	{name: "Users/List invalid queries", run: testUserListInvalidQueries},
+	{name: "Users/List sees what a transaction wrote", run: testUserListSeesTransactions},
 	{name: "Users/not found", run: testUserNotFound},
 	{name: "Users/conflict", run: testUserConflict},
 	{name: "Lookups/invalid text is not found", run: testInvalidLookups},
@@ -245,10 +252,14 @@ func sameTime(got, want time.Time) bool {
 
 func checkUser(t *testing.T, got, want store.User) {
 	t.Helper()
+	wantVia := want.CreatedVia
+	if wantVia == "" {
+		wantVia = store.CreatedViaAPI
+	}
 	switch {
 	case got.TenantID != want.TenantID, got.ID != want.ID, got.Status != want.Status,
 		got.PasswordHash != want.PasswordHash, got.MustChangePassword != want.MustChangePassword,
-		got.BlockedReason != want.BlockedReason, got.Version != want.Version:
+		got.BlockedReason != want.BlockedReason, got.Version != want.Version, got.CreatedVia != wantVia:
 		t.Fatalf("user differs:\n got %+v\nwant %+v", got, want)
 	case !sameTime(got.BlockedUntil, want.BlockedUntil), !sameTime(got.DeletedAt, want.DeletedAt),
 		!sameTime(got.PurgeAfter, want.PurgeAfter), !sameTime(got.CreatedAt, want.CreatedAt),

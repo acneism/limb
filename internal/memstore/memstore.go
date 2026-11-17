@@ -258,6 +258,9 @@ func (r users) Create(ctx context.Context, u store.User) error {
 	}
 	u = normalizeUser(u)
 	u.Version = 1
+	if u.CreatedVia == "" {
+		u.CreatedVia = store.CreatedViaAPI
+	}
 	d.users[key] = u
 	return nil
 }
@@ -294,6 +297,7 @@ func (r users) Update(ctx context.Context, u store.User) (store.User, error) {
 	}
 	u = normalizeUser(u)
 	u.CreatedAt = stored.CreatedAt
+	u.CreatedVia = stored.CreatedVia
 	u.Version = stored.Version + 1
 	d.users[key] = u
 	return u, nil

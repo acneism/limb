@@ -83,6 +83,10 @@ const (
 	// log asks for.
 	MaxAuditActions = 32
 
+	// MaxUserIdentifierRefs is the largest number of identifiers that one query of
+	// users asks for.
+	MaxUserIdentifierRefs = 16
+
 	// MaxUsersPage is the largest number of users that one query returns.
 	MaxUsersPage = 500
 
