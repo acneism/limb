@@ -383,10 +383,12 @@ func TestShutdownOfAServiceStopsItsDispatcher(t *testing.T) {
 	}
 }
 
+var testLinkToken = strings.Repeat("Q", 24)
+
 func newTestMessage() Message {
 	return Message{
 		Kind: MessagePasswordReset, UserID: "u-1", Channel: "email", To: "alice@example.com", Language: "en",
-		Subject: "Reset", Text: "text", Link: "https://app.example.com/reset#token=Zm9vYmFyYmF6cXV4", Code: "123456",
+		Subject: "Reset", Text: "text", Link: "https://app.example.com/reset#token=" + testLinkToken, Code: "123456",
 	}
 }
 
@@ -418,9 +420,9 @@ func TestDeliverHidesTheSecretsInTheErrorOfTheSender(t *testing.T) {
 		if err == nil {
 			t.Fatalf("deliver of %q returned nil", echo)
 		}
-		for _, secret := range []string{m.To, m.Link, m.Code, "Zm9vYmFyYmF6cXV4", "token="} {
-			if strings.Contains(err.Error(), secret) {
-				t.Errorf("the error %q contains %q", err, secret)
+		for _, hidden := range []string{m.To, m.Link, m.Code, testLinkToken, "token="} {
+			if strings.Contains(err.Error(), hidden) {
+				t.Errorf("the error %q contains %q", err, hidden)
 			}
 		}
 		for _, want := range []string{"password_reset", "email", "a***@example.com"} {
