@@ -37,7 +37,7 @@ func TestSecretRules(t *testing.T) {
 		"no kind":               func(s *store.Secret) { s.Kind = "" },
 		"an unknown kind":       func(s *store.Secret) { s.Kind = "token" },
 		"no purpose":            func(s *store.Secret) { s.Purpose = "" },
-		"an unknown purpose":    func(s *store.Secret) { s.Purpose = "invite" },
+		"an unknown purpose":    func(s *store.Secret) { s.Purpose = "promote" },
 		"no hash":               func(s *store.Secret) { s.Hash = nil },
 		"a short hash":          func(s *store.Secret) { s.Hash = s.Hash[:store.SecretHashLength-1] },
 		"a long hash":           func(s *store.Secret) { s.Hash = append(bytes.Clone(s.Hash), 0) },
@@ -133,12 +133,12 @@ func TestAttemptLimitRule(t *testing.T) {
 }
 
 func TestPurposeRule(t *testing.T) {
-	for _, purpose := range []store.SecretPurpose{store.PurposeVerify, store.PurposeReset} {
+	for _, purpose := range []store.SecretPurpose{store.PurposeVerify, store.PurposeReset, store.PurposeInvite} {
 		if err := Purpose(purpose); err != nil {
 			t.Errorf("Purpose(%q) = %v, want nil", purpose, err)
 		}
 	}
-	for _, purpose := range []store.SecretPurpose{"", "invite", "VERIFY", "reset ", "verify\x00"} {
+	for _, purpose := range []store.SecretPurpose{"", "promote", "INVITE", "VERIFY", "reset ", "verify\x00"} {
 		if err := Purpose(purpose); !errors.Is(err, ErrInvalid) {
 			t.Errorf("Purpose(%q) = %v, want ErrInvalid", purpose, err)
 		}

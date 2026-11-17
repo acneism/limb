@@ -82,6 +82,12 @@ var (
 	// that make no sense for an account that is deleted. Restore it first.
 	ErrUserDeleted = errors.New("limb: the user is deleted")
 
+	// ErrInvitationsDisabled is returned when an invitation is asked for and the
+	// service cannot send one: it needs a Sender, an identifier type that is a
+	// delivery channel and WithResetURL, because the link of the invitation opens
+	// the page where the user chooses the password.
+	ErrInvitationsDisabled = errors.New("limb: an invitation needs a Sender, a delivery channel and WithResetURL")
+
 	// ErrNoConfirmedChannel is returned when a link has to be sent to the user and
 	// they have no address or phone number that is confirmed, because a mistyped
 	// one would hand the account to a stranger. Give them a temporary password

@@ -89,6 +89,11 @@ type ResetPasswordRequest struct {
 // The user gets a notice that the password was changed, on every confirmed
 // channel, in the background.
 //
+// The link of an invitation, see AdminAPI.InviteUser, is accepted here too: it
+// chooses the first password of an account that has none, confirms the channel
+// that the link was sent to and works for seven days. It ends once the account
+// has a password, and it gives no notice of a change, because there was none.
+//
 // It returns ErrInvalidSecret when the secret is not accepted, a *PolicyError for
 // a password that breaks the policy, a *RateLimitError when the address sent too
 // many wrong secrets and a *ValidationError when the request does not say what to
@@ -99,14 +104,29 @@ func (a *Auth) ResetPassword(ctx context.Context, r ResetPasswordRequest) error 
 	}
 	var done resetDone
 	err := a.guardConfirmation(ctx, store.PurposeReset, r.IP, func() error {
-		return a.confirmSecret(ctx, store.PurposeReset, confirmation{token: r.Token, login: r.Login, channel: r.Channel, code: r.Code},
-			func(ctx context.Context, tx store.Repositories, s store.Secret, now time.Time) error {
-				done = resetDone{}
-				return a.applyReset(ctx, tx, s, r.Password, now, &done)
-			})
+		c := confirmation{token: r.Token, login: r.Login, channel: r.Channel, code: r.Code}
+		confirmed := a.confirmSecret(ctx, store.PurposeReset, c, func(ctx context.Context, tx store.Repositories, s store.Secret, now time.Time) error {
+			done = resetDone{}
+			return a.applyReset(ctx, tx, s, r.Password, now, &done)
+		})
+		if r.Token == "" || !errors.Is(confirmed, ErrInvalidSecret) {
+			return confirmed
+		}
+		return a.confirmSecret(ctx, store.PurposeInvite, c, func(ctx context.Context, tx store.Repositories, s store.Secret, now time.Time) error {
+			done = resetDone{}
+			return a.applyInvitation(ctx, tx, s, r.Password, now, &done)
+		})
 	})
 	if err != nil {
 		return err
+	}
+	if done.invited {
+		a.emit(ctx, Event{Type: EventChannelVerified, UserID: done.userID, Channel: done.channelType, Address: maskValue(done.channelValue), IP: eventAddress(r.IP)})
+		a.emit(ctx, Event{
+			Type: EventPasswordReset, UserID: done.userID, Channel: done.channelType, Address: maskValue(done.channelValue), IP: eventAddress(r.IP),
+			Details: map[string]string{"kind": "invitation"},
+		})
+		return nil
 	}
 	a.emit(ctx, Event{
 		Type: EventPasswordReset, UserID: done.userID, Channel: done.channelType, Address: maskValue(done.channelValue), IP: eventAddress(r.IP),
@@ -126,6 +146,53 @@ type resetDone struct {
 	channelType  string
 	channelValue string
 	revoked      int
+	invited      bool
+}
+
+func (a *Auth) applyInvitation(ctx context.Context, tx store.Repositories, s store.Secret, password string, now time.Time, out *resetDone) error {
+	user, err := tx.Users().Get(ctx, a.tenant, s.UserID)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return ErrInvalidSecret
+	case err != nil:
+		return err
+	case user.Status == store.StatusDeleted, user.PasswordHash != "":
+		return ErrInvalidSecret
+	}
+	channel, err := tx.Identifiers().Find(ctx, a.tenant, s.ChannelType, s.ChannelValue)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return ErrInvalidSecret
+	case err != nil:
+		return err
+	case channel.UserID != user.ID:
+		return ErrInvalidSecret
+	}
+	identifiers, err := tx.Identifiers().ListByUser(ctx, a.tenant, user.ID)
+	if err != nil {
+		return err
+	}
+	if rules := a.policy.Check(ctx, password, loginsOf(identifiers)); len(rules) > 0 {
+		return &PolicyError{Rules: rules}
+	}
+	hash, err := a.hasher.Hash(ctx, password)
+	if err != nil {
+		return err
+	}
+	user.PasswordHash, user.MustChangePassword = hash, false
+	if _, err = tx.Users().Update(ctx, user); err != nil {
+		return err
+	}
+	if err = tx.Identifiers().MarkVerified(ctx, a.tenant, channel.Type, channel.Value, now); err != nil {
+		return err
+	}
+	for _, purpose := range []store.SecretPurpose{store.PurposeInvite, store.PurposeReset} {
+		if _, err = tx.Secrets().End(ctx, store.SecretScope{TenantID: a.tenant, UserID: user.ID, Purpose: purpose}, now); err != nil {
+			return err
+		}
+	}
+	*out = resetDone{userID: user.ID, channelType: channel.Type, channelValue: channel.Value, invited: true}
+	return nil
 }
 
 func (a *Auth) applyReset(ctx context.Context, tx store.Repositories, s store.Secret, password string, now time.Time, out *resetDone) error {

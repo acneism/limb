@@ -47,9 +47,15 @@ const (
 	// MessageSignupAttempt tells the owner of an address that someone tried to
 	// sign up with it, which an account has already. It carries no secret.
 	MessageSignupAttempt MessageKind = "signup_attempt"
+	// MessageInvitation tells the holder of an address or a phone number that an
+	// administrator made an account for them, and carries the link that lets them
+	// choose the password. It has no code.
+	MessageInvitation MessageKind = "invitation"
 )
 
-var messageKinds = []MessageKind{MessageVerification, MessagePasswordReset, MessagePasswordChanged, MessageSignupAttempt}
+var messageKinds = []MessageKind{
+	MessageVerification, MessagePasswordReset, MessagePasswordChanged, MessageSignupAttempt, MessageInvitation,
+}
 
 // Message is what a Sender delivers. It comes ready to send, with the texts that
 // the templates made, and it carries the raw data too, for an application whose

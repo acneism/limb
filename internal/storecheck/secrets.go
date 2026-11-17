@@ -85,7 +85,7 @@ func secretKind(kind store.SecretKind) error {
 
 func Purpose(purpose store.SecretPurpose) error {
 	switch purpose {
-	case store.PurposeVerify, store.PurposeReset:
+	case store.PurposeVerify, store.PurposeReset, store.PurposeInvite:
 		return nil
 	}
 	return invalid("secret purpose %q is unknown", string(purpose))

@@ -30,6 +30,9 @@ const (
 	PurposeVerify SecretPurpose = "verify"
 	// PurposeReset lets the user choose a new password.
 	PurposeReset SecretPurpose = "reset"
+	// PurposeInvite lets the holder of a channel that an administrator named
+	// choose the first password of the account, which confirms the channel.
+	PurposeInvite SecretPurpose = "invite"
 )
 
 // Secret is a link token or a code that was sent to a channel of a user. The

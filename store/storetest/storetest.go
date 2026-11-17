@@ -88,6 +88,7 @@ var cases = []testCase{
 	{name: "RefreshTokens/rollback", run: testRefreshTokenRollback},
 	{name: "RefreshTokens/DeleteExpired", run: testRefreshTokenDeleteExpired},
 	{name: "Secrets/link", run: testSecretLink},
+	{name: "Secrets/invitation", run: testSecretInvitationLink},
 	{name: "Secrets/links that are refused", run: testSecretLinkRefusals},
 	{name: "Secrets/Add errors", run: testSecretAddErrors},
 	{name: "Secrets/TryCodes counts attempts", run: testSecretTryCodes},

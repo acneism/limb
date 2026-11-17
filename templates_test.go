@@ -520,3 +520,30 @@ func parseOrFail(t *testing.T, source string) *texttemplate.Template {
 	}
 	return parsed
 }
+
+func TestAnInvitationCarriesTheLinkAndNoCode(t *testing.T) {
+	r := newTestRenderer(t)
+	for _, language := range supportedLanguages {
+		data := dataFor(language, true, false)
+		email, err := r.render(MessageInvitation, language, "email", data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, text := range []string{email.text, email.html} {
+			if !strings.Contains(text, sampleLink) || !strings.Contains(text, data.LinkExpiresIn) || strings.Contains(text, "123456") {
+				t.Errorf("%s: the invitation lacks the link and its time or shows a code: %q", language, text)
+			}
+		}
+		short, err := r.render(MessageInvitation, language, "phone", data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(short.text, sampleLink) || strings.Contains(short.text, "123456") {
+			t.Errorf("%s: a short invitation carries the link and no code: %q", language, short.text)
+		}
+		bare, err := r.render(MessageInvitation, language, "email", dataFor(language, false, false))
+		if err != nil || strings.Contains(bare.text, "https://") {
+			t.Errorf("%s: an invitation without a link = %q, %v", language, bare.text, err)
+		}
+	}
+}

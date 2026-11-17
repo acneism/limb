@@ -324,6 +324,18 @@ func managedUser(u store.User, identifiers []store.Identifier, now time.Time) Ma
 	}
 }
 
+func (a *Auth) createdUser(user store.User, identifiers []store.Identifier) ManagedUser {
+	return managedUser(user, identifiers, a.now())
+}
+
+func identifierValues(identifiers []store.Identifier) map[string]any {
+	values := make(map[string]any, len(identifiers))
+	for _, i := range identifiers {
+		values[i.Type] = i.Value
+	}
+	return values
+}
+
 func (a *Auth) managedUserByID(ctx context.Context, id UserID) (ManagedUser, error) {
 	u, err := a.store.Users().Get(ctx, a.tenant, string(id))
 	switch {

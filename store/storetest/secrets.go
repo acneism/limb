@@ -125,6 +125,32 @@ func testSecretLink(t *testing.T, s store.Store) {
 	}
 }
 
+func testSecretInvitationLink(t *testing.T, s store.Store) {
+	ctx := t.Context()
+	prepareSecrets(t, s)
+	link := newSecret(store.SecretLink, 1, id(1), store.PurposeInvite, aliceEmail)
+	mustAddSecret(t, s, link)
+	at := link.CreatedAt.Add(time.Minute)
+	if _, err := s.Secrets().UseLink(ctx, tenantA, store.PurposeReset, link.Hash, at); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("UseLink of an invitation as a reset = %v, want ErrNotFound", err)
+	}
+	if ended, err := s.Secrets().End(ctx, scopeOf(id(1), store.PurposeReset), at); err != nil || ended != 0 {
+		t.Fatalf("End of the resets of the user = %d, %v; want 0: an invitation is no reset", ended, err)
+	}
+	got, err := s.Secrets().UseLink(ctx, tenantA, store.PurposeInvite, link.Hash, at)
+	if err != nil {
+		t.Fatalf("UseLink failed: %v", err)
+	}
+	want := link
+	want.UsedAt = at
+	checkSecret(t, got, want)
+	second := newSecret(store.SecretLink, 2, id(1), store.PurposeInvite, aliceEmail)
+	mustAddSecret(t, s, second)
+	if ended, err := s.Secrets().End(ctx, scopeOf(id(1), store.PurposeInvite), at); err != nil || ended != 1 {
+		t.Fatalf("End of the invitations of the user = %d, %v; want the one that is not used", ended, err)
+	}
+}
+
 func testSecretLinkRefusals(t *testing.T, s store.Store) {
 	ctx := t.Context()
 	prepareSecrets(t, s)
@@ -205,7 +231,7 @@ func testSecretAddErrors(t *testing.T, s store.Store) {
 		"no kind":              func(x *store.Secret) { x.Kind = "" },
 		"an unknown kind":      func(x *store.Secret) { x.Kind = "token" },
 		"no purpose":           func(x *store.Secret) { x.Purpose = "" },
-		"an unknown purpose":   func(x *store.Secret) { x.Purpose = "invite" },
+		"an unknown purpose":   func(x *store.Secret) { x.Purpose = "promote" },
 		"no hash":              func(x *store.Secret) { x.Hash = nil },
 		"a short hash":         func(x *store.Secret) { x.Hash = x.Hash[:31] },
 		"a long hash":          func(x *store.Secret) { x.Hash = append(bytes.Clone(x.Hash), 0) },

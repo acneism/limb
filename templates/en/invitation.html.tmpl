@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{.ServiceName}}</title>
+</head>
+<body>
+<p><strong>{{.ServiceName}}</strong></p>
+<p>An account was made for you, and this address is where we will reach you.</p>
+{{if .Link}}<p>To choose your password and start, open <a href="{{.Link}}">this link</a>. It works for {{.LinkExpiresIn}}.</p>
+<p>If the link does not open, copy this address into the browser:<br>{{.Link}}</p>
+{{end}}<p>If you did not expect this invitation, ignore this message.</p>
+</body>
+</html>

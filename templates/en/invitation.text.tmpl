@@ -1,0 +1,9 @@
+{{.ServiceName}}
+
+An account was made for you, and this address is where we will reach you.
+{{if .Link}}
+To choose your password and start, open this link. It works for {{.LinkExpiresIn}}:
+
+{{.Link}}
+{{end}}
+If you did not expect this invitation, ignore this message.

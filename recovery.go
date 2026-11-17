@@ -16,6 +16,7 @@ import (
 const (
 	resetLinkLifetime  = 30 * time.Minute
 	verifyLinkLifetime = 24 * time.Hour
+	inviteLinkLifetime = 7 * 24 * time.Hour
 	codeLifetime       = 10 * time.Minute
 	messagesPerHour    = 5
 	maxBaseURLLength   = 1024
@@ -73,6 +74,7 @@ type recoveryJob struct {
 	purpose  store.SecretPurpose
 	kind     MessageKind
 	language string
+	linkOnly bool
 }
 
 func (a *Auth) recoveryReady() bool {
@@ -80,15 +82,20 @@ func (a *Auth) recoveryReady() bool {
 }
 
 func (a *Auth) baseURL(purpose store.SecretPurpose) string {
-	if purpose == store.PurposeReset {
+	if purpose == store.PurposeReset || purpose == store.PurposeInvite {
 		return a.resetURL
 	}
 	return a.verifyURL
 }
 
 func linkLifetime(purpose store.SecretPurpose) time.Duration {
-	if purpose == store.PurposeReset {
+	switch purpose {
+	case store.PurposeReset:
 		return resetLinkLifetime
+	case store.PurposeInvite:
+		return inviteLinkLifetime
+	case store.PurposeVerify:
+		return verifyLinkLifetime
 	}
 	return verifyLinkLifetime
 }
@@ -158,7 +165,11 @@ func (a *Auth) sendSecretsToUser(ctx context.Context, userID string, j recoveryJ
 	if err != nil {
 		return fmt.Errorf("limb: list the identifiers: %w", err)
 	}
-	for _, channel := range a.deliveryChannels(identifiers, j.purpose == store.PurposeReset) {
+	channels := a.deliveryChannels(identifiers, j.purpose == store.PurposeReset)
+	if j.purpose == store.PurposeInvite {
+		channels = append(a.deliveryChannels(identifiers, true), a.deliveryChannels(identifiers, false)...)
+	}
+	for _, channel := range channels {
 		if err = a.sendSecretsTo(ctx, user, channel, j); err != nil {
 			a.failMessage(ctx, err)
 		}
@@ -228,21 +239,25 @@ func (a *Auth) issueSecrets(ctx context.Context, user store.User, channel store.
 	now := a.now().UTC().Truncate(time.Microsecond)
 	scope := store.SecretScope{TenantID: a.tenant, UserID: user.ID, Purpose: j.purpose, ChannelType: channel.Type, ChannelValue: channel.Value}
 	var issued issuedSecrets
-	code, err := a.keys.NewCode()
-	if err != nil {
-		return issued, fmt.Errorf("limb: %w", err)
+	made := store.Secret{
+		TenantID: a.tenant, UserID: user.ID, Purpose: j.purpose, ChannelType: channel.Type, ChannelValue: channel.Value, CreatedAt: now,
 	}
-	codeID, err := a.newID()
-	if err != nil {
-		return issued, err
+	var secrets []store.Secret
+	if !j.linkOnly {
+		code, err := a.keys.NewCode()
+		if err != nil {
+			return issued, fmt.Errorf("limb: %w", err)
+		}
+		codeID, err := a.newID()
+		if err != nil {
+			return issued, err
+		}
+		codeSecret := made
+		codeSecret.ID, codeSecret.Kind, codeSecret.ExpiresAt = codeID, store.SecretCode, now.Add(codeLifetime)
+		codeSecret.Hash = a.keys.CodeHash(codeBinding(codeSecret), code)
+		issued.code, issued.codeExpires = code, codeSecret.ExpiresAt
+		secrets = append(secrets, codeSecret)
 	}
-	codeSecret := store.Secret{
-		TenantID: a.tenant, ID: codeID, Kind: store.SecretCode, UserID: user.ID, Purpose: j.purpose,
-		ChannelType: channel.Type, ChannelValue: channel.Value, CreatedAt: now, ExpiresAt: now.Add(codeLifetime),
-	}
-	codeSecret.Hash = a.keys.CodeHash(codeBinding(codeSecret), code)
-	issued.code, issued.codeExpires = code, codeSecret.ExpiresAt
-	secrets := []store.Secret{codeSecret}
 	if base := a.baseURL(j.purpose); base != "" {
 		token, hash, tokenErr := newSecret()
 		if tokenErr != nil {
@@ -252,12 +267,15 @@ func (a *Auth) issueSecrets(ctx context.Context, user store.User, channel store.
 		if idErr != nil {
 			return issued, idErr
 		}
-		linkSecret := codeSecret
+		linkSecret := made
 		linkSecret.ID, linkSecret.Kind, linkSecret.Hash, linkSecret.ExpiresAt = linkID, store.SecretLink, hash, now.Add(linkLifetime(j.purpose))
 		secrets = append(secrets, linkSecret)
 		issued.link, issued.linkExpires = base+fragmentPrefix+token, linkSecret.ExpiresAt
 	}
-	err = a.store.InTx(ctx, func(ctx context.Context, tx store.Repositories) error {
+	if len(secrets) == 0 {
+		return issuedSecrets{none: true}, nil
+	}
+	err := a.store.InTx(ctx, func(ctx context.Context, tx store.Repositories) error {
 		if _, endErr := tx.Secrets().End(ctx, scope, now); endErr != nil {
 			return endErr
 		}

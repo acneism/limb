@@ -147,8 +147,12 @@ func parseSet(key templateKey, source MessageTemplate) (templateSet, error) {
 func (r *renderer) check(key templateKey, set templateSet) error {
 	link := sampleLinkBase + strings.Repeat("A", 43)
 	samples := []MessageData{{}}
-	if key.kind == MessageVerification || key.kind == MessagePasswordReset {
+	switch key.kind {
+	case MessageVerification, MessagePasswordReset:
 		samples = []MessageData{{Link: link, Code: sampleCode}, {Code: sampleCode}}
+	case MessageInvitation:
+		samples = []MessageData{{Link: link}}
+	case MessagePasswordChanged, MessageSignupAttempt:
 	}
 	for _, data := range samples {
 		data.LinkExpiresIn, data.CodeExpiresIn = describeDuration(key.language, 30*time.Minute), describeDuration(key.language, 10*time.Minute)
