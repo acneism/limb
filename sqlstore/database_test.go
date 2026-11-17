@@ -87,10 +87,13 @@ func TestTablesUseThePrefix(t *testing.T) {
 			t.Fatal(err)
 		}
 		want := []string{
-			s.prefix + "attempts", s.prefix + "identifiers", s.prefix + "refresh_tokens", s.prefix + "schema",
-			s.prefix + "secrets", s.prefix + "sessions", s.prefix + "signing_keys", s.prefix + "users",
+			s.prefix + "admin_recovery_codes", s.prefix + "admin_sessions", s.prefix + "admins", s.prefix + "attempts",
+			s.prefix + "audit_log", s.prefix + "identifiers", s.prefix + "refresh_tokens", s.prefix + "schema",
+			s.prefix + "secrets", s.prefix + "sessions", s.prefix + "settings", s.prefix + "signing_keys", s.prefix + "users",
 		}
-		if got := d.Tables(t, s.prefix); !slices.Equal(got, want) {
+		got := d.Tables(t, s.prefix)
+		slices.Sort(got)
+		if !slices.Equal(got, want) {
 			t.Fatalf("tables = %v, want %v", got, want)
 		}
 	})

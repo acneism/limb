@@ -16,6 +16,7 @@ const (
 	oracleDeadlock            = 60
 	oracleNoSuchTable         = 942
 	oracleNameInUse           = 955
+	oracleColumnExists        = 1430
 	oracleConstraintExists    = 2275
 	oracleParentKeyMissing    = 2291
 	oracleChildRecordFound    = 2292
@@ -65,7 +66,7 @@ func (oracleDialect) IsMissingTable(err error) bool {
 
 func (oracleDialect) IsAlreadyExists(err error) bool {
 	switch oracleCode(err) {
-	case oracleNameInUse, oracleConstraintExists:
+	case oracleNameInUse, oracleColumnExists, oracleConstraintExists:
 		return true
 	}
 	return false

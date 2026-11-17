@@ -17,8 +17,10 @@ const (
 	mysqlParentRowMissing    = 1452
 	mysqlNoSuchTable         = 1146
 	mysqlTableExists         = 1050
+	mysqlDuplicateColumn     = 1060
 	mysqlDuplicateKeyName    = 1061
 	mysqlDuplicateConstraint = 1826
+	mysqlDuplicateCheck      = 3822
 	mysqlDeadlock            = 1213
 
 	mysqlTimeLayout = "2006-01-02 15:04:05.999999"
@@ -73,7 +75,7 @@ func (mysqlDialect) IsMissingTable(err error) bool {
 
 func (mysqlDialect) IsAlreadyExists(err error) bool {
 	switch mysqlNumber(err) {
-	case mysqlTableExists, mysqlDuplicateKeyName, mysqlDuplicateConstraint:
+	case mysqlTableExists, mysqlDuplicateColumn, mysqlDuplicateKeyName, mysqlDuplicateConstraint, mysqlDuplicateCheck:
 		return true
 	}
 	return false

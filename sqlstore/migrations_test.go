@@ -9,6 +9,7 @@ import (
 
 var (
 	createTable   = regexp.MustCompile(`(?is)^CREATE TABLE (?:IF NOT EXISTS )?(\S+)\s*\((.*)\)[^)]*$`)
+	addColumn     = regexp.MustCompile(`(?is)^ALTER TABLE (\S+)\s+ADD\s+(?:COLUMN\s+)?(?:IF NOT EXISTS\s+)?\(?\s*(\w+)\s+(\S.*)$`)
 	keyedColumns  = regexp.MustCompile(`(?i)(?:PRIMARY KEY|UNIQUE)\s*\(([^)]*)\)`)
 	timestampType = regexp.MustCompile(`(?i)^\S+\s+TIMESTAMP`)
 	nonColumn     = map[string]bool{"CONSTRAINT": true, "PRIMARY": true, "UNIQUE": true, "INDEX": true, "FOREIGN": true, "CHECK": true, "KEY": true}
@@ -51,6 +52,13 @@ func tablesOf(t *testing.T, dialect Dialect) map[string]table {
 	}
 	tables := map[string]table{}
 	for _, statement := range statements {
+		if added := addColumn.FindStringSubmatch(statement); added != nil {
+			extended := tables[added[1]]
+			extended.columns = append(extended.columns, added[2])
+			extended.types[added[2]] = added[2] + " " + added[3]
+			tables[added[1]] = extended
+			continue
+		}
 		match := createTable.FindStringSubmatch(statement)
 		if match == nil {
 			continue
@@ -81,8 +89,11 @@ func tablesOf(t *testing.T, dialect Dialect) map[string]table {
 
 func TestEveryDialectHasTheSameTablesAndColumns(t *testing.T) {
 	want := tablesOf(t, Postgres)
-	if len(want) != 8 {
-		t.Fatalf("PostgreSQL has %d tables, want 8", len(want))
+	if len(want) != 13 {
+		t.Fatalf("PostgreSQL has %d tables, want 13", len(want))
+	}
+	if columns := want["p_users"].columns; columns[len(columns)-1] != "created_via" {
+		t.Fatalf("the columns of p_users are %v, want created_via added by a migration to be the last", columns)
 	}
 	for _, dialect := range []Dialect{MySQL, MariaDB, Oracle} {
 		got := tablesOf(t, dialect)

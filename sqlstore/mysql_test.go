@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -48,8 +49,10 @@ func TestMySQLDialectsRecognizeTheErrorsOfTheDriver(t *testing.T) {
 		{name: "a parent that is referenced", err: &MySQLError{Number: 1451}, foreignKey: true},
 		{name: "a missing table", err: &MySQLError{Number: 1146}, missing: true},
 		{name: "a table that exists", err: &MySQLError{Number: 1050}, exists: true},
+		{name: "a column that exists", err: &MySQLError{Number: 1060}, exists: true},
 		{name: "a key that exists", err: &MySQLError{Number: 1061}, exists: true},
 		{name: "a constraint that exists", err: &MySQLError{Number: 1826}, exists: true},
+		{name: "a check constraint that exists", err: &MySQLError{Number: 3822}, exists: true},
 		{name: "a deadlock", err: &MySQLError{Number: 1213}, retrial: true},
 		{name: "a lock wait timeout", err: &MySQLError{Number: 1205}},
 		{name: "a syntax error", err: &MySQLError{Number: 1064}},
@@ -130,23 +133,41 @@ func TestMySQLMigrationsSplitIntoTheSameStatementsAsPostgres(t *testing.T) {
 			t.Fatalf("%s: %v", dialect.Name(), err)
 		}
 		for n := range versions {
-			if len(versions[n].statements) != len(postgres[n].statements)-indexStatements(postgres[n]) {
-				t.Errorf("%s: migration %s has %d statements, PostgreSQL has %d and %d of them create indexes",
-					dialect.Name(), versions[n].name, len(versions[n].statements), len(postgres[n].statements), indexStatements(postgres[n]))
+			inline := inlineIndexStatements(postgres[n])
+			if len(versions[n].statements) != len(postgres[n].statements)-inline {
+				t.Errorf("%s: migration %s has %d statements, PostgreSQL has %d and %d of them create indexes of tables of the same migration",
+					dialect.Name(), versions[n].name, len(versions[n].statements), len(postgres[n].statements), inline)
 			}
 			for _, statement := range versions[n].statements {
-				if !strings.HasPrefix(statement, "CREATE TABLE IF NOT EXISTS ") {
-					t.Errorf("%s: %q is not a CREATE TABLE IF NOT EXISTS statement: indexes belong inside it", dialect.Name(), statement)
+				if !repeatableInMySQL(statement) {
+					t.Errorf("%s: %q cannot be repeated: use CREATE TABLE IF NOT EXISTS with the indexes inside it, "+
+						"or a CREATE INDEX or an ALTER TABLE ADD whose already-exists error the dialect recognizes", dialect.Name(), statement)
 				}
 			}
 		}
 	}
 }
 
-func indexStatements(m migration) int {
+func repeatableInMySQL(statement string) bool {
+	return strings.HasPrefix(statement, "CREATE TABLE IF NOT EXISTS ") || strings.HasPrefix(statement, "CREATE INDEX ") ||
+		(strings.HasPrefix(statement, "ALTER TABLE ") && strings.Contains(statement, " ADD "))
+}
+
+var (
+	createdTable = regexp.MustCompile(`^CREATE TABLE IF NOT EXISTS (\S+)`)
+	indexedTable = regexp.MustCompile(`^CREATE INDEX (?:IF NOT EXISTS )?\S+ ON (\S+)`)
+)
+
+func inlineIndexStatements(m migration) int {
+	created := map[string]bool{}
+	for _, statement := range m.statements {
+		if match := createdTable.FindStringSubmatch(statement); match != nil {
+			created[match[1]] = true
+		}
+	}
 	n := 0
 	for _, statement := range m.statements {
-		if strings.HasPrefix(statement, "CREATE INDEX") {
+		if match := indexedTable.FindStringSubmatch(statement); match != nil && created[match[1]] {
 			n++
 		}
 	}

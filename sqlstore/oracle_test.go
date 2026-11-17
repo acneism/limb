@@ -29,6 +29,7 @@ func TestOracleDialectRecognizesTheErrorsOfTheDriver(t *testing.T) {
 		{"a child record that is found", &OracleError{ErrCode: 2292}, verdict{foreignKey: true}},
 		{"a table that is missing", &OracleError{ErrCode: 942}, verdict{missingTable: true}},
 		{"a name that is in use", &OracleError{ErrCode: 955}, verdict{exists: true}},
+		{"a column that exists", &OracleError{ErrCode: 1430}, verdict{exists: true}},
 		{"a constraint that exists", &OracleError{ErrCode: 2275}, verdict{exists: true}},
 		{"a deadlock", &OracleError{ErrCode: 60}, verdict{retryable: true}},
 		{"no handler for the protocol stack", &OracleError{ErrCode: 12516}, verdict{}},
