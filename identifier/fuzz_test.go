@@ -52,3 +52,27 @@ func FuzzCustom(f *testing.F) {
 		"", "ab", "a1b2c3", " ab ", "AB", "a b", "\u00a0ab\u00a0",
 	})
 }
+
+func FuzzResolveDelivery(f *testing.F) {
+	types := []identifier.Type{
+		identifier.Email(identifier.Required()),
+		identifier.Username(),
+		identifier.Custom("sms", identifier.Pattern(`\+[0-9]{10,14}`), identifier.Delivery()),
+	}
+	for _, seed := range []string{"", "a@b.co", "+79991234567", "alice_01", " Alice@Example.com ", "+7 999", "\x00", "user@пример.рф"} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, raw string) {
+		typ, value, err := identifier.ResolveDelivery(types, raw)
+		if err != nil {
+			return
+		}
+		if !typ.IsDelivery() || value == "" || !utf8.ValidString(value) {
+			t.Fatalf("ResolveDelivery(%q) = %s, %q", raw, typ.Name(), value)
+		}
+		again, err := typ.Normalize(value)
+		if err != nil || again != value {
+			t.Fatalf("the value of ResolveDelivery(%q) is not normalized: %q -> %q (%v)", raw, value, again, err)
+		}
+	})
+}
