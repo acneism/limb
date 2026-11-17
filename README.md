@@ -41,6 +41,38 @@ The link in a message is the address given with `WithVerifyURL` or `WithResetURL
 - The limits count registrations and requests for messages by the address of the client and by the address, the phone number or the login that they name, and wrong links and codes by the address of the client. They answer `429` with `Retry-After`, see `limb.WithRecoveryLimits`. A queue of messages that is full answers `503 busy`.
 - `Hooks.OnEvent` hears about every registration, sign-in, change and reset of a password, confirmed channel and message that failed, after the operation was committed, and never gets a password, a link or a code. It runs in the request, except for the user that `Signup` created: that event is delivered in the background, so that a slow hook cannot show whether an address was taken.
 
+## Users, the audit log and the maintenance
+
+`auth.Admin()` returns the operations that the administration does, for the code of the application. What they change is written to the audit log as done by the actor `api` of the system, in the transaction of the change, so a change without its record does not happen. The operations that change a user return `limb.ErrUserNotFound` for a user that does not exist and `limb.ErrUserDeleted` for one that is deleted, except `RestoreUser`, which asks for a deleted one. A call that lost a race with other changes of the same user eight times in a row returns `limb.ErrConcurrentChange` and changed nothing.
+
+| Operation | What it does |
+| --- | --- |
+| `ListUsers(ctx, limb.UserFilter{...})` | A page of users, 50 by default and 200 at most, with their identifiers and the way they came to be (`api`, `signup`, `admin`, `invite`). It filters by status, confirmation, the periods of creation and of the last sign-in, and searches. A text of three characters or more finds the users that have a value of any type that starts with it, as an e-mail address in lower case or a phone number as it is typed; a shorter one finds an exact value. It is ordered by creation, last sign-in or status and read page by page with `UserPage.Next`, which is a cursor bound to the order and the direction |
+| `User`, `UserSessions` | The card of a user whatever the status is, and the sessions that are in use |
+| `BlockUser`, `UnblockUser` | A block has a reason and may have an end. It ends every session and refresh token of the user at once. A block that has run out is shown as active, and the maintenance lifts it |
+| `EndUserSession`, `EndUserSessions` | Ends one session, or all, with the refresh tokens |
+| `SendPasswordReset` | Sends the link that resets the password to the channels of the user that are confirmed |
+| `SetTemporaryPassword` | Sets a password that follows the policy and returns it once. The user has to change it at the next sign-in |
+| `CreateUser`, `InviteUser`, `ResendInvitation` | A user with a password, which they have to change at the first sign-in unless `NewUser.KeepPassword` is set, or one invited by an address or a phone number only: the holder gets a link that works for seven days and only while the account has no password, and the channel is confirmed when they choose one |
+| `SetUserIdentifier`, `RemoveUserIdentifier`, `VerifyUserIdentifier` | Changes the values that a user signs in with, which the owners of the confirmed channels are told about, and confirms an address or a phone number on the word of the administrator |
+| `DeleteUser`, `RestoreUser` | A deleted user cannot sign in, their sessions and secrets end, and their values stay taken; they are kept for 30 days, `limb.WithDeletedUserRetention`, and can be restored until then. With `limb.WithImmediateDeletion` the user is erased at once together with what belongs to them |
+| `ListAudit` | The audit log, the newest record first, filtered by user, administrator, actions and period |
+| `PasswordToEndSessions`, `SetPasswordToEndSessions` | The setting that asks for the password to end the sessions of a user. What an administrator sets wins over `limb.WithPasswordToEndSessions`, and every instance sees it within 15 seconds |
+
+`Hooks.BeforeDelete` can refuse the deletion that an administrator asks for, for example while the user owns something: the deletion then returns `limb.ErrDeletionRefused`, which wraps the error of the hook, and a panic of the hook refuses it too. `Hooks.OnEvent` hears `EventUserBlocked`, `EventUserUnblocked`, `EventUserChanged`, `EventUserDeleted`, `EventUserRestored` and `EventUserPurged` besides the events of the users themselves.
+
+The audit log holds what the users did, as `auth.login`, `auth.login_failed`, `auth.password_changed` and the like, and what the administrators and the code did, as `user.blocked`, `user.deleted`, `setting.changed`, `admin.created` and the like. A record has the time, the actor (an administrator, a user or a part of the system: `cli`, `api` or `maintenance`), the action, the user it was done to, the address and the details, which hold the old and the new value and never a password, a code, a token or a secret; the details are at most 4000 bytes, and one that is longer is cut and says so. The records of the failed sign-ins and of the accounts that `Signup` made are written in the background through a queue of 256 records: a record that does not fit is dropped and logged as lost, so that a flood of wrong passwords cannot slow the sign-in down. The records are kept for a year, `limb.WithAuditRetention`.
+
+`auth.Cleanup(ctx)` removes what is no longer of use: old sessions and tokens, counters and secrets, the signing keys that are retired, the sessions of the administrators that ended, the records of the audit log that are past their retention, the deleted users whose retention has ended and the accounts that a visitor made with `Signup` and nobody confirmed for seven days, `limb.WithUnconfirmedAccountLifetime`, and it lifts the blocks that ran out. A user that is removed is removed in one transaction with its record in the audit log, so of several instances exactly one does it. `auth.RunMaintenance(ctx, interval)` calls it at once and then every interval, with a spread of ten percent, and changes the signing key when it is due. It blocks until the context ends, so it runs in a goroutine of its own, and a second call in a process returns `limb.ErrMaintenanceRunning`. Every step has a limit of time, and a failure or a panic of a step is logged and does not stop the loop. The command `cleanup` calls `Cleanup` once.
+
+```go
+go func() {
+	if err := auth.RunMaintenance(ctx, time.Hour); err != nil {
+		log.Print(err)
+	}
+}()
+```
+
 ## Databases
 
 The application opens the `*sql.DB` with the driver it prefers and gives `limb.New` the dialect of the database. limb imports no driver. The tests use the drivers in the table.

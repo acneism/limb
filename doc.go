@@ -123,6 +123,22 @@
 // WithRecoveryLimits. Each user gets five messages of a kind in an hour, and the
 // others are not sent.
 //
+// # Administration
+//
+// Admin returns the operations of the administration for the code of the
+// application: to list, search and read users and the audit log, to block and
+// unblock users, end their sessions, send a link to reset a password or set a
+// temporary one, to create and invite users, change what they sign in with and
+// confirm it, and to delete users and restore them. Every change is written to the
+// audit log in the transaction of the change, with the actor "system" named "api",
+// and is reported to OnEvent. BeforeDelete can refuse a deletion. A deleted user
+// is kept for 30 days, see WithDeletedUserRetention, unless WithImmediateDeletion
+// erases them at once. Cleanup removes what has run out, the deleted users and
+// the audit records that are past WithAuditRetention among it, and RunMaintenance
+// calls it from a timer. Migrate and RunCommand serve the main function of an
+// application that has no service yet: they create the schema and run the command
+// line.
+//
 // # HTTP
 //
 // Handler serves the routes for signing in and out, for the sessions of the user

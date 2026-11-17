@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
@@ -281,13 +282,20 @@ func ExampleHooks() {
 	_ = limb.WithHooks(hooks)
 }
 
-func newExampleService() *limb.Auth {
+func newExampleService(opts ...limb.Option) *limb.Auth {
 	masterKey := []byte(strings.Repeat("example master ", 3))
-	auth, err := limb.NewWithStore(memstore.New(), masterKey, limb.WithAutoMigrate())
+	auth, err := limb.NewWithStore(memstore.New(), masterKey, append([]limb.Option{limb.WithAutoMigrate()}, opts...)...)
 	if err != nil {
 		log.Fatal(err)
 	}
 	return auth
+}
+
+type inbox chan limb.Message
+
+func (i inbox) Send(_ context.Context, m limb.Message) error {
+	i <- m
+	return nil
 }
 
 func ExampleAuth_Admin() {
@@ -317,4 +325,138 @@ func ExampleAuth_RunCommandInput() {
 	// exit code 0
 	// the administrator root cannot sign in and has no sessions
 	// exit code 0
+}
+
+func ExampleAdminAPI_BlockUser() {
+	ctx := context.Background()
+	auth := newExampleService(limb.WithIdentifiers(identifier.Username()))
+	alice, err := auth.Register(ctx, limb.Registration{
+		Identifiers: map[string]string{"username": "alice"},
+		Password:    "correct horse battery staple",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	signIn := limb.Credentials{Login: "alice", Password: "correct horse battery staple", IP: netip.MustParseAddr("203.0.113.7"), Kind: limb.SessionCookie}
+
+	err = auth.Admin().BlockUser(ctx, alice.ID, "spam in the comments", time.Time{})
+	fmt.Println("blocked:", err == nil)
+	_, err = auth.Login(ctx, signIn)
+	fmt.Println("sign-in refused:", errors.Is(err, limb.ErrUserBlocked))
+
+	err = auth.Admin().UnblockUser(ctx, alice.ID)
+	fmt.Println("unblocked:", err == nil)
+	_, err = auth.Login(ctx, signIn)
+	fmt.Println("sign-in works:", err == nil)
+
+	page, err := auth.Admin().ListAudit(ctx, limb.AuditFilter{UserID: alice.ID, Actions: []string{"user.blocked", "user.unblocked"}})
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, entry := range page.Entries {
+		fmt.Println(entry.ActorKind, entry.ActorID, entry.Action)
+	}
+	// Output:
+	// blocked: true
+	// sign-in refused: true
+	// unblocked: true
+	// sign-in works: true
+	// system api user.unblocked
+	// system api user.blocked
+}
+
+func ExampleAdminAPI_ListUsers() {
+	ctx := context.Background()
+	auth := newExampleService(limb.WithIdentifiers(identifier.Email(identifier.Required()), identifier.Username()))
+	for _, name := range []string{"alice", "alina", "boris"} {
+		_, err := auth.Register(ctx, limb.Registration{
+			Identifiers: map[string]string{"email": name + "@example.com", "username": name},
+			Password:    "correct horse battery staple",
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	filter := limb.UserFilter{Search: "ali", Limit: 1}
+	for {
+		page, err := auth.Admin().ListUsers(ctx, filter)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, user := range page.Users {
+			fmt.Println(user.Status, user.CreatedVia, user.Identifiers[0].Value)
+		}
+		if page.Next == "" {
+			break
+		}
+		filter.Cursor = page.Next
+	}
+	// Output:
+	// active api alice@example.com
+	// active api alina@example.com
+}
+
+func ExampleAdminAPI_InviteUser() {
+	ctx := context.Background()
+	mailbox := make(inbox, 1)
+	auth := newExampleService(
+		limb.WithIdentifiers(identifier.Email(identifier.Required())),
+		limb.WithSender(mailbox),
+		limb.WithResetURL("https://app.example.com/reset"),
+	)
+	invited, err := auth.Admin().InviteUser(ctx, limb.Invitation{Identifiers: map[string]string{"email": "ivan@example.com"}, Language: "en"})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(invited.Status, invited.CreatedVia)
+
+	message := <-mailbox
+	fmt.Println(message.Kind, message.To)
+	_, token, _ := strings.Cut(message.Link, "#token=")
+	err = auth.ResetPassword(ctx, limb.ResetPasswordRequest{Token: token, Password: "correct horse battery staple"})
+	fmt.Println("password chosen:", err == nil)
+	err = auth.ResetPassword(ctx, limb.ResetPasswordRequest{Token: token, Password: "another horse battery staple"})
+	fmt.Println("the link works once:", errors.Is(err, limb.ErrInvalidSecret))
+	// Output:
+	// active invite
+	// invitation ivan@example.com
+	// password chosen: true
+	// the link works once: true
+}
+
+func ExampleMigrate() {
+	db, err := sql.Open("pgx", os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err = limb.Migrate(context.Background(), db, limb.Postgres, limb.WithTablePrefix("app_")); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func ExampleRunCommand() {
+	db, err := sql.Open("pgx", os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	masterKey, err := base64.StdEncoding.DecodeString(os.Getenv("LIMB_MASTER_KEY"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	os.Exit(limb.RunCommand(context.Background(), db, limb.Postgres, masterKey, os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func ExampleAuth_RunMaintenance() {
+	auth := openAuth()
+	ctx, stop := context.WithCancel(context.Background())
+	go func() {
+		if err := auth.RunMaintenance(ctx, time.Hour); err != nil {
+			log.Print(err)
+		}
+	}()
+	server := &http.Server{Addr: ":8080", Handler: auth.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	err := server.ListenAndServe()
+	stop()
+	log.Fatal(err)
 }
