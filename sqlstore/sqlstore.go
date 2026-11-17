@@ -157,6 +157,11 @@ func (s *Store) Audit() store.Audit {
 	return audit{s: s, x: s.auto}
 }
 
+// Admins returns the repository of the accounts of administrators.
+func (s *Store) Admins() store.Admins {
+	return admins{s: s, x: s.auto}
+}
+
 type repositories struct {
 	s *Store
 	x executor
@@ -196,6 +201,10 @@ func (r repositories) Settings() store.Settings {
 
 func (r repositories) Audit() store.Audit {
 	return audit(r)
+}
+
+func (r repositories) Admins() store.Admins {
+	return admins(r)
 }
 
 // InTx runs fn in a database transaction at the isolation level that the dialect

@@ -75,6 +75,10 @@ const (
 	// MaxAuditDetailsLength is the longest details of a record in the audit log.
 	MaxAuditDetailsLength = 4000
 
+	// MaxRecoveryCodes is the largest number of recovery codes that an
+	// administrator has.
+	MaxRecoveryCodes = 32
+
 	// MaxAuditActions is the largest number of actions that one query of the audit
 	// log asks for.
 	MaxAuditActions = 32
