@@ -88,6 +88,8 @@ type Auth struct {
 	resetURL   string
 	verifyURL  string
 
+	immediate    bool
+	retention    time.Duration
 	keepSessions bool
 	signup       bool
 	needVerified bool
@@ -266,6 +268,8 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 		resetURL:  cfg.resetURL,
 		verifyURL: cfg.verifyURL,
 
+		immediate:    cfg.immediate,
+		retention:    cmp.Or(cfg.retention, defaultDeletedRetention),
 		keepSessions: cfg.keepOpen,
 		signup:       cfg.signup,
 		needVerified: needVerified,

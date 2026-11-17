@@ -31,6 +31,8 @@ const (
 	SettingChanged     = "setting.changed"
 
 	UserCreated            = "user.created"
+	UserDeleted            = "user.deleted"
+	UserRestored           = "user.restored"
 	UserInvited            = "user.invited"
 	UserInvitationResent   = "user.invitation_resent"
 	UserIdentifierAdded    = "user.identifier_added"

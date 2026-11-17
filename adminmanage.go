@@ -22,10 +22,17 @@ type userEdit struct {
 	events []Event
 }
 
-func (a *Auth) editUser(
-	ctx context.Context, by actorRef, id UserID,
-	edit func(ctx context.Context, tx store.Repositories, u store.User, now time.Time) (userEdit, error),
-) error {
+type userEditor func(ctx context.Context, tx store.Repositories, u store.User, now time.Time) (userEdit, error)
+
+func (a *Auth) editUser(ctx context.Context, by actorRef, id UserID, edit userEditor) error {
+	return a.editUserWith(ctx, by, id, false, edit)
+}
+
+func (a *Auth) editDeletedUser(ctx context.Context, by actorRef, id UserID, edit userEditor) error {
+	return a.editUserWith(ctx, by, id, true, edit)
+}
+
+func (a *Auth) editUserWith(ctx context.Context, by actorRef, id UserID, allowDeleted bool, edit userEditor) error {
 	var err error
 	for range changeAttempts {
 		var applied userEdit
@@ -39,7 +46,7 @@ func (a *Auth) editUser(
 				return ErrUserNotFound
 			case getErr != nil:
 				return fmt.Errorf("limb: get the user: %w", getErr)
-			case u.Status == store.StatusDeleted:
+			case u.Status == store.StatusDeleted && !allowDeleted:
 				return ErrUserDeleted
 			}
 			var editErr error

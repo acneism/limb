@@ -53,6 +53,8 @@ type config struct {
 	keepOpen    bool
 	signup      bool
 	unverified  bool
+	immediate   bool
+	retention   time.Duration
 	err         error
 }
 

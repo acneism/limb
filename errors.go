@@ -88,6 +88,15 @@ var (
 	// the page where the user chooses the password.
 	ErrInvitationsDisabled = errors.New("limb: an invitation needs a Sender, a delivery channel and WithResetURL")
 
+	// ErrDeletionRefused is returned by DeleteUser when the hook BeforeDelete
+	// refused the deletion or panicked. When the hook returned an error, the error
+	// is wrapped too, so that the administrator can be told why.
+	ErrDeletionRefused = errors.New("limb: the deletion was refused")
+
+	// ErrRetentionOver is returned by RestoreUser for a user whose time of
+	// retention has ended. The record is removed for good by the next maintenance.
+	ErrRetentionOver = errors.New("limb: the retention of the deleted user is over")
+
 	// ErrNoConfirmedChannel is returned when a link has to be sent to the user and
 	// they have no address or phone number that is confirmed, because a mistyped
 	// one would hand the account to a stranger. Give them a temporary password

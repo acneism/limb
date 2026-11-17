@@ -30,6 +30,15 @@ const (
 	// EventUserUnblocked is reported when an administrator lifted a block.
 	EventUserUnblocked EventType = "user_unblocked"
 
+	// EventUserDeleted is reported when an administrator deleted a user.
+	// Details["mode"] is "soft", and then Details["purge_after"] is the time in RFC
+	// 3339 when the record is removed for good, or "immediate", when it is gone at
+	// once together with what belongs to it.
+	EventUserDeleted EventType = "user_deleted"
+
+	// EventUserRestored is reported when an administrator restored a deleted user.
+	EventUserRestored EventType = "user_restored"
+
 	// EventLogin is reported when a user signed in. Details["kind"] is "cookie" or
 	// "token".
 	EventLogin EventType = "login"
@@ -132,8 +141,15 @@ type Hooks struct {
 	// not know whether the address is taken, and its answer must not depend on it.
 	BeforeRegister func(ctx context.Context, r Registration) error
 
-	// BeforeDelete is declared for the deletion of users, which comes later with
-	// the administration of users. limb does not call it yet.
+	// BeforeDelete is called by AdminAPI.DeleteUser, before anything is changed, with
+	// the user that is about to be deleted, in the soft mode and in the immediate
+	// one. It can refuse the deletion by returning an error, which DeleteUser
+	// returns wrapped in ErrDeletionRefused, so the administrator can be told why;
+	// a panic refuses it too, and only the type of its value is logged. It is not
+	// called when the retention of a deleted user ends and the record is removed
+	// for good, nor when an account that nobody confirmed is removed: the
+	// application had its say when the user was deleted, and EventUserDeleted and
+	// EventUserPurged let it clear what it keeps of the user.
 	BeforeDelete func(ctx context.Context, u User) error
 
 	// OnEvent is called after an operation has been committed, in the goroutine of
