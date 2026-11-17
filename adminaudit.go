@@ -16,7 +16,8 @@ const (
 )
 
 // AuditFilter picks the records of the audit log. The conditions that are set all
-// have to hold.
+// have to hold. A moment in it is in the years from 1 to 9999, which every
+// database keeps.
 type AuditFilter struct {
 	// UserID keeps the records about this user: what happened to them and what
 	// they did.
@@ -97,6 +98,11 @@ func (a *Auth) listAudit(ctx context.Context, f AuditFilter) (AuditPage, error) 
 	if len(f.Actions) > store.MaxAuditActions {
 		return AuditPage{}, &ValidationError{Field: "actions", Reason: fmt.Sprintf("at most %d", store.MaxAuditActions)}
 	}
+	for field, at := range map[string]time.Time{"from": f.From, "to": f.To} {
+		if err := checkMoment(field, at); err != nil {
+			return AuditPage{}, err
+		}
+	}
 	q := store.AuditQuery{
 		TenantID: a.tenant, TargetUserID: string(f.UserID), ActorID: f.AdminID, Actions: f.Actions, From: f.From, To: f.To, Limit: limit + 1,
 	}
@@ -146,14 +152,18 @@ func encodeAuditCursor(r store.AuditRecord) string {
 func decodeAuditCursor(text string) (*store.AuditRecord, error) {
 	invalid := &ValidationError{Field: "cursor", Reason: "is not valid"}
 	raw, err := base64.RawURLEncoding.DecodeString(text)
-	if err != nil {
+	if err != nil || len(text) > longestCursor {
 		return nil, invalid
 	}
 	var c auditCursor
-	if err = json.Unmarshal(raw, &c); err != nil || c.ID == "" {
+	if err = json.Unmarshal(raw, &c); err != nil || c.ID == "" || len(c.ID) > store.MaxIDLength {
 		return nil, invalid
 	}
-	return &store.AuditRecord{At: time.UnixMicro(c.At).UTC(), ID: c.ID}, nil
+	at, ok := momentOf(c.At)
+	if !ok {
+		return nil, invalid
+	}
+	return &store.AuditRecord{At: at, ID: c.ID}, nil
 }
 
 // ListAudit returns a page of the audit log that matches the filter, the newest

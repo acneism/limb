@@ -130,6 +130,9 @@ func (a *Auth) blockUser(ctx context.Context, by actorRef, id UserID, reason str
 	if !until.IsZero() && !until.After(a.now()) {
 		return &ValidationError{Field: "until", Reason: "must be in the future"}
 	}
+	if err = checkMoment("until", until); err != nil {
+		return err
+	}
 	if !until.IsZero() {
 		until = until.UTC().Truncate(time.Microsecond)
 	}
@@ -318,8 +321,8 @@ func (a *Auth) setTemporaryPassword(ctx context.Context, by actorRef, id UserID,
 // sessions of the user and so their refresh tokens at once, and the user cannot
 // sign in until it is lifted or has run out. A user who is blocked already gets
 // the new reason and end. It returns a *ValidationError for a reason that is empty
-// or too long and for a time that is not in the future, ErrUserNotFound and
-// ErrUserDeleted.
+// or too long and for a time that is not in the future or is after the year 9999,
+// ErrUserNotFound and ErrUserDeleted.
 func (x *AdminAPI) BlockUser(ctx context.Context, id UserID, reason string, until time.Time) error {
 	return x.a.blockUser(ctx, apiActor, id, reason, until)
 }

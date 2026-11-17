@@ -168,7 +168,10 @@ func TestABlockNeedsAReasonAndAnEndInTheFuture(t *testing.T) {
 			t.Errorf("%s: BlockUser = %v, want a *ValidationError for the reason", name, err)
 		}
 	}
-	for name, until := range map[string]time.Time{"now": f.clock.now(), "past": f.clock.now().Add(-time.Hour)} {
+	for name, until := range map[string]time.Time{
+		"now": f.clock.now(), "past": f.clock.now().Add(-time.Hour), "a year no database keeps": time.Date(10000, time.January, 1, 0, 0, 0, 0, time.UTC),
+		"the last moment of the year that is kept in another zone": time.Date(9999, time.December, 31, 23, 0, 0, 0, time.FixedZone("west", -2*3600)),
+	} {
 		if err := f.a.Admin().BlockUser(t.Context(), f.user.ID, "reason", until); !errors.As(err, &validation) || validation.Field != "until" {
 			t.Errorf("%s: BlockUser = %v, want a *ValidationError for the end", name, err)
 		}

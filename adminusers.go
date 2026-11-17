@@ -21,6 +21,7 @@ const (
 	largestUsersPage = 200
 	shortestPrefix   = 3
 	longestSearch    = 128
+	longestCursor    = 512
 )
 
 // UserOrder tells what a list of users is ordered by. The users that have the
@@ -64,7 +65,8 @@ type ManagedUser struct {
 }
 
 // UserFilter picks the users of a list and orders them. The conditions that are
-// set all have to hold.
+// set all have to hold. A moment in it is in the years from 1 to 9999, which every
+// database keeps.
 type UserFilter struct {
 	// Statuses keeps the users whose stored status is one of these. A block that
 	// has run out is lifted by the maintenance, so for a while an account whose
@@ -169,6 +171,13 @@ func (a *Auth) userQuery(f UserFilter) (store.UserQuery, bool, error) {
 	if via != "" && !validCreatedVia(via) {
 		return store.UserQuery{}, false, &ValidationError{Field: "created_via", Reason: "unknown way"}
 	}
+	for field, at := range map[string]time.Time{
+		"created_from": f.CreatedFrom, "created_before": f.CreatedBefore, "last_login_from": f.LastLoginFrom, "last_login_before": f.LastLoginBefore,
+	} {
+		if err := checkMoment(field, at); err != nil {
+			return store.UserQuery{}, false, err
+		}
+	}
 	q := store.UserQuery{
 		TenantID: a.tenant, Statuses: f.Statuses, Confirmed: f.Confirmed, CreatedVia: via,
 		CreatedFrom: f.CreatedFrom, CreatedBefore: f.CreatedBefore, LastLoginFrom: f.LastLoginFrom, LastLoginBefore: f.LastLoginBefore,
@@ -269,19 +278,34 @@ func encodeUserCursor(u store.User, order UserOrder, descending bool) string {
 func decodeUserCursor(text string, order UserOrder, descending bool) (*store.User, error) {
 	invalid := &ValidationError{Field: "cursor", Reason: "is not valid for this list"}
 	raw, err := base64.RawURLEncoding.DecodeString(text)
-	if err != nil {
+	if err != nil || len(text) > longestCursor {
 		return nil, invalid
 	}
 	var c userCursor
-	if err = json.Unmarshal(raw, &c); err != nil || c.Order != order || c.Descending != descending || c.ID == "" {
+	if err = json.Unmarshal(raw, &c); err != nil || c.Order != order || c.Descending != descending || c.ID == "" || len(c.ID) > store.MaxIDLength {
 		return nil, invalid
 	}
-	after := &store.User{ID: c.ID, Status: c.Status}
-	if c.Created != 0 {
-		after.CreatedAt = time.UnixMicro(c.Created).UTC()
-	}
-	if c.LastLogin != 0 {
-		after.LastLoginAt = time.UnixMicro(c.LastLogin).UTC()
+	after := &store.User{ID: c.ID}
+	switch order {
+	case UserOrderCreated:
+		created, ok := momentOf(c.Created)
+		if !ok || c.Created == 0 {
+			return nil, invalid
+		}
+		after.CreatedAt = created
+	case UserOrderStatus:
+		if !validStatus(c.Status) {
+			return nil, invalid
+		}
+		after.Status = c.Status
+	case UserOrderLastLogin:
+		if c.LastLogin != 0 {
+			lastLogin, ok := momentOf(c.LastLogin)
+			if !ok {
+				return nil, invalid
+			}
+			after.LastLoginAt = lastLogin
+		}
 	}
 	return after, nil
 }

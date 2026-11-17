@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/acneism/limb/store"
 )
 
 func (i *instances) user(t *testing.T, a *Auth, name string) User {
@@ -558,6 +560,43 @@ func TestUsersOfTheAdministrationAreCreatedAndTheirPasswordsResetOnEveryDatabase
 			if !seen[action] {
 				t.Errorf("the audit log of the user has no record of %s", action)
 			}
+		}
+	})
+}
+
+func TestMomentsAtTheEdgesOfTheSupportedYearsWorkOnEveryDatabase(t *testing.T) {
+	eachDatabase(t, func(t *testing.T, d *database) {
+		in := newInstances(t, d)
+		ctx := t.Context()
+		nina := in.user(t, in.a, "nina")
+		first := time.Date(1, time.January, 1, 0, 0, 1, 0, time.UTC)
+		last := time.Date(9999, time.December, 31, 23, 59, 59, 999999000, time.UTC)
+		if err := in.a.Admin().BlockUser(ctx, nina.ID, "far away", last); err != nil {
+			t.Fatalf("BlockUser until the last moment failed: %v", err)
+		}
+		card, err := in.b.Admin().User(ctx, nina.ID)
+		if err != nil || card.Status != StatusBlocked || !card.BlockedUntil.Equal(last) {
+			t.Fatalf("the card is %+v, %v", card, err)
+		}
+		page, err := in.b.Admin().ListUsers(ctx, UserFilter{CreatedFrom: first, CreatedBefore: last, LastLoginFrom: first, LastLoginBefore: last})
+		if err != nil || len(page.Users) != 0 {
+			t.Fatalf("ListUsers at the edges = %+v, %v; want nobody, as nobody has signed in", page.Users, err)
+		}
+		page, err = in.b.Admin().ListUsers(ctx, UserFilter{CreatedFrom: first, CreatedBefore: last})
+		if err != nil || len(page.Users) != 1 {
+			t.Fatalf("ListUsers created between the edges = %+v, %v; want the user", page.Users, err)
+		}
+		entries, err := in.b.Admin().ListAudit(ctx, AuditFilter{From: first, To: last, UserID: nina.ID})
+		if err != nil || len(entries.Entries) == 0 {
+			t.Fatalf("ListAudit between the edges = %+v, %v; want the records of the user", entries, err)
+		}
+		cursor := encodeAuditCursor(store.AuditRecord{At: time.UnixMicro(0), ID: "x"})
+		if entries, err = in.b.Admin().ListAudit(ctx, AuditFilter{Cursor: cursor}); err != nil || len(entries.Entries) != 0 {
+			t.Fatalf("ListAudit after the beginning of the epoch = %+v, %v; want nothing", entries.Entries, err)
+		}
+		cursor = encodeAuditCursor(store.AuditRecord{At: last, ID: "x"})
+		if entries, err = in.b.Admin().ListAudit(ctx, AuditFilter{Cursor: cursor}); err != nil || len(entries.Entries) == 0 {
+			t.Fatalf("ListAudit after the last moment = %+v, %v; want everything", entries.Entries, err)
 		}
 	})
 }

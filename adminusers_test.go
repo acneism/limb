@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -243,9 +244,29 @@ func TestACursorThatDoesNotFitTheListIsRefused(t *testing.T) {
 		"no ID":             {Cursor: encode(`{"o":"created","c":5}`)},
 		"another list":      {Cursor: encode(`{"o":"status","i":"x"}`)},
 		"standard encoding": {Cursor: base64.StdEncoding.EncodeToString([]byte(`{"o":"created","i":"x"}`)) + "+"},
+		"no time":           {Cursor: encode(`{"o":"created","i":"x"}`)},
+		"a time that no database keeps": {
+			Cursor: encode(`{"o":"created","i":"x","c":9223372036854775807}`),
+		},
+		"the zero time":      {Cursor: encode(`{"o":"created","i":"x","c":-62135596800000000}`)},
+		"an ID that is long": {Cursor: encode(`{"o":"created","i":"` + strings.Repeat("a", store.MaxIDLength+1) + `","c":5}`)},
+		"a cursor that is long": {
+			Cursor: encode(`{"o":"created","i":"x","c":5,"s":"` + strings.Repeat("a", longestCursor) + `"}`),
+		},
+		"no status":                  {Order: UserOrderStatus, Cursor: encode(`{"o":"status","i":"x"}`)},
+		"a status that is unknown":   {Order: UserOrderStatus, Cursor: encode(`{"o":"status","i":"x","s":"gone"}`)},
+		"a last sign-in that is far": {Order: UserOrderLastLogin, Cursor: encode(`{"o":"last_login","i":"x","l":-9223372036854775808}`)},
 	} {
 		if _, err := f.a.Admin().ListUsers(t.Context(), filter); !errors.As(err, &validation) || validation.Field != "cursor" {
 			t.Errorf("%s: ListUsers = %v, want a *ValidationError for the cursor", name, err)
+		}
+	}
+	for name, filter := range map[string]UserFilter{
+		"a user who never signed in": {Order: UserOrderLastLogin, Cursor: encode(`{"o":"last_login","i":"x"}`)},
+		"a status":                   {Order: UserOrderStatus, Descending: true, Cursor: encode(`{"o":"status","d":true,"i":"x","s":"blocked"}`)},
+	} {
+		if _, err := f.a.Admin().ListUsers(t.Context(), filter); err != nil {
+			t.Errorf("%s: ListUsers failed: %v", name, err)
 		}
 	}
 	if _, err := f.a.Admin().ListUsers(t.Context(), UserFilter{Cursor: encode(`{"o":"created","i":"00000000-0000-7000-8000-000000000999","c":1}`)}); err != nil {
@@ -269,6 +290,27 @@ func TestAFilterThatCannotBeAppliedIsRefused(t *testing.T) {
 	}
 	if _, err := f.a.Admin().ListUsers(t.Context(), UserFilter{Limit: largestUsersPage + 1}); !errors.As(err, &validation) || validation.Field != "limit" {
 		t.Errorf("a limit over the largest = %v, want a *ValidationError", err)
+	}
+	beyond := []time.Time{
+		time.Date(10000, time.January, 1, 0, 0, 0, 0, time.UTC), time.Date(0, time.December, 31, 0, 0, 0, 0, time.UTC),
+		time.UnixMicro(math.MaxInt64), time.UnixMicro(math.MinInt64),
+	}
+	for _, at := range beyond {
+		for field, filter := range map[string]UserFilter{
+			"created_from": {CreatedFrom: at}, "created_before": {CreatedBefore: at},
+			"last_login_from": {LastLoginFrom: at}, "last_login_before": {LastLoginBefore: at},
+		} {
+			if _, err := f.a.Admin().ListUsers(t.Context(), filter); !errors.As(err, &validation) || validation.Field != field {
+				t.Errorf("%s of %v: ListUsers = %v, want a *ValidationError for that field", field, at, err)
+			}
+		}
+	}
+	edges := UserFilter{
+		CreatedFrom: time.Date(1, time.January, 1, 0, 0, 1, 0, time.UTC), CreatedBefore: time.Date(9999, time.December, 31, 23, 59, 59, 999999000, time.UTC),
+		LastLoginFrom: time.Date(1, time.January, 1, 0, 0, 1, 0, time.UTC), LastLoginBefore: time.Date(9999, time.December, 31, 23, 59, 59, 999999000, time.UTC),
+	}
+	if page, err := f.a.Admin().ListUsers(t.Context(), edges); err != nil || len(page.Users) != 2 {
+		t.Errorf("the edges of the years that are kept = %d users, %v; want the two who signed in", len(page.Users), err)
 	}
 	if page, err := f.a.Admin().ListUsers(t.Context(), UserFilter{Limit: largestUsersPage}); err != nil || len(page.Users) != 7 {
 		t.Errorf("the largest limit = %d users, %v", len(page.Users), err)
@@ -481,10 +523,26 @@ func TestAnAuditFilterThatCannotBeAppliedIsRefused(t *testing.T) {
 		"limit":   {Limit: -3},
 		"actions": {Actions: make([]string, store.MaxAuditActions+1)},
 		"cursor":  {Cursor: "not a cursor"},
+		"from":    {From: time.Date(10000, time.January, 1, 0, 0, 0, 0, time.UTC)},
+		"to":      {To: time.UnixMicro(math.MinInt64)},
 	} {
 		if _, err := f.a.Admin().ListAudit(t.Context(), filter); !errors.As(err, &validation) || validation.Field != field {
 			t.Errorf("%s: ListAudit = %v, want a *ValidationError for that field", field, err)
 		}
+	}
+	encode := func(text string) string { return base64.RawURLEncoding.EncodeToString([]byte(text)) }
+	for name, cursor := range map[string]string{
+		"a time that no database keeps": `{"t":9223372036854775807,"i":"x"}`,
+		"the zero time":                 `{"t":-62135596800000000,"i":"x"}`,
+		"an ID that is long":            `{"t":5,"i":"` + strings.Repeat("a", store.MaxIDLength+1) + `"}`,
+		"a cursor that is long":         `{"t":5,"i":"x","x":"` + strings.Repeat("a", longestCursor) + `"}`,
+	} {
+		if _, err := f.a.Admin().ListAudit(t.Context(), AuditFilter{Cursor: encode(cursor)}); !errors.As(err, &validation) || validation.Field != "cursor" {
+			t.Errorf("%s: ListAudit = %v, want a *ValidationError for the cursor", name, err)
+		}
+	}
+	if _, err := f.a.Admin().ListAudit(t.Context(), AuditFilter{Cursor: encode(`{"t":0,"i":"x"}`), From: time.Date(9999, time.December, 31, 23, 59, 59, 999999000, time.UTC)}); err != nil {
+		t.Errorf("a cursor at the first moment of the epoch and a filter at the last moment of the years that are kept failed: %v", err)
 	}
 	if _, err := f.a.Admin().ListAudit(t.Context(), AuditFilter{Limit: largestAuditPage + 1}); !errors.As(err, &validation) {
 		t.Errorf("a limit over the largest = %v, want a *ValidationError", err)
