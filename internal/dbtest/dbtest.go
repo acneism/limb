@@ -34,6 +34,7 @@ type engine struct {
 	driver   string
 	reported int64
 	cancels  bool
+	pool     int
 	list     func(ctx context.Context, db *sql.DB, prefix string) ([]string, error)
 	drop     func(table string) string
 }
@@ -72,6 +73,7 @@ var engines = []engine{
 		variable: "LIMB_TEST_ORACLE_DSN",
 		driver:   "oracle",
 		reported: 1,
+		pool:     16,
 		list: func(ctx context.Context, db *sql.DB, prefix string) ([]string, error) {
 			return listTables(ctx, db, "SELECT LOWER(table_name) FROM user_tables "+
 				"WHERE SUBSTR(LOWER(table_name), 1, :1) = :2 ORDER BY 1", len(prefix), prefix)
@@ -157,6 +159,10 @@ func open(t *testing.T, e engine) *Live {
 		t.Fatalf("sql.Open failed: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
+	if e.pool > 0 {
+		db.SetMaxOpenConns(e.pool)
+		db.SetMaxIdleConns(e.pool)
+	}
 	ctx, cancel := context.WithTimeout(t.Context(), connectTimeout)
 	defer cancel()
 	if err = db.PingContext(ctx); err != nil {

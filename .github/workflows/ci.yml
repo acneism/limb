@@ -218,7 +218,7 @@ jobs:
       - name: Test against ${{ matrix.image }}
         shell: bash
         run: |
-          go test -race -count=1 -v . ./sqlstore/... 2>&1 | tee integration.log
+          go test -race -count=1 -p 1 -v . ./sqlstore/... 2>&1 | tee integration.log
           if grep -E -e '--- SKIP' integration.log; then
             echo "integration tests must not be skipped"
             exit 1
