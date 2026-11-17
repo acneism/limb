@@ -47,6 +47,7 @@ type config struct {
 	templates   []templateOverride
 	sending     SendingOptions
 	hooks       Hooks
+	recovery    RecoveryLimits
 	err         error
 }
 

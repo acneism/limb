@@ -57,6 +57,7 @@ type Auth struct {
 
 	absolute   time.Duration
 	idle       time.Duration
+	recovery   recoveryLimits
 	origins    map[string]struct{}
 	cookie     string
 	algorithm  SigningAlgorithm
@@ -177,6 +178,10 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 	if err != nil {
 		return nil, err
 	}
+	recovery, err := cfg.recovery.resolve()
+	if err != nil {
+		return nil, err
+	}
 	sending, err := cfg.sending.resolve()
 	if err != nil {
 		return nil, err
@@ -214,6 +219,7 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 
 		absolute:   absolute,
 		idle:       idle,
+		recovery:   recovery,
 		origins:    make(map[string]struct{}, len(cfg.origins)),
 		cookie:     sessionCookieName(cfg.development),
 		algorithm:  cmp.Or(cfg.algorithm, SigningEdDSA),

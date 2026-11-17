@@ -42,6 +42,13 @@ var (
 	// ErrSessionNotFound is returned when the user has no active session with the
 	// given ID. It is the same for a session that belongs to someone else.
 	ErrSessionNotFound = errors.New("limb: session not found")
+
+	// ErrInvalidSecret is returned when a link or a code that confirms an address
+	// or resets a password is not accepted. It is the same for a link that is
+	// unknown, expired or used, a code that is wrong, expired or used up, a login
+	// or a channel that no code was sent to and a secret meant for something
+	// else, so it reveals nothing about which accounts exist.
+	ErrInvalidSecret = errors.New("limb: the link or the code is not valid")
 )
 
 // RateLimitError reports that there were too many failed attempts and says how

@@ -193,11 +193,18 @@ func (a *Auth) limited(ctx context.Context, keys attemptKeys, verify func() erro
 }
 
 func (a *Auth) checkLimits(ctx context.Context, keys attemptKeys) error {
-	wanted := make([]string, 0, 3)
-	for _, key := range []string{keys.accountIP, keys.ip, keys.account} {
+	return a.checkKeys(ctx, keys.accountIP, keys.ip, keys.account)
+}
+
+func (a *Auth) checkKeys(ctx context.Context, keys ...string) error {
+	wanted := make([]string, 0, len(keys))
+	for _, key := range keys {
 		if key != "" {
 			wanted = append(wanted, key)
 		}
+	}
+	if len(wanted) == 0 {
+		return nil
 	}
 	counters, err := a.store.Attempts().Get(ctx, wanted...)
 	if err != nil {
