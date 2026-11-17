@@ -81,8 +81,8 @@ func tablesOf(t *testing.T, dialect Dialect) map[string]table {
 
 func TestEveryDialectHasTheSameTablesAndColumns(t *testing.T) {
 	want := tablesOf(t, Postgres)
-	if len(want) != 7 {
-		t.Fatalf("PostgreSQL has %d tables, want 7", len(want))
+	if len(want) != 8 {
+		t.Fatalf("PostgreSQL has %d tables, want 8", len(want))
 	}
 	for _, dialect := range []Dialect{MySQL, MariaDB, Oracle} {
 		got := tablesOf(t, dialect)
