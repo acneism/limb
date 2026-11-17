@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/acneism/limb/internal/memstore"
 	"github.com/acneism/limb/store"
@@ -223,4 +224,43 @@ func TestDetailsThatCannotBeShortenedKeepOnlyTheMarkThatTheyWereCut(t *testing.T
 	if text != `{"`+truncatedKey+`":true}` {
 		t.Fatalf("the details are %q, want only the mark", text)
 	}
+}
+
+func FuzzEncode(f *testing.F) {
+	for _, seed := range []struct {
+		key, value string
+		repeats    uint16
+		count      uint8
+	}{
+		{"old", "a", 3000, 2}, {"новое", "я", 1500, 3}, {"", "", 0, 0}, {"k", "\xff\xfe", 800, 1}, {"x", "\U0001F600", 700, 5},
+		{strings.Repeat("k", 100), "v", 2, 40}, {"truncated", "x", 100, 3}, {"a\x00b", "<&>", 900, 4}, {strings.Repeat("k", 4500), "v", 1, 1},
+		{"k", "\u2028", 800, 63},
+	} {
+		f.Add(seed.key, seed.value, seed.repeats, seed.count)
+	}
+	f.Fuzz(func(t *testing.T, key, value string, repeats uint16, count uint8) {
+		if len(value) > 64 || len(key) > 8192 {
+			return
+		}
+		long := strings.Repeat(value, int(repeats)%4001)
+		details := map[string]any{"nested": map[string]any{key: []any{long, 7}}}
+		for i := range int(count) % 64 {
+			details[fmt.Sprintf("%s%d", key, i)] = long
+		}
+		text, err := Encode(details)
+		if err != nil {
+			t.Fatalf("Encode failed: %v", err)
+		}
+		var got map[string]any
+		if len(text) == 0 || len(text) > store.MaxAuditDetailsLength || !utf8.ValidString(text) || json.Unmarshal([]byte(text), &got) != nil {
+			t.Fatalf("Encode made %d bytes: %.200q", len(text), text)
+		}
+		plain, err := json.Marshal(details)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fits := len(plain) <= store.MaxAuditDetailsLength; fits != (text == string(plain)) || fits == (got[truncatedKey] == true) {
+			t.Fatalf("the details of %d bytes came out as %d bytes: %.200q", len(plain), len(text), text)
+		}
+	})
 }
