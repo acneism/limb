@@ -28,6 +28,7 @@ const (
 	AdminEnabled       = "admin.enabled"
 	AdminPasswordReset = "admin.password_reset"
 	AdminTOTPReset     = "admin.totp_reset"
+	SettingChanged     = "setting.changed"
 )
 
 const (

@@ -324,6 +324,10 @@ func checkClaim(name, value string) error {
 // authenticate again to end their sessions. It is recommended wherever the theft
 // of a session is a real risk, because a thief cannot then end the sessions of
 // the owner, who would otherwise lose track of the devices they are signed in on.
+//
+// The option gives the value that holds until an administrator sets one with
+// AdminAPI.SetPasswordToEndSessions or in the administration: what the
+// administrator set wins.
 func WithPasswordToEndSessions() Option {
 	return func(c *config) {
 		c.endSessions = true

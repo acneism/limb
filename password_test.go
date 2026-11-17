@@ -475,12 +475,12 @@ func TestEndingSessionsAsksForThePasswordWhenTheOptionIsOn(t *testing.T) {
 
 func TestTheSettingThatAsksForThePasswordIsReadInOnePlace(t *testing.T) {
 	f := newSessionFixture(t)
-	if f.a.passwordToEndSessions(t.Context()) {
-		t.Fatal("the password must not be needed by default")
+	if needed, err := f.a.passwordToEndSessions(t.Context()); err != nil || needed {
+		t.Fatalf("the password is needed by default: %v, %v", needed, err)
 	}
 	on := newSessionFixture(t, WithPasswordToEndSessions())
-	if !on.a.passwordToEndSessions(t.Context()) {
-		t.Fatal("WithPasswordToEndSessions must turn it on")
+	if needed, err := on.a.passwordToEndSessions(t.Context()); err != nil || !needed {
+		t.Fatalf("WithPasswordToEndSessions must turn it on: %v, %v", needed, err)
 	}
 }
 

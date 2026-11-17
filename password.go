@@ -12,8 +12,17 @@ import (
 
 const changeAttempts = 3
 
-func (a *Auth) passwordToEndSessions(_ context.Context) bool {
-	return a.endNeeds
+func (a *Auth) passwordToEndSessions(ctx context.Context) (bool, error) {
+	value, _, err := a.setting(ctx, settingPasswordToEndSessions)
+	switch {
+	case err != nil:
+		return false, err
+	case value == "true":
+		return true, nil
+	case value == "false":
+		return false, nil
+	}
+	return a.endNeeds, nil
 }
 
 func (a *Auth) confirmPassword(ctx context.Context, userID, password string) (store.User, error) {
@@ -238,12 +247,16 @@ func (a *Auth) TerminateSession(ctx context.Context, p Principal, sessionID, pas
 }
 
 func (a *Auth) confirmToEndSessions(ctx context.Context, p Principal, password string) error {
-	if !a.passwordToEndSessions(ctx) {
+	needed, err := a.passwordToEndSessions(ctx)
+	if err != nil {
+		return err
+	}
+	if !needed {
 		return nil
 	}
 	if password == "" {
 		return &ValidationError{Field: "password", Reason: "required"}
 	}
-	_, err := a.confirmPassword(ctx, string(p.UserID), password)
+	_, err = a.confirmPassword(ctx, string(p.UserID), password)
 	return err
 }

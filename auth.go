@@ -94,6 +94,7 @@ type Auth struct {
 	events       *eventQueue
 	auditing     *eventQueue
 	admins       *admin.Service
+	settings     settingsCache
 }
 
 // New creates the service on top of the database db, which the application

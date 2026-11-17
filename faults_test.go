@@ -60,6 +60,10 @@ func (s faultStore) Audit() store.Audit {
 	return faultAudit{Audit: s.Store.Audit(), faults: s.faults}
 }
 
+func (s faultStore) Settings() store.Settings {
+	return faultSettings{Settings: s.Store.Settings(), faults: s.faults}
+}
+
 func (s faultStore) InTx(ctx context.Context, fn func(ctx context.Context, tx store.Repositories) error) error {
 	return s.Store.InTx(ctx, func(ctx context.Context, tx store.Repositories) error {
 		return fn(ctx, faultRepositories{Repositories: tx, faults: s.faults})
@@ -89,6 +93,36 @@ func (r faultRepositories) Sessions() store.Sessions {
 
 func (r faultRepositories) Audit() store.Audit {
 	return faultAudit{Audit: r.Repositories.Audit(), faults: r.faults}
+}
+
+func (r faultRepositories) Settings() store.Settings {
+	return faultSettings{Settings: r.Repositories.Settings(), faults: r.faults}
+}
+
+type faultSettings struct {
+	store.Settings
+	faults *faultSet
+}
+
+func (s faultSettings) Get(ctx context.Context, tenantID, name string) (store.Setting, error) {
+	if err := s.faults.check("settings.get"); err != nil {
+		return store.Setting{}, err
+	}
+	return s.Settings.Get(ctx, tenantID, name)
+}
+
+func (s faultSettings) List(ctx context.Context, tenantID string) ([]store.Setting, error) {
+	if err := s.faults.check("settings.list"); err != nil {
+		return nil, err
+	}
+	return s.Settings.List(ctx, tenantID)
+}
+
+func (s faultSettings) Set(ctx context.Context, setting store.Setting) error {
+	if err := s.faults.check("settings.set"); err != nil {
+		return err
+	}
+	return s.Settings.Set(ctx, setting)
 }
 
 type faultAudit struct {
