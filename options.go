@@ -111,7 +111,8 @@ func WithTablePrefix(prefix string) Option {
 
 // WithAutoMigrate makes New create the database schema or bring it up to date
 // when it is missing or outdated. Without it New fails on such a database and
-// the schema has to be created by calling Migrate.
+// the schema has to be created by calling the function Migrate or running the
+// command migrate, see RunCommand, before New.
 func WithAutoMigrate() Option {
 	return func(c *config) {
 		c.autoMigrate = true

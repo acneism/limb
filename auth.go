@@ -373,7 +373,7 @@ func (a *Auth) updateSchema(ctx context.Context, autoMigrate bool) error {
 	case !errors.Is(err, store.ErrSchemaOutdated):
 		return fmt.Errorf("limb: check the database schema: %w", err)
 	case !autoMigrate:
-		return fmt.Errorf("limb: the database schema is missing or outdated, call Migrate or use WithAutoMigrate: %w", err)
+		return fmt.Errorf("limb: the database schema is missing or outdated, run the function Migrate or the command migrate, or use WithAutoMigrate: %w", err)
 	}
 	if err = a.store.Migrate(ctx); err != nil {
 		return fmt.Errorf("limb: migrate the database schema: %w", err)
@@ -385,7 +385,10 @@ func (a *Auth) updateSchema(ctx context.Context, autoMigrate bool) error {
 }
 
 // Migrate creates the database schema or brings it up to date. It is safe to
-// call when the schema is current and from several processes at once.
+// call when the schema is current and from several processes at once. It needs
+// the service, which New makes only for a database whose schema is current or
+// with WithAutoMigrate: to create the schema before the service exists, call the
+// function Migrate.
 func (a *Auth) Migrate(ctx context.Context) error {
 	return a.store.Migrate(ctx)
 }

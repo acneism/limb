@@ -52,7 +52,7 @@ The application opens the `*sql.DB` with the driver it prefers and gives `limb.N
 | MariaDB | `limb.MariaDB` | 10.11 and newer | `github.com/go-sql-driver/mysql` |
 | Oracle | `limb.Oracle` | 19c and newer | `github.com/sijms/go-ora/v2` |
 
-limb creates its tables itself, with `limb.WithAutoMigrate` or `Auth.Migrate`. Their names start with a prefix, `limb_` by default and `limb.WithTablePrefix` changes it. Every database has the same tables and columns. Migrations are written for each database in `sqlstore/migrations`, and several processes can migrate at once: one of them takes a lease on the schema and the others wait.
+limb creates its tables itself: with `limb.WithAutoMigrate`, with the function `limb.Migrate(ctx, db, dialect, opts...)`, which needs no service and is meant for the step of a deployment that runs before the new version starts, or with the command `migrate`, see below. Their names start with a prefix, `limb_` by default and `limb.WithTablePrefix` changes it. Every database has the same tables and columns. Migrations are written for each database in `sqlstore/migrations`, and several processes can migrate at once: one of them takes a lease on the schema and the others wait.
 
 `limb.New` checks how the connection is set up before it writes anything and says what to change when it is wrong. Texts are compared byte by byte, and every text has a longest length in bytes, so a value that one database accepts is accepted by all of them.
 
@@ -82,13 +82,15 @@ Every time column of Oracle is `TIMESTAMP(6) WITH TIME ZONE`, because a plain `T
 
 ## Command line
 
-`Auth.RunCommand` runs the commands of the command line of the application, which connects it in its `main` function, for example when the first argument is `limb`:
+`limb.RunCommand` runs the commands of the command line of the application, which connects it in its `main` function, for example when the first argument is `limb`:
 
 ```go
 if len(os.Args) > 1 && os.Args[1] == "limb" {
-	os.Exit(auth.RunCommand(context.Background(), os.Args[2:], os.Stdout, os.Stderr))
+	os.Exit(limb.RunCommand(ctx, db, limb.Postgres, masterKey, os.Args[2:], os.Stdout, os.Stderr, options...))
 }
 ```
+
+It makes the service itself for the commands that need one and stops it, and the commands `migrate` and `help` need none, so `migrate` creates the schema of an empty database without `WithAutoMigrate`. It is for the process that runs a command and ends. A service that exists has the method `auth.RunCommand(ctx, args, stdout, stderr)`.
 
 The commands are `admin create --login LOGIN`, `admin delete`, `admin list`, `admin disable`, `admin enable`, `admin reset-password` and `admin reset-totp`, and `migrate` and `cleanup`; `help` lists them. The administrators of the web administration are made only here and with `Auth.Admin()`, never from the web. The password is never an argument of the command line: in a terminal the command asks for it twice without echo, and without a terminal it is the first line of the standard input, which `--password-stdin` has to say is meant, as in `echo "$PASSWORD" | ./app limb admin create --login root --password-stdin`. What the commands change is written to the audit log as done by the command line.
 
