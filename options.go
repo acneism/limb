@@ -45,6 +45,7 @@ type config struct {
 	sender      Sender
 	serviceName string
 	templates   []templateOverride
+	sending     SendingOptions
 	err         error
 }
 
