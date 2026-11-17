@@ -14,7 +14,8 @@ type EventType string
 // The events that limb reports to Hooks.OnEvent.
 const (
 	// EventUserCreated is reported when a user was created, by Register or by
-	// Signup. The user is in UserID.
+	// Signup. The user is in UserID. Signup reports it in the background, see
+	// Hooks.OnEvent.
 	EventUserCreated EventType = "user_created"
 
 	// EventUserChanged is reported when an administrator changes a user. It is
@@ -120,6 +121,15 @@ type Hooks struct {
 	// OnEvent is called after an operation has been committed, in the goroutine of
 	// the request, so a slow hook slows the request down. It cannot undo what
 	// happened. A panic is contained and logged and does not touch the operation.
+	//
+	// The exception is EventUserCreated of Signup, which a worker of limb delivers
+	// after the registration has been answered. A registration that uses an address
+	// that is taken creates no user and has no such event, so a hook that runs in the
+	// request and is slow would show which addresses are taken. The events wait in a
+	// queue of 256 and go to the hook one at a time, in the order of their
+	// registrations, with a context that carries the values of the request but not
+	// its cancellation and ends after 30 seconds. An event that finds the queue full
+	// is dropped and logged, and Auth.Shutdown waits for the others.
 	OnEvent func(ctx context.Context, e Event)
 }
 
@@ -134,8 +144,26 @@ func (a *Auth) emit(ctx context.Context, e Event) {
 	if a.hooks.OnEvent == nil {
 		return
 	}
+	a.callHook(ctx, a.stamped(e))
+}
+
+func (a *Auth) emitLater(ctx context.Context, e Event) {
+	if a.events == nil {
+		return
+	}
+	e = a.stamped(e)
+	if !a.events.add(ctx, e) {
+		a.logger.WarnContext(ctx, "limb: an event was dropped, the queue of events is full or stopped", "event", e.Type)
+	}
+}
+
+func (a *Auth) stamped(e Event) Event {
 	e.At = a.now().UTC()
 	e.Details = maps.Clone(e.Details)
+	return e
+}
+
+func (a *Auth) callHook(ctx context.Context, e Event) {
 	defer func() {
 		if r := recover(); r != nil {
 			a.logger.ErrorContext(ctx, "limb: the hook of events panicked", "event", e.Type, "panic_type", fmt.Sprintf("%T", r))

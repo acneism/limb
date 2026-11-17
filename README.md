@@ -7,7 +7,7 @@ It works with PostgreSQL, MySQL/MariaDB and Oracle through `database/sql`.
 
 ## Registration, confirmation and password reset
 
-limb sends no e-mail and no SMS itself. The application gives `limb.WithSender` an implementation of `limb.Sender`, and limb calls it in the background with a `limb.Message`: the kind of the message, the recipient, the language, the link, the code and a text made from the built-in templates in Russian and English. `limb.WithMessageTemplate` replaces a template, `limb.WithServiceName` names the service in the texts, and `Auth.Shutdown` waits for the messages that are still waiting when the application stops.
+limb sends no e-mail and no SMS itself. The application gives `limb.WithSender` an implementation of `limb.Sender`, and limb calls it in the background with a `limb.Message`: the kind of the message, the recipient, the language, the link, the code and a text made from the built-in templates in Russian and English. `limb.WithMessageTemplate` replaces a template, `limb.WithServiceName` names the service in the texts, and `Auth.Shutdown` waits for the messages and the events that are still waiting when the application stops.
 
 ```go
 auth, err := limb.New(db, limb.Postgres, masterKey,
@@ -39,7 +39,7 @@ The link in a message is the address given with `WithVerifyURL` or `WithResetURL
 - A link that resets a password works for 30 minutes and one that confirms an address for 24 hours. A code of six digits works for ten minutes and survives five guesses. A link or a code works once, and using one ends the other. The database keeps only hashes.
 - A password is reset only through a channel that is confirmed, and by default it ends every session of the user. The user gets a message about every change of the password. A message of a kind goes to one user at most five times in an hour.
 - The limits count registrations and requests for messages by the address of the client and by the address, the phone number or the login that they name, and wrong links and codes by the address of the client. They answer `429` with `Retry-After`, see `limb.WithRecoveryLimits`. A queue of messages that is full answers `503 busy`.
-- `Hooks.OnEvent` hears about every registration, sign-in, change and reset of a password, confirmed channel and message that failed, after the operation was committed, and never gets a password, a link or a code.
+- `Hooks.OnEvent` hears about every registration, sign-in, change and reset of a password, confirmed channel and message that failed, after the operation was committed, and never gets a password, a link or a code. It runs in the request, except for the user that `Signup` created: that event is delivered in the background, so that a slow hook cannot show whether an address was taken.
 
 ## Databases
 

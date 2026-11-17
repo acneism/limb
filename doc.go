@@ -107,7 +107,9 @@
 // Event that holds no password, link, token or code, when a user is created, signs
 // in or fails to, signs out, changes or resets the password, confirms a channel or
 // loses a session, when a refresh token is used again and when a message cannot be
-// sent. A panic in a hook is contained and logged.
+// sent. A panic in a hook is contained and logged. The one event that a worker
+// delivers after the answer is the user that Signup created, so that a slow hook
+// cannot show whether an address was taken, and Shutdown waits for it.
 //
 // # Limits
 //

@@ -125,7 +125,7 @@ func (a *Auth) Signup(ctx context.Context, r SignupRequest) error {
 		a.queueSignupAttempt(ctx, *taken, language)
 		return nil
 	}
-	a.emit(ctx, Event{Type: EventUserCreated, UserID: user.ID, IP: eventAddress(r.IP)})
+	a.emitLater(ctx, Event{Type: EventUserCreated, UserID: user.ID, IP: eventAddress(r.IP)})
 	a.queueVerification(ctx, user.ID, language)
 	return nil
 }

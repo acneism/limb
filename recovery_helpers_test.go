@@ -104,6 +104,12 @@ func (f *recoveryFixture) identifierOf(t *testing.T, typ string) store.Identifie
 	return store.Identifier{}
 }
 
+func (f *recoveryFixture) takeEvents(t *testing.T, n int) []Event {
+	t.Helper()
+	eventually(t, "the events to reach the hook", func() bool { return len(f.events.peek()) >= n })
+	return f.events.take()
+}
+
 func (f *recoveryFixture) change(t *testing.T, edit func(*store.User)) {
 	t.Helper()
 	u, err := f.a.store.Users().Get(t.Context(), f.a.tenant, string(f.user.ID))

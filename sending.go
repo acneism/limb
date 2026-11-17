@@ -199,18 +199,23 @@ func (d *dispatcher) shutdown(ctx context.Context) error {
 	return fmt.Errorf("limb: %d messages were not sent before the deadline: %w", unsent, ctx.Err())
 }
 
-// Shutdown stops the background sending: it takes no new messages, lets the
+// Shutdown stops the background work: it takes no new messages, lets the
 // messages that wait go out and waits for the workers until ctx ends. When ctx
 // ends first, the sending that is still running is canceled, and the number of
 // messages that were lost is logged and returned in the error. Call it after
 // http.Server.Shutdown, so that no request is left to add messages. Messages
-// that cannot be sent after the call are refused with ErrBusy. It does nothing
-// when no Sender was given.
+// that cannot be sent after the call are refused with ErrBusy. The events that
+// wait to reach Hooks.OnEvent get the same treatment, after the messages. It does
+// nothing when no Sender and no OnEvent were given.
 func (a *Auth) Shutdown(ctx context.Context) error {
-	if a.dispatcher == nil {
-		return nil
+	var sending, events error
+	if a.dispatcher != nil {
+		sending = a.dispatcher.shutdown(ctx)
 	}
-	return a.dispatcher.shutdown(ctx)
+	if a.events != nil {
+		events = a.events.shutdown(ctx)
+	}
+	return errors.Join(sending, events)
 }
 
 type deliveryError struct {

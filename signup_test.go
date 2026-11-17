@@ -78,7 +78,7 @@ func TestASignupMakesAnUnconfirmedUserAndSendsTheMessageThatConfirmsIt(t *testin
 	if err != nil {
 		t.Fatalf("Signup = %v", err)
 	}
-	events := f.events.take()
+	events := f.takeEvents(t, 1)
 	wantTypes(t, events, EventUserCreated)
 	if events[0].UserID == "" || events[0].IP != ipOne.String() {
 		t.Fatalf("event = %+v", events[0])
@@ -919,4 +919,93 @@ func TestAFailureToMakeTheIDFailsTheSignup(t *testing.T) {
 		t.Fatalf("Signup = %v, want the error of the generator", err)
 	}
 	f.wantNothingCreated(t, "email", "olga@example.com")
+}
+
+func finishes(t *testing.T, what string, run func()) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		run()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("%s did not return while the hook of events was held up", what)
+	}
+}
+
+func TestASlowHookOfEventsDoesNotShowWhetherAnAddressIsTaken(t *testing.T) {
+	f := newSignupFixture(t)
+	release := make(chan struct{})
+	entered := make(chan Event, 4)
+	f.a.hooks.OnEvent = func(_ context.Context, e Event) {
+		entered <- e
+		<-release
+	}
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	finishes(t, "Signup with a free address", func() {
+		if err := f.signup(t, map[string]string{"email": "olga@example.com", "username": "olga_o"}); err != nil {
+			t.Errorf("Signup = %v", err)
+		}
+	})
+	select {
+	case e := <-entered:
+		if e.Type != EventUserCreated {
+			t.Fatalf("event = %+v", e)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the event of the new user never reached the hook")
+	}
+	finishes(t, "Signup with a taken address", func() {
+		if err := f.signup(t, map[string]string{"email": "nina@example.com", "username": "other_o"}); err != nil {
+			t.Errorf("Signup = %v", err)
+		}
+	})
+	finishes(t, "a second Signup with a free address, while the first event is still in the hook", func() {
+		if err := f.signup(t, map[string]string{"email": "boris@example.com", "username": "boris_b"}); err != nil {
+			t.Errorf("Signup = %v", err)
+		}
+	})
+	close(release)
+	select {
+	case e := <-entered:
+		if e.Type != EventUserCreated {
+			t.Fatalf("event = %+v", e)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the event of the second user never reached the hook")
+	}
+	select {
+	case e := <-entered:
+		t.Fatalf("the registration that used a taken address reported %+v", e)
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestNoRequestThatMustNotShowAnAccountWaitsForTheHookOfEvents(t *testing.T) {
+	f := newSignupFixture(t)
+	f.verify(t, "email", "nina@example.com")
+	release := make(chan struct{})
+	f.a.hooks.OnEvent = func(context.Context, Event) { <-release }
+	t.Cleanup(func() { close(release) })
+	for _, login := range []string{"nina_n", "nobody@example.com"} {
+		finishes(t, "RequestPasswordReset for "+login, func() {
+			if err := f.a.RequestPasswordReset(t.Context(), ResetRequest{Login: login, IP: ipOne}); err != nil {
+				t.Errorf("RequestPasswordReset = %v", err)
+			}
+		})
+		finishes(t, "RequestVerification for "+login, func() {
+			if err := f.a.RequestVerification(t.Context(), VerificationRequest{Login: login, IP: ipOne}); err != nil {
+				t.Errorf("RequestVerification = %v", err)
+			}
+		})
+	}
+	f.idle(t)
 }
