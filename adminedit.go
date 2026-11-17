@@ -77,6 +77,16 @@ func (a *Auth) createUser(ctx context.Context, by actorRef, n NewUser) (ManagedU
 	return a.createdUser(user, identifiers), nil
 }
 
+func (a *Auth) holdUser(ctx context.Context, tx store.Repositories, u store.User) error {
+	if _, err := tx.Users().Update(ctx, u); err != nil {
+		if errors.Is(err, store.ErrStale) {
+			return err
+		}
+		return fmt.Errorf("limb: update the user: %w", err)
+	}
+	return nil
+}
+
 func (a *Auth) kindOf(typ string) (identifier.Type, error) {
 	kind, declared := a.known[typ]
 	if !declared {
@@ -101,6 +111,9 @@ func (a *Auth) changeIdentifier(ctx context.Context, by actorRef, id UserID, typ
 	var told []store.Identifier
 	err = a.editUser(ctx, by, id, func(ctx context.Context, tx store.Repositories, u store.User, _ time.Time) (userEdit, error) {
 		told = nil
+		if holdErr := a.holdUser(ctx, tx, u); holdErr != nil {
+			return userEdit{}, holdErr
+		}
 		identifiers, listErr := tx.Identifiers().ListByUser(ctx, a.tenant, u.ID)
 		if listErr != nil {
 			return userEdit{}, fmt.Errorf("limb: list the identifiers: %w", listErr)
@@ -135,7 +148,7 @@ func (a *Auth) changeIdentifier(ctx context.Context, by actorRef, id UserID, typ
 			details["old_verified"] = !old[0].VerifiedAt.IsZero()
 		}
 		return userEdit{
-			next: u, update: true, entry: &audit.Entry{Action: action, Details: details},
+			entry:  &audit.Entry{Action: action, Details: details},
 			events: []Event{{Type: EventUserChanged, Channel: typ, Address: maskValue(normalized), Details: map[string]string{"change": change}}},
 		}, nil
 	})
@@ -156,6 +169,9 @@ func (a *Auth) removeIdentifier(ctx context.Context, by actorRef, id UserID, typ
 	var told []store.Identifier
 	err = a.editUser(ctx, by, id, func(ctx context.Context, tx store.Repositories, u store.User, _ time.Time) (userEdit, error) {
 		told = nil
+		if holdErr := a.holdUser(ctx, tx, u); holdErr != nil {
+			return userEdit{}, holdErr
+		}
 		identifiers, listErr := tx.Identifiers().ListByUser(ctx, a.tenant, u.ID)
 		if listErr != nil {
 			return userEdit{}, fmt.Errorf("limb: list the identifiers: %w", listErr)
@@ -184,7 +200,7 @@ func (a *Auth) removeIdentifier(ctx context.Context, by actorRef, id UserID, typ
 		}
 		details := map[string]any{"type": typ, "old": old[0].Value, "old_verified": !old[0].VerifiedAt.IsZero()}
 		return userEdit{
-			next: u, update: true, entry: &audit.Entry{Action: audit.UserIdentifierRemoved, Details: details},
+			entry:  &audit.Entry{Action: audit.UserIdentifierRemoved, Details: details},
 			events: []Event{{Type: EventUserChanged, Channel: typ, Address: maskValue(old[0].Value), Details: map[string]string{"change": "identifier_removed"}}},
 		}, nil
 	})
@@ -203,6 +219,9 @@ func (a *Auth) verifyIdentifier(ctx context.Context, by actorRef, id UserID, typ
 		return &ValidationError{Field: typ, Reason: "only an address or a phone number can be confirmed"}
 	}
 	return a.editUser(ctx, by, id, func(ctx context.Context, tx store.Repositories, u store.User, now time.Time) (userEdit, error) {
+		if holdErr := a.holdUser(ctx, tx, u); holdErr != nil {
+			return userEdit{}, holdErr
+		}
 		identifiers, listErr := tx.Identifiers().ListByUser(ctx, a.tenant, u.ID)
 		if listErr != nil {
 			return userEdit{}, fmt.Errorf("limb: list the identifiers: %w", listErr)
@@ -219,7 +238,7 @@ func (a *Auth) verifyIdentifier(ctx context.Context, by actorRef, id UserID, typ
 			return userEdit{}, fmt.Errorf("limb: confirm the %s identifier: %w", typ, markErr)
 		}
 		return userEdit{
-			next: u, update: true, entry: &audit.Entry{Action: audit.UserIdentifierVerified, Details: map[string]any{"type": typ, "value": target.Value}},
+			entry:  &audit.Entry{Action: audit.UserIdentifierVerified, Details: map[string]any{"type": typ, "value": target.Value}},
 			events: []Event{{Type: EventUserChanged, Channel: typ, Address: maskValue(target.Value), Details: map[string]string{"change": "identifier_verified"}}},
 		}, nil
 	})
