@@ -77,7 +77,9 @@ type Auth struct {
 	refreshCookie string
 	refreshPath   string
 
-	renderer *renderer
+	sender     Sender
+	renderer   *renderer
+	dispatcher *dispatcher
 }
 
 // New creates the service on top of the database db, which the application
@@ -174,6 +176,10 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 	if err != nil {
 		return nil, err
 	}
+	sending, err := cfg.sending.resolve()
+	if err != nil {
+		return nil, err
+	}
 	messages, err := newRenderer(cfg.templates, cfg.serviceName, cfg.development)
 	if err != nil {
 		return nil, err
@@ -223,7 +229,11 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 		refreshCookie: refreshCookieName(cfg.development),
 		refreshPath:   refreshCookiePath(cfg.mountPath),
 
+		sender:   cfg.sender,
 		renderer: messages,
+	}
+	if cfg.sender != nil {
+		a.dispatcher = newDispatcher(sending, logger, nil)
 	}
 	for _, endpoint := range cfg.disabled {
 		a.disabled[endpoint] = true
