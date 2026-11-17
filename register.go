@@ -78,6 +78,7 @@ func (a *Auth) Register(ctx context.Context, r Registration) (User, error) {
 		return User{}, err
 	}
 	user.Version = 1
+	a.emit(ctx, Event{Type: EventUserCreated, UserID: user.ID})
 	return newUser(user, identifiers), nil
 }
 

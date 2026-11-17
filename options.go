@@ -46,6 +46,7 @@ type config struct {
 	serviceName string
 	templates   []templateOverride
 	sending     SendingOptions
+	hooks       Hooks
 	err         error
 }
 

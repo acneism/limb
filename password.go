@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/acneism/limb/store"
@@ -73,6 +74,10 @@ func (a *Auth) ChangePassword(ctx context.Context, p Principal, current, next st
 	for range changeAttempts {
 		var login Login
 		login, err = a.replaceSession(ctx, p, user.PasswordHash, hash)
+		if err == nil {
+			a.emit(ctx, Event{Type: EventPasswordChanged, UserID: string(p.UserID), SessionID: login.Principal.SessionID})
+			a.emit(ctx, Event{Type: EventSessionEnded, UserID: string(p.UserID), Details: map[string]string{"reason": "password_changed"}})
+		}
 		if !errors.Is(err, store.ErrStale) {
 			return login, err
 		}
@@ -192,8 +197,12 @@ func (a *Auth) LogoutAll(ctx context.Context, p Principal, password string) erro
 	if err := a.confirmToEndSessions(ctx, p, password); err != nil {
 		return err
 	}
-	if _, err := a.store.Sessions().RevokeAllForUser(ctx, a.tenant, string(p.UserID), "", a.now()); err != nil {
+	ended, err := a.store.Sessions().RevokeAllForUser(ctx, a.tenant, string(p.UserID), "", a.now())
+	if err != nil {
 		return fmt.Errorf("limb: end the sessions: %w", err)
+	}
+	if ended > 0 {
+		a.emit(ctx, Event{Type: EventSessionEnded, UserID: string(p.UserID), Details: map[string]string{"reason": "logout_all", "count": strconv.Itoa(ended)}})
 	}
 	return nil
 }
@@ -220,6 +229,7 @@ func (a *Auth) TerminateSession(ctx context.Context, p Principal, sessionID, pas
 	case err != nil:
 		return fmt.Errorf("limb: end the session: %w", err)
 	}
+	a.emit(ctx, Event{Type: EventSessionEnded, UserID: string(p.UserID), SessionID: sessionID, Details: map[string]string{"reason": "terminated", "count": "1"}})
 	return nil
 }
 

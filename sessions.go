@@ -40,7 +40,10 @@ func (a *Auth) Sessions(ctx context.Context, p Principal) ([]Session, error) {
 // already is not an error.
 func (a *Auth) Logout(ctx context.Context, p Principal) error {
 	err := a.store.Sessions().Revoke(ctx, a.tenant, string(p.UserID), p.SessionID, a.now())
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	switch {
+	case err == nil:
+		a.emit(ctx, Event{Type: EventLogout, UserID: string(p.UserID), SessionID: p.SessionID})
+	case !errors.Is(err, store.ErrNotFound):
 		return fmt.Errorf("limb: end the session: %w", err)
 	}
 	return nil

@@ -80,6 +80,7 @@ type Auth struct {
 	sender     Sender
 	renderer   *renderer
 	dispatcher *dispatcher
+	hooks      Hooks
 }
 
 // New creates the service on top of the database db, which the application
@@ -231,9 +232,10 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 
 		sender:   cfg.sender,
 		renderer: messages,
+		hooks:    cfg.hooks,
 	}
 	if cfg.sender != nil {
-		a.dispatcher = newDispatcher(sending, logger, nil)
+		a.dispatcher = newDispatcher(sending, logger, a.reportMessageFailure)
 	}
 	for _, endpoint := range cfg.disabled {
 		a.disabled[endpoint] = true

@@ -108,6 +108,11 @@ func (a *Auth) refresh(ctx context.Context, refreshToken string) (Tokens, refres
 	if outcome == refreshReused {
 		a.logger.WarnContext(ctx, "limb: a refresh token was used again, the session was ended",
 			"user_id", current.Session.UserID, "session_id", current.Session.ID)
+		a.emit(ctx, Event{Type: EventRefreshTokenReused, UserID: current.Session.UserID, SessionID: current.Session.ID})
+		a.emit(ctx, Event{
+			Type: EventSessionEnded, UserID: current.Session.UserID, SessionID: current.Session.ID,
+			Details: map[string]string{"reason": "refresh_token_reused", "count": "1"},
+		})
 	}
 	if outcome != refreshDone {
 		return Tokens{}, outcome, ErrUnauthenticated

@@ -215,8 +215,10 @@ func (a *Auth) Shutdown(ctx context.Context) error {
 
 type deliveryError struct {
 	kind      MessageKind
+	userID    string
 	channel   string
 	recipient string
+	code      string
 	reason    string
 }
 
@@ -224,13 +226,19 @@ func (e *deliveryError) Error() string {
 	return fmt.Sprintf("limb: send a %s message to %s %s: %s", e.kind, e.channel, e.recipient, e.reason)
 }
 
+func asDeliveryError(err error) (*deliveryError, bool) {
+	var failure *deliveryError
+	return failure, errors.As(err, &failure)
+}
+
+func failureOf(m Message, code, reason string) error {
+	return &deliveryError{kind: m.Kind, userID: m.UserID, channel: m.Channel, recipient: maskValue(m.To), code: code, reason: reason}
+}
+
 func (a *Auth) deliver(ctx context.Context, m Message) (err error) {
-	failure := func(reason string) error {
-		return &deliveryError{kind: m.Kind, channel: m.Channel, recipient: maskValue(m.To), reason: reason}
-	}
 	defer func() {
 		if r := recover(); r != nil {
-			err = failure(fmt.Sprintf("the sender panicked with a value of type %T", r))
+			err = failureOf(m, "panic", fmt.Sprintf("the sender panicked with a value of type %T", r))
 		}
 	}()
 	sendErr := a.sender.Send(ctx, m)
@@ -238,11 +246,11 @@ func (a *Auth) deliver(ctx context.Context, m Message) (err error) {
 	case sendErr == nil:
 		return nil
 	case errors.Is(sendErr, context.DeadlineExceeded), errors.Is(ctx.Err(), context.DeadlineExceeded):
-		return failure("the sending timed out")
+		return failureOf(m, "timeout", "the sending timed out")
 	case errors.Is(sendErr, context.Canceled), errors.Is(ctx.Err(), context.Canceled):
-		return failure("the sending was canceled")
+		return failureOf(m, "canceled", "the sending was canceled")
 	}
-	return failure(scrub(sendErr.Error(), m))
+	return failureOf(m, "rejected", scrub(sendErr.Error(), m))
 }
 
 func scrub(text string, m Message) string {

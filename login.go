@@ -39,12 +39,14 @@ func (a *Auth) Login(ctx context.Context, c Credentials) (Login, error) {
 	}
 	keys := a.loginAttemptKeys(c.Login, c.IP)
 	var user store.User
+	var known string
 	err := a.limited(ctx, keys, func() error {
 		var checkErr error
-		user, _, checkErr = a.checkPassword(ctx, c.Login, c.Password)
+		user, _, checkErr = a.lookupAndVerify(ctx, c.Login, c.Password, &known)
 		return checkErr
 	})
 	if err != nil {
+		a.reportFailedLogin(ctx, c, known, err)
 		return Login{}, err
 	}
 	now := a.now().UTC().Truncate(time.Microsecond)
@@ -59,7 +61,27 @@ func (a *Auth) Login(ctx context.Context, c Credentials) (Login, error) {
 	}
 	a.recordLogin(ctx, user, now)
 	a.clearFailures(ctx, keys.accountIP)
+	a.emit(ctx, Event{
+		Type: EventLogin, UserID: user.ID, SessionID: login.Principal.SessionID, IP: eventAddress(c.IP),
+		Details: map[string]string{"kind": string(c.Kind)},
+	})
 	return login, nil
+}
+
+func (a *Auth) reportFailedLogin(ctx context.Context, c Credentials, userID string, err error) {
+	var reason string
+	switch {
+	case errors.Is(err, ErrInvalidCredentials):
+		reason = "invalid_credentials"
+	case errors.Is(err, ErrUserBlocked):
+		reason = "blocked"
+	default:
+		return
+	}
+	a.emit(ctx, Event{
+		Type: EventLoginFailed, UserID: userID, Address: maskValue(cutAtRune(strings.TrimSpace(c.Login), maxRawLoginKey)), IP: eventAddress(c.IP),
+		Details: map[string]string{"reason": reason},
+	})
 }
 
 func (a *Auth) openCookieSession(ctx context.Context, user store.User, c Credentials, now time.Time) (Login, error) {

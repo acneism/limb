@@ -10,6 +10,10 @@ import (
 )
 
 func (a *Auth) checkPassword(ctx context.Context, login, password string) (store.User, store.Identifier, error) {
+	return a.lookupAndVerify(ctx, login, password, nil)
+}
+
+func (a *Auth) lookupAndVerify(ctx context.Context, login, password string, known *string) (store.User, store.Identifier, error) {
 	kind, value, err := identifier.Resolve(a.types, login)
 	if err != nil {
 		return a.reject(ctx, password)
@@ -27,6 +31,9 @@ func (a *Auth) checkPassword(ctx context.Context, login, password string) (store
 	}
 	if err != nil {
 		return store.User{}, store.Identifier{}, fmt.Errorf("limb: get the user: %w", err)
+	}
+	if known != nil {
+		*known = user.ID
 	}
 	user, err = a.verifyPassword(ctx, user, password, true)
 	if err != nil {
