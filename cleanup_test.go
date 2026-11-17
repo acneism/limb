@@ -256,7 +256,7 @@ func TestCleanupDoesNotTouchAnotherTenant(t *testing.T) {
 
 type cleanupFailures struct {
 	store.Store
-	sessionsErr, tokensErr, attemptsErr, keysErr error
+	sessionsErr, tokensErr, attemptsErr, secretsErr, keysErr error
 }
 
 func (s cleanupFailures) Sessions() store.Sessions {
@@ -269,6 +269,10 @@ func (s cleanupFailures) RefreshTokens() store.RefreshTokens {
 
 func (s cleanupFailures) Attempts() store.Attempts {
 	return cleanupAttempts{Attempts: s.Store.Attempts(), err: s.attemptsErr}
+}
+
+func (s cleanupFailures) Secrets() store.Secrets {
+	return cleanupSecrets{Secrets: s.Store.Secrets(), err: s.secretsErr}
 }
 
 func (s cleanupFailures) SigningKeys() store.SigningKeys {
@@ -311,6 +315,18 @@ func (s cleanupAttempts) DeleteStale(ctx context.Context, before time.Time) (int
 	return s.Attempts.DeleteStale(ctx, before)
 }
 
+type cleanupSecrets struct {
+	store.Secrets
+	err error
+}
+
+func (s cleanupSecrets) DeleteStale(ctx context.Context, tenantID string, before time.Time) (int, error) {
+	if s.err != nil {
+		return 0, s.err
+	}
+	return s.Secrets.DeleteStale(ctx, tenantID, before)
+}
+
 type cleanupKeys struct {
 	store.SigningKeys
 	err error
@@ -350,7 +366,7 @@ func TestAFailureOfOneKindOfDataDoesNotStopTheOthers(t *testing.T) {
 	if !c.exists(t, sid(1)) {
 		t.Fatal("the session whose removal failed must still be there")
 	}
-	for _, failing := range []cleanupFailures{{tokensErr: boom}, {attemptsErr: boom}} {
+	for _, failing := range []cleanupFailures{{tokensErr: boom}, {attemptsErr: boom}, {secretsErr: boom}} {
 		failing.Store = healthy
 		a.store = failing
 		if err = a.Cleanup(ctx); !errors.Is(err, boom) {
@@ -381,5 +397,69 @@ func TestCleanupReportsWhatItRemoved(t *testing.T) {
 	}
 	if text := logs.String(); !strings.Contains(text, "old data was removed") || !strings.Contains(text, "sessions=1") {
 		t.Fatalf("the removal must be logged:\n%s", text)
+	}
+}
+
+func (c *cleanupSetup) secret(t *testing.T, label uint16, kind store.SecretKind, expires, used time.Time) store.Secret {
+	t.Helper()
+	secret := store.Secret{
+		TenantID: c.f.a.tenant, ID: fmt.Sprintf("00000000-0000-7000-8000-%012d", 5000+int(label)), Kind: kind, Hash: hashFor(label),
+		UserID: string(c.f.user.ID), Purpose: store.PurposeReset, ChannelType: "email", ChannelValue: "nina@example.com",
+		CreatedAt: c.now.Add(-60 * 24 * time.Hour), ExpiresAt: expires,
+	}
+	if err := c.f.a.store.Secrets().Add(t.Context(), secret); err != nil {
+		t.Fatal(err)
+	}
+	if !used.IsZero() {
+		var err error
+		if kind == store.SecretLink {
+			_, err = c.f.a.store.Secrets().UseLink(t.Context(), secret.TenantID, secret.Purpose, secret.Hash, used)
+		} else {
+			err = c.f.a.store.Secrets().UseCode(t.Context(), secret.TenantID, secret.ID, used)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	return secret
+}
+
+func (c *cleanupSetup) secretExists(t *testing.T, secret store.Secret) bool {
+	t.Helper()
+	err := c.f.a.store.Secrets().Add(t.Context(), secret)
+	switch {
+	case errors.Is(err, store.ErrConflict):
+		return true
+	case err == nil:
+		return false
+	}
+	t.Fatal(err)
+	return false
+}
+
+func TestCleanupRemovesTheSecretsThatAreOldEnough(t *testing.T) {
+	c := newCleanupSetup(t)
+	now, hour := c.now, time.Hour
+	secrets := []struct {
+		name string
+		made store.Secret
+		want bool
+	}{
+		{"a link that is valid", c.secret(t, 1, store.SecretLink, now.Add(hour), time.Time{}), true},
+		{"a code that expired 23 hours ago", c.secret(t, 2, store.SecretCode, now.Add(-23*hour), time.Time{}), true},
+		{"a link that was used 23 hours ago", c.secret(t, 3, store.SecretLink, now.Add(hour), now.Add(-23*hour)), true},
+		{"a code that was used a minute ago", c.secret(t, 4, store.SecretCode, now.Add(hour), now.Add(-time.Minute)), true},
+		{"a link that expired just inside the edge", c.secret(t, 5, store.SecretLink, now.Add(-24*hour+time.Minute), time.Time{}), true},
+		{"a link that expired 25 hours ago", c.secret(t, 6, store.SecretLink, now.Add(-25*hour), time.Time{}), false},
+		{"a code that was used 25 hours ago", c.secret(t, 7, store.SecretCode, now.Add(hour), now.Add(-25*hour)), false},
+		{"a code that expired long ago", c.secret(t, 8, store.SecretCode, now.Add(-30*24*hour), time.Time{}), false},
+	}
+	if err := c.f.a.Cleanup(t.Context()); err != nil {
+		t.Fatalf("Cleanup failed: %v", err)
+	}
+	for _, s := range secrets {
+		if got := c.secretExists(t, s.made); got != s.want {
+			t.Errorf("%s: present = %v, want %v", s.name, got, s.want)
+		}
 	}
 }
