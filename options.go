@@ -50,6 +50,7 @@ type config struct {
 	recovery    RecoveryLimits
 	resetURL    string
 	verifyURL   string
+	keepOpen    bool
 	err         error
 }
 

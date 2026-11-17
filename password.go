@@ -41,6 +41,9 @@ func (a *Auth) confirmPassword(ctx context.Context, userID, password string) (st
 // limits on failed attempts as a sign-in. The new password must meet the
 // password policy, which also refuses the login identifiers of the user.
 //
+// The user gets a notice that the password was changed, on every confirmed
+// channel, in the background, in the language of ContextWithLanguage.
+//
 // The change ends every session of the user, including the current one, and
 // opens a new one in its place of the same kind. It inherits the time of the
 // sign-in, the end of the session, the address and the user agent of the old one,
@@ -77,6 +80,7 @@ func (a *Auth) ChangePassword(ctx context.Context, p Principal, current, next st
 		if err == nil {
 			a.emit(ctx, Event{Type: EventPasswordChanged, UserID: string(p.UserID), SessionID: login.Principal.SessionID})
 			a.emit(ctx, Event{Type: EventSessionEnded, UserID: string(p.UserID), Details: map[string]string{"reason": "password_changed"}})
+			a.notifyPasswordChanged(ctx, string(p.UserID), "")
 		}
 		if !errors.Is(err, store.ErrStale) {
 			return login, err

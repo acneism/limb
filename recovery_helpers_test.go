@@ -104,6 +104,18 @@ func (f *recoveryFixture) identifierOf(t *testing.T, typ string) store.Identifie
 	return store.Identifier{}
 }
 
+func (f *recoveryFixture) change(t *testing.T, edit func(*store.User)) {
+	t.Helper()
+	u, err := f.a.store.Users().Get(t.Context(), f.a.tenant, string(f.user.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	edit(&u)
+	if _, err = f.a.store.Users().Update(t.Context(), u); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func (f *recoveryFixture) block(t *testing.T) (release func()) {
 	t.Helper()
 	started := make(chan struct{})

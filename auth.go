@@ -86,6 +86,8 @@ type Auth struct {
 	delivers   bool
 	resetURL   string
 	verifyURL  string
+
+	keepSessions bool
 }
 
 // New creates the service on top of the database db, which the application
@@ -252,6 +254,8 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 		delivers:  slices.ContainsFunc(types, identifier.Type.IsDelivery),
 		resetURL:  cfg.resetURL,
 		verifyURL: cfg.verifyURL,
+
+		keepSessions: cfg.keepOpen,
 	}
 	if cfg.sender != nil {
 		a.dispatcher = newDispatcher(sending, logger, a.reportMessageFailure)
