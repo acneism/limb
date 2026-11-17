@@ -84,11 +84,16 @@ func TestSubkeysAreDerivedWithHKDFAndTheirOwnInfo(t *testing.T) {
 	if want := referenceHKDF(master, "limb/v1/csrf"); !bytes.Equal(k.csrf, want) {
 		t.Fatalf("the CSRF key is not HKDF-SHA256 with the info %q", "limb/v1/csrf")
 	}
-	if bytes.Equal(k.attempts, k.csrf) {
-		t.Fatal("the attempts key and the CSRF key are equal")
+	if want := referenceHKDF(master, "limb/v1/codes"); !bytes.Equal(k.codes, want) {
+		t.Fatalf("the codes key is not HKDF-SHA256 with the info %q", "limb/v1/codes")
 	}
-	if bytes.Equal(referenceHKDF(master, "limb/v1/signing-keys"), k.attempts) || bytes.Equal(referenceHKDF(master, "limb/v1/signing-keys"), k.csrf) {
-		t.Fatal("the sealing key equals another subkey")
+	if bytes.Equal(k.attempts, k.csrf) || bytes.Equal(k.attempts, k.codes) || bytes.Equal(k.csrf, k.codes) {
+		t.Fatal("two of the attempts, CSRF and codes keys are equal")
+	}
+	for _, key := range [][]byte{k.attempts, k.csrf, k.codes} {
+		if bytes.Equal(referenceHKDF(master, "limb/v1/signing-keys"), key) {
+			t.Fatal("the sealing key equals another subkey")
+		}
 	}
 }
 

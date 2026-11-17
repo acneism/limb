@@ -26,6 +26,7 @@ const (
 	infoSigningKeys = "limb/v1/signing-keys"
 	infoAttempts    = "limb/v1/attempts"
 	infoCSRF        = "limb/v1/csrf"
+	infoCodes       = "limb/v1/codes"
 )
 
 var (
@@ -42,6 +43,7 @@ type Keys struct {
 	aead     cipher.AEAD
 	attempts []byte
 	csrf     []byte
+	codes    []byte
 	random   io.Reader
 }
 
@@ -71,7 +73,11 @@ func NewKeys(master []byte) (*Keys, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Keys{aead: aead, attempts: attempts, csrf: csrf, random: rand.Reader}, nil
+	codes, err := derive(master, infoCodes)
+	if err != nil {
+		return nil, err
+	}
+	return &Keys{aead: aead, attempts: attempts, csrf: csrf, codes: codes, random: rand.Reader}, nil
 }
 
 func derive(master []byte, info string) ([]byte, error) {
