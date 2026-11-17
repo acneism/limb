@@ -142,6 +142,11 @@ func (r admins) Delete(ctx context.Context, tenantID, id string) error {
 			delete(d.recoveryCodes, k)
 		}
 	}
+	for k, s := range d.adminSessions {
+		if s.TenantID == tenantID && s.AdminID == id {
+			delete(d.adminSessions, k)
+		}
+	}
 	return nil
 }
 

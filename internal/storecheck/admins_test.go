@@ -108,3 +108,64 @@ func TestAdminsAreComparedByTheBytesOfTheirLogins(t *testing.T) {
 		t.Fatal("the logins must be compared byte by byte")
 	}
 }
+
+func validAdminSession() store.AdminSession {
+	now := time.Now()
+	return store.AdminSession{
+		TenantID: "default", ID: "s1", AdminID: "a1", Stage: store.AdminStageFull, SecretHash: bytes.Repeat([]byte{1}, store.SecretHashLength),
+		AdminVersion: 1, IP: "192.0.2.1", UserAgent: "agent", CreatedAt: now, LastSeenAt: now, ExpiresAt: now.Add(time.Hour),
+	}
+}
+
+func TestAdminSessionRules(t *testing.T) {
+	if err := NewAdminSession(validAdminSession()); err != nil {
+		t.Fatalf("a valid session was rejected: %v", err)
+	}
+	pending := validAdminSession()
+	pending.Stage, pending.IP, pending.UserAgent = store.AdminStagePassword, "", ""
+	if err := NewAdminSession(pending); err != nil {
+		t.Fatalf("a session that has passed the password was rejected: %v", err)
+	}
+	cases := map[string]func(*store.AdminSession){
+		"no tenant":        func(s *store.AdminSession) { s.TenantID = "" },
+		"no ID":            func(s *store.AdminSession) { s.ID = "" },
+		"no administrator": func(s *store.AdminSession) { s.AdminID = "" },
+		"no stage":         func(s *store.AdminSession) { s.Stage = "" },
+		"an unknown stage": func(s *store.AdminSession) { s.Stage = "half" },
+		"no hash":          func(s *store.AdminSession) { s.SecretHash = nil },
+		"a short hash":     func(s *store.AdminSession) { s.SecretHash = s.SecretHash[:31] },
+		"a long hash":      func(s *store.AdminSession) { s.SecretHash = append(bytes.Clone(s.SecretHash), 0) },
+		"no version":       func(s *store.AdminSession) { s.AdminVersion = 0 },
+		"attempts":         func(s *store.AdminSession) { s.Attempts = 1 },
+		"no creation":      func(s *store.AdminSession) { s.CreatedAt = time.Time{} },
+		"no last use":      func(s *store.AdminSession) { s.LastSeenAt = time.Time{} },
+		"no expiry":        func(s *store.AdminSession) { s.ExpiresAt = time.Time{} },
+		"a long address":   func(s *store.AdminSession) { s.IP = strings.Repeat("a", store.MaxIPLength+1) },
+		"a long agent":     func(s *store.AdminSession) { s.UserAgent = strings.Repeat("a", store.MaxUserAgentLength+1) },
+		"a long ID":        func(s *store.AdminSession) { s.ID = strings.Repeat("a", store.MaxIDLength+1) },
+		"a NUL in the ID":  func(s *store.AdminSession) { s.ID = "a\x00" },
+		"a bad agent":      func(s *store.AdminSession) { s.UserAgent = "\xff" },
+	}
+	for name, edit := range cases {
+		t.Run(name, func(t *testing.T) {
+			s := validAdminSession()
+			edit(&s)
+			if err := NewAdminSession(s); !errors.Is(err, ErrInvalid) {
+				t.Fatalf("NewAdminSession = %v, want ErrInvalid", err)
+			}
+		})
+	}
+}
+
+func TestAdminSessionsAreOrderedByCreationAndThenByID(t *testing.T) {
+	now := time.Now()
+	older := store.AdminSession{ID: "z", CreatedAt: now}
+	newer := store.AdminSession{ID: "a", CreatedAt: now.Add(time.Second)}
+	low, high := store.AdminSession{ID: "a", CreatedAt: now}, store.AdminSession{ID: "b", CreatedAt: now}
+	if CompareAdminSessions(older, newer) >= 0 || CompareAdminSessions(newer, older) <= 0 {
+		t.Fatal("an older session must come first")
+	}
+	if CompareAdminSessions(low, high) >= 0 || CompareAdminSessions(high, low) <= 0 || CompareAdminSessions(low, low) != 0 {
+		t.Fatal("of two sessions of one moment the one with the lesser ID must come first")
+	}
+}

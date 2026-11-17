@@ -20,90 +20,101 @@ const (
 	attemptColumns = "attempt_key, window_start, hit_count, blocked_until, next_allowed_at"
 	keyColumns     = "kid, algorithm, generation, private_key, public_key, created_at, retire_after"
 
-	settingColumns = "tenant_id, name, value, updated_at, updated_by"
-	auditColumns   = "tenant_id, id, occurred_at, actor_kind, actor_id, action, target_user_id, ip, details"
-	adminColumns   = "tenant_id, id, login, password_hash, totp_secret, totp_confirmed_at, totp_last_step, status, created_at, last_login_at, version"
+	settingColumns      = "tenant_id, name, value, updated_at, updated_by"
+	auditColumns        = "tenant_id, id, occurred_at, actor_kind, actor_id, action, target_user_id, ip, details"
+	adminSessionColumns = "tenant_id, id, admin_id, stage, secret_hash, admin_version, attempts, ip, user_agent, created_at, last_seen_at, expires_at"
+	adminColumns        = "tenant_id, id, login, password_hash, totp_secret, totp_confirmed_at, totp_last_step, status, created_at, last_login_at, version"
 )
 
 type queries struct {
-	insertUser          string
-	selectUser          string
-	updateUser          string
-	userExists          string
-	identifierExists    string
-	deleteUser          string
-	insertIdentifier    string
-	selectIdentifier    string
-	listIdentifiers     string
-	deleteIdentifier    string
-	markVerified        string
-	insertSession       string
-	resolveByID         string
-	resolveBySecret     string
-	touchSession        string
-	revokeSession       string
-	revokeAll           string
-	revokeAllExcept     string
-	listSessions        string
-	deleteSessions      string
-	insertToken         string
-	useToken            string
-	selectToken         string
-	deleteTokens        string
-	insertSecret        string
-	endSecrets          string
-	endChannel          string
-	useLink             string
-	selectLink          string
-	selectCodes         string
-	selectChannel       string
-	countAttempt        string
-	useCode             string
-	deleteSecrets       string
-	insertAttempt       string
-	bumpAttempt         string
-	restartAttempt      string
-	selectAttempt       string
-	holdBlock           string
-	holdDelay           string
-	resetAttempt        string
-	deleteAttempts      string
-	insertKey           string
-	listKeys            string
-	retireKey           string
-	keyExists           string
-	deleteKeys          string
-	selectSetting       string
-	listSettings        string
-	updateSetting       string
-	insertSetting       string
-	settingExists       string
-	deleteSetting       string
-	insertAudit         string
-	insertAdmin         string
-	selectAdmin         string
-	selectAdminByLogin  string
-	listAdmins          string
-	updateAdmin         string
-	deleteAdmin         string
-	adminMark           string
-	adminExists         string
-	acceptStep          string
-	recordLogin         string
-	deleteRecoveryCodes string
-	insertRecoveryCode  string
-	useRecoveryCode     string
-	countRecoveryCodes  string
-	bind                func(template string) string
-	schemaVersion       string
-	probeSchema         string
-	touchSchema         string
-	insertSchemaRow     string
-	acquireLock         string
-	renewLock           string
-	lockHeld            string
-	setVersion          string
-	releaseLock         string
+	insertUser                string
+	selectUser                string
+	updateUser                string
+	userExists                string
+	identifierExists          string
+	deleteUser                string
+	insertIdentifier          string
+	selectIdentifier          string
+	listIdentifiers           string
+	deleteIdentifier          string
+	markVerified              string
+	insertSession             string
+	resolveByID               string
+	resolveBySecret           string
+	touchSession              string
+	revokeSession             string
+	revokeAll                 string
+	revokeAllExcept           string
+	listSessions              string
+	deleteSessions            string
+	insertToken               string
+	useToken                  string
+	selectToken               string
+	deleteTokens              string
+	insertSecret              string
+	endSecrets                string
+	endChannel                string
+	useLink                   string
+	selectLink                string
+	selectCodes               string
+	selectChannel             string
+	countAttempt              string
+	useCode                   string
+	deleteSecrets             string
+	insertAttempt             string
+	bumpAttempt               string
+	restartAttempt            string
+	selectAttempt             string
+	holdBlock                 string
+	holdDelay                 string
+	resetAttempt              string
+	deleteAttempts            string
+	insertKey                 string
+	listKeys                  string
+	retireKey                 string
+	keyExists                 string
+	deleteKeys                string
+	selectSetting             string
+	listSettings              string
+	updateSetting             string
+	insertSetting             string
+	settingExists             string
+	deleteSetting             string
+	insertAudit               string
+	insertAdmin               string
+	selectAdmin               string
+	selectAdminByLogin        string
+	listAdmins                string
+	updateAdmin               string
+	deleteAdmin               string
+	adminMark                 string
+	adminExists               string
+	acceptStep                string
+	recordLogin               string
+	deleteRecoveryCodes       string
+	insertRecoveryCode        string
+	useRecoveryCode           string
+	countRecoveryCodes        string
+	insertAdminSession        string
+	resolveAdminSession       string
+	touchAdminSession         string
+	tryAdminAttempt           string
+	rebindAdminSession        string
+	deleteAdminSession        string
+	deleteAdminSessions       string
+	deleteAdminSessionsExcept string
+	listAdminSessions         string
+	deleteStaleAdminSessions  string
+	bind                      func(template string) string
+	schemaVersion             string
+	probeSchema               string
+	touchSchema               string
+	insertSchemaRow           string
+	acquireLock               string
+	renewLock                 string
+	lockHeld                  string
+	setVersion                string
+	releaseLock               string
 }
 
 func newQueries(prefix string, d Dialect) queries {
@@ -230,10 +241,25 @@ func newQueries(prefix string, d Dialect) queries {
 		useRecoveryCode: build("UPDATE {admin_recovery_codes} SET used_at = ? " +
 			"WHERE tenant_id = ? AND admin_id = ? AND code_hash = ? AND used_at IS NULL"),
 		countRecoveryCodes: build("SELECT COUNT(*) FROM {admin_recovery_codes} WHERE tenant_id = ? AND admin_id = ? AND used_at IS NULL"),
-		schemaVersion:      build("SELECT version FROM {schema} WHERE id = 1"),
-		probeSchema:        build("SELECT 1 FROM {schema} WHERE id = 1"),
-		touchSchema:        build("UPDATE {schema} SET version = version WHERE id = 1"),
-		insertSchemaRow:    build("INSERT INTO {schema} (id, version, applied_at) VALUES (1, 0, ?)"),
+		insertAdminSession: build("INSERT INTO {admin_sessions} (" + adminSessionColumns + ") VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)"),
+		resolveAdminSession: build("SELECT s.tenant_id, s.id, s.admin_id, s.stage, s.secret_hash, s.admin_version, s.attempts, s.ip, " +
+			"s.user_agent, s.created_at, s.last_seen_at, s.expires_at, a.login, a.status, a.version, a.totp_confirmed_at " +
+			"FROM {admin_sessions} s JOIN {admins} a ON a.tenant_id = s.tenant_id AND a.id = s.admin_id " +
+			"WHERE s.tenant_id = ? AND s.secret_hash = ?"),
+		touchAdminSession: build("UPDATE {admin_sessions} SET last_seen_at = ? WHERE tenant_id = ? AND id = ? AND last_seen_at < ?"),
+		tryAdminAttempt: build("UPDATE {admin_sessions} SET attempts = attempts + 1 " +
+			"WHERE tenant_id = ? AND id = ? AND stage = 'password' AND attempts < ?"),
+		rebindAdminSession:        build("UPDATE {admin_sessions} SET admin_version = ? WHERE tenant_id = ? AND id = ? AND admin_id = ?"),
+		deleteAdminSession:        build("DELETE FROM {admin_sessions} WHERE tenant_id = ? AND admin_id = ? AND id = ?"),
+		deleteAdminSessions:       build("DELETE FROM {admin_sessions} WHERE tenant_id = ? AND admin_id = ?"),
+		deleteAdminSessionsExcept: build("DELETE FROM {admin_sessions} WHERE tenant_id = ? AND admin_id = ? AND id <> ?"),
+		listAdminSessions: build("SELECT " + adminSessionColumns + " FROM {admin_sessions} " +
+			"WHERE tenant_id = ? AND admin_id = ? AND stage = 'full' AND expires_at > ?"),
+		deleteStaleAdminSessions: build("DELETE FROM {admin_sessions} WHERE tenant_id = ? AND (expires_at < ? OR last_seen_at < ?)"),
+		schemaVersion:            build("SELECT version FROM {schema} WHERE id = 1"),
+		probeSchema:              build("SELECT 1 FROM {schema} WHERE id = 1"),
+		touchSchema:              build("UPDATE {schema} SET version = version WHERE id = 1"),
+		insertSchemaRow:          build("INSERT INTO {schema} (id, version, applied_at) VALUES (1, 0, ?)"),
 		acquireLock: build("UPDATE {schema} SET lock_holder = ?, lock_expires_at = ? " +
 			"WHERE id = 1 AND (lock_holder IS NULL OR lock_expires_at < ?)"),
 		renewLock: build("UPDATE {schema} SET lock_expires_at = ? WHERE id = 1 AND lock_holder = ?"),

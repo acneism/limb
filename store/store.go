@@ -68,6 +68,8 @@ type Repositories interface {
 	Audit() Audit
 	// Admins returns the repository of the accounts of administrators.
 	Admins() Admins
+	// AdminSessions returns the repository of the sessions of administrators.
+	AdminSessions() AdminSessions
 }
 
 // Store is the storage that limb runs on. Implementations are safe for

@@ -67,3 +67,51 @@ func RecoveryHashes(hashes [][]byte) error {
 func CompareAdmins(a, b store.Admin) int {
 	return strings.Compare(a.Login, b.Login)
 }
+
+func NewAdminSession(s store.AdminSession) error {
+	for _, f := range []struct{ name, value string }{
+		{"admin session tenant_id", s.TenantID},
+		{"admin session id", s.ID},
+		{"admin session admin_id", s.AdminID},
+	} {
+		if err := required(f.name, f.value, store.MaxIDLength); err != nil {
+			return err
+		}
+	}
+	switch s.Stage {
+	case store.AdminStagePassword, store.AdminStageFull:
+	default:
+		return invalid("admin session stage %q is unknown", string(s.Stage))
+	}
+	if err := optional("admin session ip", s.IP, store.MaxIPLength); err != nil {
+		return err
+	}
+	if err := optional("admin session user_agent", s.UserAgent, store.MaxUserAgentLength); err != nil {
+		return err
+	}
+	switch {
+	case !ValidHash(s.SecretHash):
+		return invalid("an admin session needs a secret hash of %d bytes", store.SecretHashLength)
+	case s.AdminVersion < 1:
+		return invalid("admin session admin_version must be positive")
+	case s.Attempts != 0:
+		return invalid("a new admin session has no attempts")
+	case s.CreatedAt.IsZero():
+		return invalid("admin session created_at is required")
+	case s.LastSeenAt.IsZero():
+		return invalid("admin session last_seen_at is required")
+	case s.ExpiresAt.IsZero():
+		return invalid("admin session expires_at is required")
+	}
+	return nil
+}
+
+func CompareAdminSessions(a, b store.AdminSession) int {
+	switch {
+	case a.CreatedAt.Before(b.CreatedAt):
+		return -1
+	case a.CreatedAt.After(b.CreatedAt):
+		return 1
+	}
+	return strings.Compare(a.ID, b.ID)
+}

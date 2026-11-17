@@ -30,6 +30,7 @@ type data struct {
 
 	admins        map[adminKey]store.Admin
 	recoveryCodes map[recoveryKey]time.Time
+	adminSessions map[adminSessionKey]store.AdminSession
 }
 
 func newData() *data {
@@ -46,6 +47,7 @@ func newData() *data {
 
 		admins:        map[adminKey]store.Admin{},
 		recoveryCodes: map[recoveryKey]time.Time{},
+		adminSessions: map[adminSessionKey]store.AdminSession{},
 	}
 }
 
@@ -63,6 +65,7 @@ func (d *data) clone() *data {
 
 		admins:        maps.Clone(d.admins),
 		recoveryCodes: maps.Clone(d.recoveryCodes),
+		adminSessions: maps.Clone(d.adminSessions),
 	}
 }
 
@@ -116,6 +119,10 @@ func (s *Store) Audit() store.Audit {
 
 func (s *Store) Admins() store.Admins {
 	return admins{d: func() *data { return s.data }, mu: &s.mu}
+}
+
+func (s *Store) AdminSessions() store.AdminSessions {
+	return adminSessions{d: func() *data { return s.data }, mu: &s.mu}
 }
 
 func (s *Store) InTx(ctx context.Context, fn func(ctx context.Context, tx store.Repositories) error) error {
@@ -194,6 +201,10 @@ func (r txRepositories) Audit() store.Audit {
 
 func (r txRepositories) Admins() store.Admins {
 	return admins{d: func() *data { return r.d }}
+}
+
+func (r txRepositories) AdminSessions() store.AdminSessions {
+	return adminSessions{d: func() *data { return r.d }}
 }
 
 type users struct {
