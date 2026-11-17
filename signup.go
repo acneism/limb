@@ -114,7 +114,7 @@ func (a *Auth) Signup(ctx context.Context, r SignupRequest) error {
 	if err != nil {
 		return err
 	}
-	user, identifiers := a.newAccount(id, hash, pending, nil)
+	user, identifiers := a.newAccount(id, hash, store.CreatedViaSignup, pending, nil)
 	a.deliveryLast(identifiers)
 	language := a.languageFor(ctx, r.Language)
 	taken, err := a.storeSignup(ctx, user, identifiers)

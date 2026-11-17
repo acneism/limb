@@ -205,17 +205,20 @@ func (d *dispatcher) shutdown(ctx context.Context) error {
 // messages that were lost is logged and returned in the error. Call it after
 // http.Server.Shutdown, so that no request is left to add messages. Messages
 // that cannot be sent after the call are refused with ErrBusy. The events that
-// wait to reach Hooks.OnEvent get the same treatment, after the messages. It does
-// nothing when no Sender and no OnEvent were given.
+// wait to reach Hooks.OnEvent and the records of the audit log that wait to be
+// written get the same treatment, after the messages.
 func (a *Auth) Shutdown(ctx context.Context) error {
-	var sending, events error
+	var sending, events, records error
 	if a.dispatcher != nil {
 		sending = a.dispatcher.shutdown(ctx)
 	}
 	if a.events != nil {
 		events = a.events.shutdown(ctx)
 	}
-	return errors.Join(sending, events)
+	if a.auditing != nil {
+		records = a.auditing.shutdown(ctx)
+	}
+	return errors.Join(sending, events, records)
 }
 
 type deliveryError struct {

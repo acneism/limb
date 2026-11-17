@@ -56,6 +56,10 @@ func (s faultStore) Sessions() store.Sessions {
 	return faultSessions{Sessions: s.Store.Sessions(), faults: s.faults}
 }
 
+func (s faultStore) Audit() store.Audit {
+	return faultAudit{Audit: s.Store.Audit(), faults: s.faults}
+}
+
 func (s faultStore) InTx(ctx context.Context, fn func(ctx context.Context, tx store.Repositories) error) error {
 	return s.Store.InTx(ctx, func(ctx context.Context, tx store.Repositories) error {
 		return fn(ctx, faultRepositories{Repositories: tx, faults: s.faults})
@@ -81,6 +85,36 @@ func (r faultRepositories) Secrets() store.Secrets {
 
 func (r faultRepositories) Sessions() store.Sessions {
 	return faultSessions{Sessions: r.Repositories.Sessions(), faults: r.faults}
+}
+
+func (r faultRepositories) Audit() store.Audit {
+	return faultAudit{Audit: r.Repositories.Audit(), faults: r.faults}
+}
+
+type faultAudit struct {
+	store.Audit
+	faults *faultSet
+}
+
+func (a faultAudit) Add(ctx context.Context, r store.AuditRecord) error {
+	if err := a.faults.check("audit.add"); err != nil {
+		return err
+	}
+	return a.Audit.Add(ctx, r)
+}
+
+func (a faultAudit) List(ctx context.Context, q store.AuditQuery) ([]store.AuditRecord, error) {
+	if err := a.faults.check("audit.list"); err != nil {
+		return nil, err
+	}
+	return a.Audit.List(ctx, q)
+}
+
+func (a faultAudit) DeleteBefore(ctx context.Context, tenantID string, before time.Time, limit int) (int, error) {
+	if err := a.faults.check("audit.delete"); err != nil {
+		return 0, err
+	}
+	return a.Audit.DeleteBefore(ctx, tenantID, before, limit)
 }
 
 type faultUsers struct {

@@ -70,6 +70,17 @@ const (
 
 // Event is something that happened and has been saved. It never holds a
 // password, a link, a token or a code.
+//
+// The events of users are also written to the audit log, as the records with the
+// action "auth." and the type of the event: EventUserCreated, EventLogin,
+// EventLoginFailed, EventLogout, EventPasswordChanged, EventPasswordReset,
+// EventSessionEnded, EventRefreshTokenReused and EventChannelVerified. The record
+// holds what the event holds, so a login is masked there too. A record that cannot
+// be written is logged and does not touch the operation. EventLoginFailed and the
+// EventUserCreated of Signup are written by a worker after the answer, so that the
+// time of the answer does not tell whether a login or an address exists. The
+// worker has a queue of 256 records, drops a record that finds it full and logs
+// that, and Auth.Shutdown waits for the rest.
 type Event struct {
 	// Type says what happened.
 	Type EventType
@@ -141,6 +152,14 @@ func WithHooks(h Hooks) Option {
 }
 
 func (a *Auth) emit(ctx context.Context, e Event) {
+	e = a.stamped(e)
+	a.auditEvent(ctx, e)
+	if a.hooks.OnEvent != nil {
+		a.callHook(ctx, e)
+	}
+}
+
+func (a *Auth) emitHook(ctx context.Context, e Event) {
 	if a.hooks.OnEvent == nil {
 		return
 	}
@@ -148,10 +167,13 @@ func (a *Auth) emit(ctx context.Context, e Event) {
 }
 
 func (a *Auth) emitLater(ctx context.Context, e Event) {
+	e = a.stamped(e)
+	if auditedEvents[e.Type] {
+		a.queueAudit(ctx, e)
+	}
 	if a.events == nil {
 		return
 	}
-	e = a.stamped(e)
 	if !a.events.add(ctx, e) {
 		a.logger.WarnContext(ctx, "limb: an event was dropped, the queue of events is full or stopped", "event", e.Type)
 	}

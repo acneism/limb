@@ -92,6 +92,7 @@ type Auth struct {
 	signup       bool
 	needVerified bool
 	events       *eventQueue
+	auditing     *eventQueue
 	admins       *admin.Service
 }
 
@@ -275,6 +276,7 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 	if cfg.hooks.OnEvent != nil {
 		a.events = newEventQueue(eventQueueSize, a.callHook, logger)
 	}
+	a.auditing = newRecordQueue(eventQueueSize, a.recordEvent, logger)
 	for _, endpoint := range cfg.disabled {
 		a.disabled[endpoint] = true
 	}

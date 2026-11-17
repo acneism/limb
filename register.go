@@ -83,7 +83,7 @@ func (a *Auth) Register(ctx context.Context, r Registration) (User, error) {
 	if err != nil {
 		return User{}, err
 	}
-	user, identifiers := a.newAccount(id, hash, pending, confirmed)
+	user, identifiers := a.newAccount(id, hash, store.CreatedViaAPI, pending, confirmed)
 	if err = a.store.InTx(ctx, func(ctx context.Context, tx store.Repositories) error {
 		return storeNewUser(ctx, tx, user, identifiers)
 	}); err != nil {
@@ -98,7 +98,7 @@ func (a *Auth) Register(ctx context.Context, r Registration) (User, error) {
 	return newUser(user, identifiers), nil
 }
 
-func (a *Auth) newAccount(id, hash string, pending []pendingIdentifier, confirmed map[string]bool) (store.User, []store.Identifier) {
+func (a *Auth) newAccount(id, hash string, via store.CreatedVia, pending []pendingIdentifier, confirmed map[string]bool) (store.User, []store.Identifier) {
 	now := a.now().UTC().Truncate(time.Microsecond)
 	user := store.User{
 		TenantID:     a.tenant,
@@ -106,6 +106,7 @@ func (a *Auth) newAccount(id, hash string, pending []pendingIdentifier, confirme
 		Status:       store.StatusActive,
 		PasswordHash: hash,
 		CreatedAt:    now,
+		CreatedVia:   via,
 	}
 	identifiers := make([]store.Identifier, 0, len(pending))
 	for _, p := range pending {

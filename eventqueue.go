@@ -12,6 +12,11 @@ import (
 const (
 	eventQueueSize = 256
 	eventTimeout   = 30 * time.Second
+
+	eventsLostWarning  = "limb: the service stopped before all events reached the hook"
+	eventsLostError    = "limb: %d events did not reach the hook before the deadline: %w"
+	recordsLostWarning = "limb: the service stopped before all audit records were written"
+	recordsLostError   = "limb: %d audit records were not written before the deadline: %w"
 )
 
 type queuedEvent struct {
@@ -28,6 +33,9 @@ type eventQueue struct {
 	pending atomic.Int64
 	worker  sync.WaitGroup
 
+	lostWarning string
+	lostError   string
+
 	mu      sync.Mutex
 	started bool
 	closed  bool
@@ -36,12 +44,20 @@ type eventQueue struct {
 func newEventQueue(size int, deliver func(ctx context.Context, e Event), logger *slog.Logger) *eventQueue {
 	base, cancel := context.WithCancel(context.Background())
 	return &eventQueue{
-		deliver: deliver,
-		logger:  logger,
-		events:  make(chan queuedEvent, size),
-		base:    base,
-		cancel:  cancel,
+		deliver:     deliver,
+		logger:      logger,
+		events:      make(chan queuedEvent, size),
+		base:        base,
+		cancel:      cancel,
+		lostWarning: eventsLostWarning,
+		lostError:   eventsLostError,
 	}
+}
+
+func newRecordQueue(size int, write func(ctx context.Context, e Event), logger *slog.Logger) *eventQueue {
+	q := newEventQueue(size, write, logger)
+	q.lostWarning, q.lostError = recordsLostWarning, recordsLostError
+	return q
 }
 
 func (q *eventQueue) add(values context.Context, e Event) bool {
@@ -99,8 +115,8 @@ func (q *eventQueue) shutdown(ctx context.Context) error {
 	}
 	q.cancel()
 	lost := q.pending.Load()
-	q.logger.Warn("limb: the service stopped before all events reached the hook", "lost", lost)
-	return fmt.Errorf("limb: %d events did not reach the hook before the deadline: %w", lost, ctx.Err())
+	q.logger.Warn(q.lostWarning, "lost", lost)
+	return fmt.Errorf(q.lostError, lost, ctx.Err())
 }
 
 type requestValues struct {

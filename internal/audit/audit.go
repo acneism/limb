@@ -16,6 +16,10 @@ import (
 	"github.com/acneism/limb/store"
 )
 
+// AuthPrefix starts the action of a record that is made of an event of a user,
+// such as a sign-in. The rest of the action is the type of the event.
+const AuthPrefix = "auth."
+
 // The actions that administrators and the maintenance leave in the log.
 const (
 	AdminCreated       = "admin.created"
@@ -59,6 +63,8 @@ type Entry struct {
 	TargetUserID string
 	// IP is the address the actor came from, empty if it is unknown.
 	IP string
+	// At is when it happened, the time of the writer when it is not set.
+	At time.Time
 	// Details are what changed. The values are strings, numbers, booleans, lists
 	// and maps of them.
 	Details map[string]any
@@ -85,10 +91,14 @@ func (w Writer) Add(ctx context.Context, repo store.Audit, e Entry) error {
 	if err != nil {
 		return err
 	}
+	at := e.At
+	if at.IsZero() {
+		at = w.Now()
+	}
 	err = repo.Add(ctx, store.AuditRecord{
 		TenantID:     w.Tenant,
 		ID:           id,
-		At:           w.Now(),
+		At:           at,
 		ActorKind:    e.Actor.Kind,
 		ActorID:      e.Actor.ID,
 		Action:       e.Action,

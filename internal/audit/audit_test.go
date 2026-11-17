@@ -56,6 +56,24 @@ func TestAnEntryBecomesARecord(t *testing.T) {
 	}
 }
 
+func TestAnEntryThatCarriesItsTimeIsWrittenAtThatTime(t *testing.T) {
+	w, s := writer(t)
+	earlier := moment.Add(-time.Hour)
+	if err := w.Add(t.Context(), s.Audit(), Entry{Actor: API, Action: AdminCreated, At: earlier}); err != nil {
+		t.Fatalf("Add failed: %v", err)
+	}
+	if err := w.Add(t.Context(), s.Audit(), Entry{Actor: API, Action: AdminDeleted}); err != nil {
+		t.Fatalf("Add failed: %v", err)
+	}
+	list, err := s.Audit().List(t.Context(), store.AuditQuery{TenantID: store.DefaultTenant, Limit: 10})
+	if err != nil || len(list) != 2 {
+		t.Fatalf("List = %v, %v", list, err)
+	}
+	if !list[0].At.Equal(moment.Truncate(time.Microsecond)) || list[0].Action != AdminDeleted || !list[1].At.Equal(earlier.Truncate(time.Microsecond)) {
+		t.Fatalf("the records are %+v: an entry without a time takes the time of the writer, one with a time keeps it", list)
+	}
+}
+
 func TestAnEntryWithoutDetailsHasNone(t *testing.T) {
 	w, s := writer(t)
 	for _, details := range []map[string]any{nil, {}} {
