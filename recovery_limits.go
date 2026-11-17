@@ -66,7 +66,9 @@ func (l RecoveryLimits) resolve() (recoveryLimits, error) {
 
 // WithRecoveryLimits sets the limits on the requests and on the guesses of
 // links and codes, see RecoveryLimits. New fails for a value that is negative or
-// out of range.
+// out of range. When requests arrive at the same time, each counts the others that
+// came with it, so a limit can turn a request down earlier than its number says,
+// and never later.
 func WithRecoveryLimits(l RecoveryLimits) Option {
 	return func(c *config) {
 		c.recovery = l
