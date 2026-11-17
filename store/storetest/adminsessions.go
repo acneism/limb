@@ -535,11 +535,20 @@ func testAdminSessionsFollowTheAdmin(t *testing.T, s store.Store) {
 func testAdminSessionTenantIsolation(t *testing.T, s store.Store) {
 	ctx := t.Context()
 	mustCreateAdmin(t, s, newAdmin(tenantA, id(1), "root"))
-	mustCreateAdmin(t, s, newAdmin(tenantB, id(1), "root"))
+	mustCreateAdmin(t, s, newAdmin(tenantB, id(1), "other"))
 	a := newAdminSession(tenantA, id(10), id(1), 1)
 	b := newAdminSession(tenantB, id(10), id(1), 2)
 	mustCreateAdminSession(t, s, a)
 	mustCreateAdminSession(t, s, b)
+	for _, c := range []struct {
+		tenant string
+		hash   []byte
+		login  string
+	}{{tenantA, a.SecretHash, "root"}, {tenantB, b.SecretHash, "other"}} {
+		if got := resolveAdminSession(t, s, c.tenant, c.hash).Admin.Login; got != c.login {
+			t.Fatalf("the session of the tenant %s resolved the administrator %q, want %q: the administrator is the one of the same tenant", c.tenant, got, c.login)
+		}
+	}
 	if err := s.AdminSessions().Touch(ctx, tenantA, id(10), adminSessionBase.Add(5*time.Hour)); err != nil {
 		t.Fatal(err)
 	}

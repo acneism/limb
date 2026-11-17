@@ -132,8 +132,8 @@ func TestDetailsThatDoNotFitAreCutShort(t *testing.T) {
 }
 
 func TestDetailsAreCutOnACharacterBoundary(t *testing.T) {
-	huge := strings.Repeat("я", 3000)
-	text, err := Encode(map[string]any{"old": huge, "new": huge, "extra": strings.Repeat("\U0001F600", 3000)})
+	huge := "a" + strings.Repeat("я", 3000)
+	text, err := Encode(map[string]any{"old": huge, "new": huge, "extra": "ab" + strings.Repeat("\U0001F600", 3000)})
 	if err != nil || len(text) > store.MaxAuditDetailsLength {
 		t.Fatalf("Encode = %d bytes, %v", len(text), err)
 	}
@@ -145,6 +145,9 @@ func TestDetailsAreCutOnACharacterBoundary(t *testing.T) {
 		if s, ok := value.(string); ok && strings.ContainsRune(s, '�') {
 			t.Fatalf("%s was cut in the middle of a character: %q", key, s)
 		}
+	}
+	if got["old"] != "a"+strings.Repeat("я", 31)+ellipsis || got["extra"] != "ab"+strings.Repeat("\U0001F600", 15)+ellipsis {
+		t.Fatalf("the values are cut at the last whole character before %d bytes: %q, %q", longestValue, got["old"], got["extra"])
 	}
 }
 

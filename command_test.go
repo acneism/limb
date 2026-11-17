@@ -72,6 +72,7 @@ func TestTheCommandLineAnswersToHelpAndToWhatItDoesNotUnderstand(t *testing.T) {
 		"two logins":                {"admin", "delete", "--login", "a", "b"},
 		"the login twice":           {"admin", "delete", "--login", "abc", "--login=abd"},
 		"an unknown option":         {"admin", "delete", "--force", "abc"},
+		"an unknown option alone":   {"admin", "delete", "--force"},
 		"a password for delete":     {"admin", "delete", "abc", "--password-stdin"},
 		"a password for reset-totp": {"admin", "reset-totp", "abc", "--password-stdin"},
 		"an empty login":            {"admin", "enable", "--login="},
@@ -86,6 +87,9 @@ func TestTheCommandLineAnswersToHelpAndToWhatItDoesNotUnderstand(t *testing.T) {
 	_, _, stderr := runCommand(t, a, "", "admin", "delete")
 	if !strings.Contains(stderr, "the login is missing: give it as --login LOGIN") {
 		t.Errorf("the message does not say what is missing: %q", stderr)
+	}
+	if _, _, stderr = runCommand(t, a, "", "admin", "delete", "--force"); !strings.Contains(stderr, `"--force" is not an option of this command`) {
+		t.Errorf("the message does not say that the option is not known: %q", stderr)
 	}
 }
 
@@ -165,12 +169,14 @@ func TestWithoutATerminalThePasswordNeedsTheOptionThatSaysSo(t *testing.T) {
 			t.Errorf("%s: code %d, stderr %q", name, code, stderr)
 		}
 	}
-	long := strings.Repeat("x", maxPasswordInput+1)
-	if code, _, stderr = runCommand(t, a, long+"\n", "admin", "create", "root", "--password-stdin"); code != 1 || !strings.Contains(stderr, "too long") {
+	if code, _, stderr = runCommand(t, a, strings.Repeat("x", 4097)+"\n", "admin", "create", "root", "--password-stdin"); code != 1 || !strings.Contains(stderr, "the password line is too long") {
 		t.Errorf("a line over the limit: code %d, stderr %q", code, stderr)
 	}
-	if code, _, stderr = runCommand(t, a, strings.Repeat("x", maxPasswordInput)+"\n", "admin", "create", "root", "--password-stdin"); code != 1 || !strings.Contains(stderr, "too long") && !strings.Contains(stderr, "does not meet the policy") {
-		t.Errorf("the longest line: code %d, stderr %q", code, stderr)
+	for _, ending := range []string{"\n", "\r\n", ""} {
+		code, _, stderr = runCommand(t, a, strings.Repeat("x", 4096)+ending, "admin", "create", "root", "--password-stdin")
+		if code != 1 || strings.Contains(stderr, "the password line is too long") || !strings.Contains(stderr, "does not meet the policy") {
+			t.Errorf("the longest line with the ending %q: code %d, stderr %q", ending, code, stderr)
+		}
 	}
 	if list, err := a.Admin().ListAdmins(t.Context()); err != nil || len(list) != 0 {
 		t.Fatalf("a command that failed made an administrator: %v, %v", list, err)
@@ -227,7 +233,8 @@ func TestAPasswordThatIsTypedWrongInATerminalIsNotUsed(t *testing.T) {
 		"nothing is repeated":     {[]typedLine{{text: typedPassword}, {text: ""}}, "the password is empty"},
 		"the terminal fails":      {[]typedLine{{err: errors.New("no terminal")}}, "read the password: no terminal"},
 		"the repetition fails":    {[]typedLine{{text: typedPassword}, {err: errors.New("no terminal")}}, "read the password: no terminal"},
-		"a line that is too long": {[]typedLine{{text: strings.Repeat("x", maxPasswordInput+1)}}, "too long"},
+		"a line that is too long": {[]typedLine{{text: strings.Repeat("x", 4097)}}, "the password line is too long"},
+		"the longest line":        {[]typedLine{{text: strings.Repeat("x", 4096)}, {text: strings.Repeat("x", 4096)}}, "does not meet the policy"},
 	}
 	for name, c := range cases {
 		a := newTestAuth(t)

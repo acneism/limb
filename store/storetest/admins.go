@@ -173,6 +173,15 @@ func testAdminConflicts(t *testing.T, s store.Store) {
 		t.Fatalf("a rejected administrator was stored: %v, %v", list, err)
 	}
 	mustCreateAdmin(t, s, newAdmin(tenantB, id(1), "root"))
+	mustCreateAdmin(t, s, newAdmin(tenantB, id(2), "elsewhere"))
+	if _, err := s.Admins().FindByLogin(ctx, tenantA, "elsewhere"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("FindByLogin of the login of another tenant = %v, want ErrNotFound", err)
+	}
+	for _, tenant := range []string{tenantA, tenantB} {
+		if got, err := s.Admins().FindByLogin(ctx, tenant, "root"); err != nil || got.TenantID != tenant {
+			t.Fatalf("FindByLogin(%s, root) = %+v, %v, want the administrator of that tenant", tenant, got, err)
+		}
+	}
 	for n, login := range []string{"Root", "ROOT", "root ", " root", "rööt", "roöt"} {
 		mustCreateAdmin(t, s, newAdmin(tenantA, id(10+n), login))
 	}
@@ -514,6 +523,11 @@ func testAdminAcceptStep(t *testing.T, s store.Store) {
 	}
 	if err = s.Admins().AcceptStep(ctx, tenantA, id(1), a.Version-1, 101, adminBase); !errors.Is(err, store.ErrStale) {
 		t.Errorf("AcceptStep with an old version = %v, want ErrStale", err)
+	}
+	for _, step := range []int64{100, 50} {
+		if err = s.Admins().AcceptStep(ctx, tenantA, id(1), a.Version+1, step, adminBase); !errors.Is(err, store.ErrStale) {
+			t.Errorf("AcceptStep of the step %d with a version that is not the stored one = %v, want ErrStale: the version is judged first", step, err)
+		}
 	}
 	if got, err = s.Admins().Get(ctx, tenantA, id(1)); err != nil || got.TOTPLastStep != 100 || !sameTime(got.LastLoginAt, first) {
 		t.Fatalf("a refused step must change nothing: %+v, %v", got, err)

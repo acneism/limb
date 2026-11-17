@@ -635,3 +635,144 @@ type failingAdmins struct {
 }
 
 func (f failingAdmins) List(context.Context, string) ([]store.Admin, error) { return nil, f.err }
+
+type faults struct {
+	find, remove, update, create, count, replace, endSessions error
+}
+
+type faultyAdmins struct {
+	store.Admins
+	faults
+}
+
+func (f faultyAdmins) FindByLogin(ctx context.Context, tenantID, login string) (store.Admin, error) {
+	if f.find != nil {
+		return store.Admin{}, f.find
+	}
+	return f.Admins.FindByLogin(ctx, tenantID, login)
+}
+
+func (f faultyAdmins) Create(ctx context.Context, a store.Admin) error {
+	if f.create != nil {
+		return f.create
+	}
+	return f.Admins.Create(ctx, a)
+}
+
+func (f faultyAdmins) Update(ctx context.Context, a store.Admin) (store.Admin, error) {
+	if f.update != nil {
+		return store.Admin{}, f.update
+	}
+	return f.Admins.Update(ctx, a)
+}
+
+func (f faultyAdmins) Delete(ctx context.Context, tenantID, id string) error {
+	if f.remove != nil {
+		return f.remove
+	}
+	return f.Admins.Delete(ctx, tenantID, id)
+}
+
+func (f faultyAdmins) CountRecoveryCodes(ctx context.Context, tenantID, id string) (int, error) {
+	if f.count != nil {
+		return 0, f.count
+	}
+	return f.Admins.CountRecoveryCodes(ctx, tenantID, id)
+}
+
+func (f faultyAdmins) ReplaceRecoveryCodes(ctx context.Context, tenantID, id string, hashes [][]byte) error {
+	if f.replace != nil {
+		return f.replace
+	}
+	return f.Admins.ReplaceRecoveryCodes(ctx, tenantID, id, hashes)
+}
+
+type faultySessions struct {
+	store.AdminSessions
+	err error
+}
+
+func (f faultySessions) DeleteForAdmin(context.Context, string, string, string) (int, error) {
+	return 0, f.err
+}
+
+type faultyRepositories struct {
+	store.Repositories
+	faults
+}
+
+func (f faultyRepositories) Admins() store.Admins {
+	return faultyAdmins{Admins: f.Repositories.Admins(), faults: f.faults}
+}
+
+func (f faultyRepositories) AdminSessions() store.AdminSessions {
+	if f.endSessions == nil {
+		return f.Repositories.AdminSessions()
+	}
+	return faultySessions{AdminSessions: f.Repositories.AdminSessions(), err: f.endSessions}
+}
+
+type faultyStore struct {
+	store.Store
+	faults
+}
+
+func (s faultyStore) Admins() store.Admins {
+	return faultyAdmins{Admins: s.Store.Admins(), faults: s.faults}
+}
+
+func (s faultyStore) InTx(ctx context.Context, fn func(ctx context.Context, tx store.Repositories) error) error {
+	return s.Store.InTx(ctx, func(ctx context.Context, tx store.Repositories) error {
+		return fn(ctx, faultyRepositories{Repositories: tx, faults: s.faults})
+	})
+}
+
+func TestAFailureInTheMiddleOfAChangeIsReportedAndLeavesNothingBehind(t *testing.T) {
+	broken := errors.New("the store failed")
+	disable := func(f *fixture) error { return f.Disable(t.Context(), audit.CLI, "root") }
+	cases := []struct {
+		name   string
+		faults faults
+		run    func(f *fixture) error
+		want   error
+	}{
+		{"a creation that fails", faults{create: broken}, func(f *fixture) error {
+			_, err := f.Create(t.Context(), audit.CLI, "second", goodPassword)
+			return err
+		}, broken},
+		{"finding the administrator to delete", faults{find: broken}, func(f *fixture) error { return f.Delete(t.Context(), audit.CLI, "root") }, broken},
+		{"deleting the administrator", faults{remove: broken}, func(f *fixture) error { return f.Delete(t.Context(), audit.CLI, "root") }, broken},
+		{"deleting an administrator that another call deleted", faults{remove: store.ErrNotFound}, func(f *fixture) error {
+			return f.Delete(t.Context(), audit.CLI, "root")
+		}, ErrNotFound},
+		{"finding the administrator to change", faults{find: broken}, disable, broken},
+		{"updating the administrator", faults{update: broken}, disable, broken},
+		{"ending the sessions", faults{endSessions: broken}, disable, broken},
+		{"removing the recovery codes", faults{replace: broken}, func(f *fixture) error { return f.ResetTOTP(t.Context(), audit.CLI, "root") }, broken},
+		{"counting the recovery codes", faults{count: broken}, func(f *fixture) error {
+			_, err := f.List(t.Context())
+			return err
+		}, broken},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := newFixture(t)
+			f.create(t, "root")
+			before := f.stored(t, "root")
+			f.session(t, before, 1)
+			f.Service.store = faultyStore{Store: f.store, faults: c.faults}
+			if err := c.run(f); !errors.Is(err, c.want) {
+				t.Fatalf("the error is %v, want %v", err, c.want)
+			}
+			if after := f.stored(t, "root"); after.Version != before.Version || after.Status != before.Status || after.PasswordHash != before.PasswordHash {
+				t.Fatalf("a change that failed was made: %+v", after)
+			}
+			if f.sessions(t, before) != 1 {
+				t.Fatal("a change that failed ended the sessions")
+			}
+			if records := f.records(t); len(records) != 1 || records[0].Action != audit.AdminCreated {
+				t.Fatalf("a change that failed was recorded: %+v", records)
+			}
+		})
+	}
+}

@@ -3,6 +3,7 @@ package limb
 import (
 	"context"
 	"errors"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -188,5 +189,32 @@ func TestTheLoginIsNeverThePasswordOfAnAdministrator(t *testing.T) {
 	}
 	if err := a.Admin().ResetAdminPassword(t.Context(), "second-admin", "SECOND-ADMIN-2"); err != nil {
 		t.Fatalf("a password that is not the login = %v", err)
+	}
+}
+
+func TestTheAuthenticatorOfAnAdministratorCarriesTheNameOfTheService(t *testing.T) {
+	cases := map[string]struct {
+		options []Option
+		issuer  string
+	}{
+		"a named service": {[]Option{WithServiceName("Acme Cloud")}, "Acme Cloud"},
+		"no name":         {nil, defaultIssuer},
+	}
+	for name, c := range cases {
+		a := newTestAuth(t, c.options...)
+		enrollment, err := a.admins.NewEnrollment(store.Admin{ID: "00000000-0000-7000-8000-000000000001", Login: "root"})
+		if err != nil {
+			t.Fatalf("%s: NewEnrollment failed: %v", name, err)
+		}
+		address, err := url.Parse(enrollment.URI)
+		if err != nil {
+			t.Fatalf("%s: the address %q is not valid: %v", name, enrollment.URI, err)
+		}
+		if got := address.Query().Get("issuer"); got != c.issuer {
+			t.Errorf("%s: the issuer is %q, want %q", name, got, c.issuer)
+		}
+		if want := "/" + c.issuer + ":root"; address.Path != want {
+			t.Errorf("%s: the label is %q, want %q", name, address.Path, want)
+		}
 	}
 }
