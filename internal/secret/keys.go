@@ -27,6 +27,8 @@ const (
 	infoAttempts    = "limb/v1/attempts"
 	infoCSRF        = "limb/v1/csrf"
 	infoCodes       = "limb/v1/codes"
+	infoTOTP        = "limb/v1/totp"
+	infoRecovery    = "limb/v1/recovery"
 )
 
 var (
@@ -41,9 +43,11 @@ var (
 // from HKDF-SHA256, with the purpose as the info string.
 type Keys struct {
 	aead     cipher.AEAD
+	totp     cipher.AEAD
 	attempts []byte
 	csrf     []byte
 	codes    []byte
+	recovery []byte
 	random   io.Reader
 }
 
@@ -53,17 +57,13 @@ func NewKeys(master []byte) (*Keys, error) {
 	if len(master) < MinMasterKeyLength {
 		return nil, fmt.Errorf("%w: at least %d bytes are needed, got %d", ErrMasterKey, MinMasterKeyLength, len(master))
 	}
-	sealing, err := derive(master, infoSigningKeys)
+	aead, err := newAEAD(master, infoSigningKeys)
 	if err != nil {
 		return nil, err
 	}
-	block, err := aes.NewCipher(sealing)
+	totp, err := newAEAD(master, infoTOTP)
 	if err != nil {
-		return nil, fmt.Errorf("secret: create the cipher: %w", err)
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, fmt.Errorf("secret: create the cipher: %w", err)
+		return nil, err
 	}
 	attempts, err := derive(master, infoAttempts)
 	if err != nil {
@@ -77,7 +77,27 @@ func NewKeys(master []byte) (*Keys, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Keys{aead: aead, attempts: attempts, csrf: csrf, codes: codes, random: rand.Reader}, nil
+	recovery, err := derive(master, infoRecovery)
+	if err != nil {
+		return nil, err
+	}
+	return &Keys{aead: aead, totp: totp, attempts: attempts, csrf: csrf, codes: codes, recovery: recovery, random: rand.Reader}, nil
+}
+
+func newAEAD(master []byte, info string) (cipher.AEAD, error) {
+	key, err := derive(master, info)
+	if err != nil {
+		return nil, err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("secret: create the cipher: %w", err)
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("secret: create the cipher: %w", err)
+	}
+	return aead, nil
 }
 
 func derive(master []byte, info string) ([]byte, error) {
@@ -92,26 +112,49 @@ func derive(master []byte, info string) ([]byte, error) {
 // context strings are authenticated but not stored, so Open succeeds only with
 // the same strings in the same order. The result starts with a format version.
 func (k *Keys) Seal(plaintext []byte, context ...string) ([]byte, error) {
-	out := make([]byte, 1+nonceLength, 1+nonceLength+len(plaintext)+k.aead.Overhead())
+	return seal(k.aead, k.random, plaintext, context)
+}
+
+func seal(aead cipher.AEAD, random io.Reader, plaintext []byte, context []string) ([]byte, error) {
+	out := make([]byte, 1+nonceLength, 1+nonceLength+len(plaintext)+aead.Overhead())
 	out[0] = sealVersion
-	if _, err := io.ReadFull(k.random, out[1:]); err != nil {
+	if _, err := io.ReadFull(random, out[1:]); err != nil {
 		return nil, fmt.Errorf("secret: random source failed: %w", err)
 	}
-	return k.aead.Seal(out, out[1:], plaintext, additionalData(sealVersion, context)), nil
+	return aead.Seal(out, out[1:], plaintext, additionalData(sealVersion, context)), nil
 }
 
 // Open decrypts the result of Seal. Every failure, whether the data is too
 // short, of an unknown version, damaged or sealed for another context, gives
 // the same ErrOpen.
 func (k *Keys) Open(sealed []byte, context ...string) ([]byte, error) {
-	if len(sealed) < 1+nonceLength+k.aead.Overhead() || len(sealed) > maxSealedLength || sealed[0] != sealVersion {
+	return open(k.aead, sealed, context)
+}
+
+func open(aead cipher.AEAD, sealed []byte, context []string) ([]byte, error) {
+	if len(sealed) < 1+nonceLength+aead.Overhead() || len(sealed) > maxSealedLength || sealed[0] != sealVersion {
 		return nil, ErrOpen
 	}
-	plaintext, err := k.aead.Open(nil, sealed[1:1+nonceLength], sealed[1+nonceLength:], additionalData(sealed[0], context))
+	plaintext, err := aead.Open(nil, sealed[1:1+nonceLength], sealed[1+nonceLength:], additionalData(sealed[0], context))
 	if err != nil {
 		return nil, ErrOpen
 	}
 	return plaintext, nil
+}
+
+// SealTOTP encrypts the seed of the one-time passwords of an administrator under
+// a subkey of its own, bound to the ID of the administrator, so that a sealed
+// seed that is copied to the account of another administrator does not open. The
+// format is that of Seal.
+func (k *Keys) SealTOTP(seed []byte, adminID string) ([]byte, error) {
+	return seal(k.totp, k.random, seed, []string{adminID})
+}
+
+// OpenTOTP decrypts the result of SealTOTP for the same administrator. Every
+// failure gives ErrOpen, and so does data that Seal made, because the key is not
+// the same.
+func (k *Keys) OpenTOTP(sealed []byte, adminID string) ([]byte, error) {
+	return open(k.totp, sealed, []string{adminID})
 }
 
 func additionalData(version byte, context []string) []byte {

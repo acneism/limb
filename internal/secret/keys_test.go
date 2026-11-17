@@ -470,3 +470,111 @@ func FuzzSealOpen(f *testing.F) {
 		}
 	})
 }
+
+func TestTheSeedOfAdministratorsIsSealedUnderASubkeyOfItsOwn(t *testing.T) {
+	master := randomMaster(t)
+	k := newKeys(t, master)
+	reference := referenceAEAD(t, referenceHKDF(master, "limb/v1/totp"))
+	additional := []byte{1, 8, 'a', 'd', 'm', 'i', 'n', '-', '0', '1'}
+	seed := bytes.Repeat([]byte{0x5A}, 20)
+
+	sealed, err := k.SealTOTP(seed, "admin-01")
+	if err != nil {
+		t.Fatalf("SealTOTP failed: %v", err)
+	}
+	if sealed[0] != 1 || len(sealed) != 1+12+20+16 {
+		t.Fatalf("the sealed seed has the version %d and %d bytes, want 1 and 49", sealed[0], len(sealed))
+	}
+	got, err := reference.Open(nil, sealed[1:13], sealed[13:], additional)
+	if err != nil || !bytes.Equal(got, seed) {
+		t.Fatalf("the reference AES-256-GCM under the subkey limb/v1/totp cannot open the sealed seed: %x, %v", got, err)
+	}
+
+	nonce := make([]byte, 12)
+	if _, err = rand.Read(nonce); err != nil {
+		t.Fatalf("random source failed: %v", err)
+	}
+	foreign := reference.Seal(append([]byte{1}, nonce...), nonce, seed, additional)
+	if got, err = k.OpenTOTP(foreign, "admin-01"); err != nil || !bytes.Equal(got, seed) {
+		t.Fatalf("OpenTOTP cannot open data sealed by the reference: %x, %v", got, err)
+	}
+}
+
+func TestASealedSeedOpensOnlyForItsAdministratorAndOnlyWithItsOwnKey(t *testing.T) {
+	k := newKeys(t, randomMaster(t))
+	seed := []byte("a seed of twenty by.")
+	sealed, err := k.SealTOTP(seed, "admin-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, openErr := k.OpenTOTP(sealed, "admin-01"); openErr != nil || !bytes.Equal(got, seed) {
+		t.Fatalf("OpenTOTP = %q, %v", got, openErr)
+	}
+	for name, admin := range map[string]string{"another administrator": "admin-02", "no administrator": "", "a prefix": "admin-0", "the same with a suffix": "admin-01x"} {
+		if got, openErr := k.OpenTOTP(sealed, admin); !errors.Is(openErr, ErrOpen) || got != nil {
+			t.Errorf("OpenTOTP for %s = %q, %v; want ErrOpen", name, got, openErr)
+		}
+	}
+	if got, openErr := k.Open(sealed, "admin-01"); !errors.Is(openErr, ErrOpen) || got != nil {
+		t.Errorf("Open with the key of the signing keys opened a sealed seed: %q, %v", got, openErr)
+	}
+	other, err := k.Seal(seed, "admin-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, openErr := k.OpenTOTP(other, "admin-01"); !errors.Is(openErr, ErrOpen) || got != nil {
+		t.Errorf("OpenTOTP opened data that Seal made: %q, %v", got, openErr)
+	}
+	if got, openErr := newKeys(t, randomMaster(t)).OpenTOTP(sealed, "admin-01"); !errors.Is(openErr, ErrOpen) || got != nil {
+		t.Errorf("OpenTOTP with another master key = %q, %v; want ErrOpen", got, openErr)
+	}
+	for _, damaged := range [][]byte{nil, sealed[:10], append(bytes.Clone(sealed), 0), func() []byte { c := bytes.Clone(sealed); c[len(c)-1] ^= 1; return c }(), func() []byte { c := bytes.Clone(sealed); c[0] = 2; return c }()} {
+		if got, openErr := k.OpenTOTP(damaged, "admin-01"); !errors.Is(openErr, ErrOpen) || got != nil {
+			t.Errorf("OpenTOTP of damaged data = %q, %v; want ErrOpen", got, openErr)
+		}
+	}
+}
+
+func TestEverySealOfASeedUsesANewNonceAndReportsAFailureOfTheSource(t *testing.T) {
+	k := newKeys(t, randomMaster(t))
+	first, err := k.SealTOTP([]byte("seed"), "admin-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := k.SealTOTP([]byte("seed"), "admin-01")
+	if err != nil || bytes.Equal(first, second) || bytes.Equal(first[1:13], second[1:13]) {
+		t.Fatalf("two seals of one seed are alike: %x %x, %v", first, second, err)
+	}
+	broken := errors.New("no randomness")
+	k.random = iotest.ErrReader(broken)
+	if sealed, sealErr := k.SealTOTP([]byte("seed"), "admin-01"); !errors.Is(sealErr, broken) || sealed != nil {
+		t.Fatalf("SealTOTP = %x, %v; want the failure of the source", sealed, sealErr)
+	}
+}
+
+func FuzzOpenTOTP(f *testing.F) {
+	k := fuzzKeys(f)
+	sealed, err := k.SealTOTP([]byte("seed of the admin"), "admin-01")
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add(sealed, "admin-01")
+	f.Add(sealed[:20], "admin-01")
+	f.Add([]byte{}, "")
+	f.Fuzz(func(t *testing.T, data []byte, admin string) {
+		got, err := k.OpenTOTP(data, admin)
+		if err != nil {
+			if !errors.Is(err, ErrOpen) || got != nil {
+				t.Fatalf("OpenTOTP = %x, %v; want ErrOpen and nothing", got, err)
+			}
+			return
+		}
+		again, err := k.SealTOTP(got, admin)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if back, err := k.OpenTOTP(again, admin); err != nil || !bytes.Equal(back, got) {
+			t.Fatalf("a seed that was opened does not survive sealing: %x, %v", back, err)
+		}
+	})
+}
