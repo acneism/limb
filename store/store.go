@@ -55,6 +55,8 @@ type Repositories interface {
 	Sessions() Sessions
 	// RefreshTokens returns the repository of refresh tokens.
 	RefreshTokens() RefreshTokens
+	// Secrets returns the repository of the secrets of links and codes.
+	Secrets() Secrets
 	// Attempts returns the repository of counters of failed attempts.
 	Attempts() Attempts
 	// SigningKeys returns the repository of the keys that sign access tokens.

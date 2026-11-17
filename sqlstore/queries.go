@@ -15,6 +15,8 @@ const (
 	resolveFrom  = " FROM {sessions} s JOIN {users} u ON u.tenant_id = s.tenant_id AND u.id = s.user_id"
 	tokenColumns = "tenant_id, token_hash, session_id, expires_at, used_at"
 
+	onetimeColumns = "tenant_id, id, kind, secret_hash, user_id, purpose, channel_type, channel_value, attempts, created_at, expires_at, used_at"
+
 	attemptColumns = "attempt_key, window_start, hit_count, blocked_until, next_allowed_at"
 	keyColumns     = "kid, algorithm, generation, private_key, public_key, created_at, retire_after"
 )
@@ -44,6 +46,16 @@ type queries struct {
 	useToken         string
 	selectToken      string
 	deleteTokens     string
+	insertSecret     string
+	endSecrets       string
+	endChannel       string
+	useLink          string
+	selectLink       string
+	selectCodes      string
+	selectChannel    string
+	countAttempt     string
+	useCode          string
+	deleteSecrets    string
 	insertAttempt    string
 	bumpAttempt      string
 	restartAttempt   string
@@ -75,6 +87,7 @@ func newQueries(prefix string, d Dialect) queries {
 			"{identifiers}", prefix+"identifiers",
 			"{sessions}", prefix+"sessions",
 			"{refresh_tokens}", prefix+"refresh_tokens",
+			"{secrets}", prefix+"secrets",
 			"{attempts}", prefix+"attempts",
 			"{signing_keys}", prefix+"signing_keys",
 			"{schema}", prefix+"schema",
@@ -124,6 +137,24 @@ func newQueries(prefix string, d Dialect) queries {
 			"WHERE tenant_id = ? AND token_hash = ? AND used_at IS NULL"),
 		selectToken:  build("SELECT " + tokenColumns + " FROM {refresh_tokens} WHERE tenant_id = ? AND token_hash = ?"),
 		deleteTokens: build("DELETE FROM {refresh_tokens} WHERE tenant_id = ? AND expires_at < ?"),
+		insertSecret: build("INSERT INTO {secrets} (" + onetimeColumns + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, NULL)"),
+		endSecrets: build("UPDATE {secrets} SET used_at = ? " +
+			"WHERE tenant_id = ? AND user_id = ? AND purpose = ? AND used_at IS NULL"),
+		endChannel: build("UPDATE {secrets} SET used_at = ? " +
+			"WHERE tenant_id = ? AND user_id = ? AND purpose = ? AND channel_type = ? AND channel_value = ? AND used_at IS NULL"),
+		useLink: build("UPDATE {secrets} SET used_at = ? " +
+			"WHERE tenant_id = ? AND kind = 'link' AND purpose = ? AND secret_hash = ? AND used_at IS NULL AND expires_at > ?"),
+		selectLink: build("SELECT " + onetimeColumns + " FROM {secrets} WHERE tenant_id = ? AND secret_hash = ?"),
+		selectCodes: build("SELECT " + onetimeColumns + " FROM {secrets} " +
+			"WHERE tenant_id = ? AND user_id = ? AND purpose = ? AND kind = 'code' AND used_at IS NULL AND expires_at > ? AND attempts < ?"),
+		selectChannel: build("SELECT " + onetimeColumns + " FROM {secrets} " +
+			"WHERE tenant_id = ? AND user_id = ? AND purpose = ? AND kind = 'code' AND used_at IS NULL AND expires_at > ? AND attempts < ? " +
+			"AND channel_type = ? AND channel_value = ?"),
+		countAttempt: build("UPDATE {secrets} SET attempts = attempts + 1 " +
+			"WHERE tenant_id = ? AND id = ? AND used_at IS NULL AND attempts < ?"),
+		useCode: build("UPDATE {secrets} SET used_at = ? " +
+			"WHERE tenant_id = ? AND id = ? AND kind = 'code' AND used_at IS NULL AND expires_at > ?"),
+		deleteSecrets: build("DELETE FROM {secrets} WHERE tenant_id = ? AND (expires_at < ? OR used_at < ?)"),
 		insertAttempt: build(d.InsertIgnoring("{attempts}",
 			[]string{"attempt_key", "window_start", "hit_count"}, []string{"?", "?", "1"}, []string{"attempt_key"})),
 		bumpAttempt:    build("UPDATE {attempts} SET hit_count = hit_count + 1 WHERE attempt_key = ? AND window_start > ?"),

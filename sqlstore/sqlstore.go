@@ -131,6 +131,11 @@ func (s *Store) RefreshTokens() store.RefreshTokens {
 	return refreshTokens{s: s, x: s.auto}
 }
 
+// Secrets returns the repository of the secrets of links and codes.
+func (s *Store) Secrets() store.Secrets {
+	return secrets{s: s, x: s.auto}
+}
+
 // Attempts returns the repository of counters of failed attempts.
 func (s *Store) Attempts() store.Attempts {
 	return attempts{s: s, x: s.auto}
@@ -160,6 +165,10 @@ func (r repositories) Sessions() store.Sessions {
 
 func (r repositories) RefreshTokens() store.RefreshTokens {
 	return refreshTokens(r)
+}
+
+func (r repositories) Secrets() store.Secrets {
+	return secrets(r)
 }
 
 func (r repositories) Attempts() store.Attempts {

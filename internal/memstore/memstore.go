@@ -11,7 +11,7 @@ import (
 	"github.com/acneism/limb/store"
 )
 
-const latestVersion = 2
+const latestVersion = 3
 
 type userKey struct{ tenant, id string }
 
@@ -22,6 +22,7 @@ type data struct {
 	idents   map[identKey]store.Identifier
 	sessions map[sessionKey]store.Session
 	tokens   map[string]store.RefreshToken
+	secrets  map[secretKey]store.Secret
 	attempts map[string]store.Attempt
 	keys     map[string]store.SigningKey
 }
@@ -32,6 +33,7 @@ func newData() *data {
 		idents:   map[identKey]store.Identifier{},
 		sessions: map[sessionKey]store.Session{},
 		tokens:   map[string]store.RefreshToken{},
+		secrets:  map[secretKey]store.Secret{},
 		attempts: map[string]store.Attempt{},
 		keys:     map[string]store.SigningKey{},
 	}
@@ -43,6 +45,7 @@ func (d *data) clone() *data {
 		idents:   maps.Clone(d.idents),
 		sessions: maps.Clone(d.sessions),
 		tokens:   maps.Clone(d.tokens),
+		secrets:  maps.Clone(d.secrets),
 		attempts: maps.Clone(d.attempts),
 		keys:     maps.Clone(d.keys),
 	}
@@ -74,6 +77,10 @@ func (s *Store) Sessions() store.Sessions {
 
 func (s *Store) RefreshTokens() store.RefreshTokens {
 	return refreshTokens{d: func() *data { return s.data }, mu: &s.mu}
+}
+
+func (s *Store) Secrets() store.Secrets {
+	return secrets{d: func() *data { return s.data }, mu: &s.mu}
 }
 
 func (s *Store) Attempts() store.Attempts {
@@ -136,6 +143,10 @@ func (r txRepositories) Sessions() store.Sessions {
 
 func (r txRepositories) RefreshTokens() store.RefreshTokens {
 	return refreshTokens{d: func() *data { return r.d }}
+}
+
+func (r txRepositories) Secrets() store.Secrets {
+	return secrets{d: func() *data { return r.d }}
 }
 
 func (r txRepositories) Attempts() store.Attempts {
@@ -259,6 +270,11 @@ func (r users) Delete(ctx context.Context, tenantID, id string) error {
 			d.removeSession(k)
 		}
 	}
+	for k, s := range d.secrets {
+		if s.TenantID == tenantID && s.UserID == id {
+			delete(d.secrets, k)
+		}
+	}
 	return nil
 }
 
@@ -332,6 +348,11 @@ func (r identifiers) Remove(ctx context.Context, tenantID, typ, value string) er
 		return store.ErrNotFound
 	}
 	delete(d.idents, key)
+	for k, s := range d.secrets {
+		if s.TenantID == tenantID && s.ChannelType == typ && s.ChannelValue == value {
+			delete(d.secrets, k)
+		}
+	}
 	return nil
 }
 
