@@ -152,6 +152,11 @@ func (s *Store) Settings() store.Settings {
 	return settings{s: s, x: s.auto}
 }
 
+// Audit returns the repository of the audit log.
+func (s *Store) Audit() store.Audit {
+	return audit{s: s, x: s.auto}
+}
+
 type repositories struct {
 	s *Store
 	x executor
@@ -187,6 +192,10 @@ func (r repositories) SigningKeys() store.SigningKeys {
 
 func (r repositories) Settings() store.Settings {
 	return settings(r)
+}
+
+func (r repositories) Audit() store.Audit {
+	return audit(r)
 }
 
 // InTx runs fn in a database transaction at the isolation level that the dialect

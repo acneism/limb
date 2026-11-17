@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -128,6 +129,10 @@ func (d mysqlDialect) CheckUpdateCount(reported int64) error {
 			"limb needs the number of rows that an UPDATE changed")
 	}
 	return nil
+}
+
+func (mysqlDialect) Limit(n int) string {
+	return " LIMIT " + strconv.Itoa(n)
 }
 
 func (d mysqlDialect) Migrations() fs.FS {

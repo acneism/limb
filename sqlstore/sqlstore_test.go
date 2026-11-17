@@ -260,3 +260,17 @@ func TestValueHelpers(t *testing.T) {
 		t.Fatal("the zero time must stay zero")
 	}
 }
+
+func TestEveryDialectWritesItsClauseThatLimitsTheRows(t *testing.T) {
+	want := map[string]string{
+		"postgres": " LIMIT 51",
+		"mysql":    " LIMIT 51",
+		"mariadb":  " LIMIT 51",
+		"oracle":   " FETCH FIRST 51 ROWS ONLY",
+	}
+	for _, dialect := range []Dialect{Postgres, MySQL, MariaDB, Oracle} {
+		if got := dialect.Limit(51); got != want[dialect.Name()] {
+			t.Errorf("%s limits the rows with %q, want %q", dialect.Name(), got, want[dialect.Name()])
+		}
+	}
+}

@@ -26,6 +26,7 @@ type data struct {
 	attempts map[string]store.Attempt
 	keys     map[string]store.SigningKey
 	settings map[settingKey]store.Setting
+	audit    map[auditKey]store.AuditRecord
 }
 
 func newData() *data {
@@ -38,6 +39,7 @@ func newData() *data {
 		attempts: map[string]store.Attempt{},
 		keys:     map[string]store.SigningKey{},
 		settings: map[settingKey]store.Setting{},
+		audit:    map[auditKey]store.AuditRecord{},
 	}
 }
 
@@ -51,6 +53,7 @@ func (d *data) clone() *data {
 		attempts: maps.Clone(d.attempts),
 		keys:     maps.Clone(d.keys),
 		settings: maps.Clone(d.settings),
+		audit:    maps.Clone(d.audit),
 	}
 }
 
@@ -96,6 +99,10 @@ func (s *Store) SigningKeys() store.SigningKeys {
 
 func (s *Store) Settings() store.Settings {
 	return settings{d: func() *data { return s.data }, mu: &s.mu}
+}
+
+func (s *Store) Audit() store.Audit {
+	return audit{d: func() *data { return s.data }, mu: &s.mu}
 }
 
 func (s *Store) InTx(ctx context.Context, fn func(ctx context.Context, tx store.Repositories) error) error {
@@ -166,6 +173,10 @@ func (r txRepositories) SigningKeys() store.SigningKeys {
 
 func (r txRepositories) Settings() store.Settings {
 	return settings{d: func() *data { return r.d }}
+}
+
+func (r txRepositories) Audit() store.Audit {
+	return audit{d: func() *data { return r.d }}
 }
 
 type users struct {

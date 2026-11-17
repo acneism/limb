@@ -21,6 +21,7 @@ const (
 	keyColumns     = "kid, algorithm, generation, private_key, public_key, created_at, retire_after"
 
 	settingColumns = "tenant_id, name, value, updated_at, updated_by"
+	auditColumns   = "tenant_id, id, occurred_at, actor_kind, actor_id, action, target_user_id, ip, details"
 )
 
 type queries struct {
@@ -77,6 +78,8 @@ type queries struct {
 	insertSetting    string
 	settingExists    string
 	deleteSetting    string
+	insertAudit      string
+	bind             func(template string) string
 	schemaVersion    string
 	probeSchema      string
 	touchSchema      string
@@ -99,6 +102,7 @@ func newQueries(prefix string, d Dialect) queries {
 			"{attempts}", prefix+"attempts",
 			"{signing_keys}", prefix+"signing_keys",
 			"{settings}", prefix+"settings",
+			"{audit_log}", prefix+"audit_log",
 			"{schema}", prefix+"schema",
 		).Replace(template)
 		var out strings.Builder
@@ -189,6 +193,8 @@ func newQueries(prefix string, d Dialect) queries {
 			[]string{"?", "?", "?", "?", "?"}, []string{"tenant_id", "name"})),
 		settingExists:   build("SELECT 1 FROM {settings} WHERE tenant_id = ? AND name = ?"),
 		deleteSetting:   build("DELETE FROM {settings} WHERE tenant_id = ? AND name = ?"),
+		insertAudit:     build("INSERT INTO {audit_log} (" + auditColumns + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"),
+		bind:            build,
 		schemaVersion:   build("SELECT version FROM {schema} WHERE id = 1"),
 		probeSchema:     build("SELECT 1 FROM {schema} WHERE id = 1"),
 		touchSchema:     build("UPDATE {schema} SET version = version WHERE id = 1"),

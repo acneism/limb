@@ -64,6 +64,8 @@ type Repositories interface {
 	// Settings returns the repository of the settings that administrators
 	// change at run time.
 	Settings() Settings
+	// Audit returns the repository of the audit log.
+	Audit() Audit
 }
 
 // Store is the storage that limb runs on. Implementations are safe for

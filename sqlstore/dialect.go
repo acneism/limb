@@ -72,6 +72,11 @@ type Dialect interface {
 	// change in the way the database is opened.
 	CheckUpdateCount(reported int64) error
 
+	// Limit returns the clause that ends a SELECT and keeps its first n rows, such
+	// as LIMIT 10. n is positive, it is written into the clause and not passed as
+	// a parameter.
+	Limit(n int) string
+
 	// Migrations returns the files of the schema: bootstrap.sql, which creates
 	// the table that records the schema version and the migration lock, and the
 	// numbered migrations such as 0001_init.sql. They are made of statements
@@ -154,6 +159,10 @@ func (postgres) Check(context.Context, *sql.DB) error {
 
 func (postgres) CheckUpdateCount(int64) error {
 	return nil
+}
+
+func (postgres) Limit(n int) string {
+	return " LIMIT " + strconv.Itoa(n)
 }
 
 func (postgres) Migrations() fs.FS {

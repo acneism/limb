@@ -124,6 +124,10 @@ func (oracleDialect) CheckUpdateCount(int64) error {
 	return nil
 }
 
+func (oracleDialect) Limit(n int) string {
+	return " FETCH FIRST " + strconv.Itoa(n) + " ROWS ONLY"
+}
+
 func (oracleDialect) Migrations() fs.FS {
 	return oracleMigrations
 }

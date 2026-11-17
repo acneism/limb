@@ -75,6 +75,10 @@ const (
 	// MaxAuditDetailsLength is the longest details of a record in the audit log.
 	MaxAuditDetailsLength = 4000
 
+	// MaxAuditActions is the largest number of actions that one query of the audit
+	// log asks for.
+	MaxAuditActions = 32
+
 	// MaxUsersPage is the largest number of users that one query returns.
 	MaxUsersPage = 500
 
