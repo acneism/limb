@@ -38,8 +38,29 @@ func (a *Auth) failure(r *http.Request, err error) *apiError {
 		return e
 	case errors.As(err, &validation):
 		return newAPIError(codeInvalidRequest)
+	case errors.Is(err, ErrInvalidSecret):
+		return newAPIError(codeInvalidSecret)
+	case errors.Is(err, ErrVerificationRequired):
+		return newAPIError(codeVerificationRequired)
+	case errors.Is(err, ErrRegistrationRefused):
+		return newAPIError(codeRegistrationRefused)
+	case errors.Is(err, ErrBusy):
+		return newAPIError(codeBusy).with("Retry-After", busyRetryAfter)
+	case errors.Is(err, ErrSignupDisabled), errors.Is(err, ErrRecoveryDisabled):
+		return newAPIError(codeNotFound)
 	}
 	return newAPIError(codeInternal)
+}
+
+func (a *Auth) failValues(w http.ResponseWriter, r *http.Request, err error) {
+	var validation *ValidationError
+	if errors.As(err, &validation) {
+		e := newAPIError(codeValidationFailed)
+		e.field, e.reason = validation.Field, validation.Reason
+		writeError(w, r, e)
+		return
+	}
+	a.fail(w, r, err)
 }
 
 func (a *Auth) fail(w http.ResponseWriter, r *http.Request, err error) {

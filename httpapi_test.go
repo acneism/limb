@@ -67,6 +67,7 @@ func TestEveryCodeHasAStatusAndTwoMessages(t *testing.T) {
 		codeInvalidRequest: 400, codeInvalidCredentials: 401, codeUserBlocked: 403, codeRateLimited: 429,
 		codePasswordChangeRequired: 403, codeUnauthenticated: 401, codeCSRFFailed: 403, codePolicyViolation: 422,
 		codeNotFound: 404, codeMethodNotAllowed: 405, codeUnsupportedMediaType: 415, codeInternal: 500,
+		codeInvalidSecret: 400, codeValidationFailed: 422, codeRegistrationRefused: 403, codeVerificationRequired: 403, codeBusy: 503,
 	}
 	if len(statusOfCode) != len(want) {
 		t.Fatalf("statuses = %v", statusOfCode)

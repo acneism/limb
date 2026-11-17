@@ -51,13 +51,21 @@ type router struct {
 //	POST   /logout                   end the current session
 //	POST   /logout/all               end every session of the user
 //	POST   /password/change          change the password
+//	POST   /register                 register a visitor, with WithSignup
+//	POST   /verify                   ask for a message that confirms an address or a phone number
+//	POST   /verify/confirm           confirm it with the link or the code
+//	POST   /password/reset           ask for a message that resets the password
+//	POST   /password/reset/confirm   choose a new password with the link or the code
 //	GET    /sessions                 list the sessions of the user
 //	GET    /sessions/current         describe the current session
 //	DELETE /sessions/{id}            end a session of the user
 //	GET    /.well-known/jwks.json    the public keys that verify access tokens
 //
 // The introspection route exists only when a service key is given with
-// WithServiceKey, and WithoutEndpoints removes any of the others.
+// WithServiceKey, /register only with WithSignup, and the routes of /verify and
+// /password/reset only when the service can send messages, that is, it has a
+// Sender and an identifier type that is a delivery channel. WithoutEndpoints
+// removes any of the others.
 //
 // Requests and responses are JSON with the names of the fields in snake_case. A
 // request with a body must have the content type application/json, may not be
@@ -74,6 +82,10 @@ type router struct {
 //	/logout/all, DELETE /sessions/{id}
 //	                           none, or {"password"} when WithPasswordToEndSessions asks for it
 //	/token/introspect          {"token"}, with the key of the service as a Bearer token
+//	/register                  {"identifiers": {"email": "...", "username": "..."}, "password", "extra": {...}}
+//	/verify, /password/reset   {"login"}
+//	/verify/confirm            {"token"}, or {"login", "code"}, or {"channel", "code"}
+//	/password/reset/confirm    the same and {"password"}
 //
 // and the bodies of the answers are, with every time in RFC 3339, in UTC and to
 // the second:
@@ -93,6 +105,14 @@ type router struct {
 //	    {"active": false}, or {"active": true, "sub", "sid", "iat", "exp"} with the times in seconds
 //	/.well-known/jwks.json
 //	    {"keys": [...]}, the JWKS of RFC 7517
+//	/register
+//	    202 {"verification_required"}, which says whether the visitor has to confirm an
+//	    address or a phone number before signing in, the same for every registration
+//	/verify, /password/reset
+//	    202 with no body, the same for a login that belongs to an account and one that
+//	    does not
+//	/verify/confirm, /password/reset/confirm
+//	    204 with no body
 //	/logout, /logout/all, DELETE /sessions/{id}
 //	    204 with no body
 //
@@ -113,8 +133,26 @@ type router struct {
 // Bearer token), user_blocked 403, password_change_required 403, csrf_failed 403,
 // not_found 404, method_not_allowed 405, unsupported_media_type 415,
 // policy_violation 422 with the broken rules of the policy in "rules",
-// rate_limited 429 with the Retry-After header and internal_error 500. The reason
-// of a failure of limb itself is never in the answer, it goes to the log.
+// rate_limited 429 with the Retry-After header and internal_error 500. The routes
+// of registration and recovery add invalid_secret 400, for a link or a code that
+// is wrong, expired or used, validation_failed 422, with the name of the value in
+// "field" and the reason in English in "reason", registration_refused 403,
+// verification_required 403, which /login and /token answer for a user who has
+// not confirmed an address or a phone number where the service asks for that, and
+// busy 503 with Retry-After, when the queue of messages is full. The reason of a
+// failure of limb itself is never in the answer, it goes to the log.
+//
+// The routes of registration and recovery need no session and set no cookie. Their
+// bodies are JSON, so a page of another origin cannot send them from a browser
+// without a CORS preflight, which the handler answers with 405. A registration
+// and a request for a message are counted against the address of the client and
+// against the address, the phone number or the login that they name, whether or
+// not an account has it, a wrong link or code against the address of the client,
+// see WithRecoveryLimits, and the answer to a request for a message is the same
+// for a login that has an account and one that has not. The language of the
+// messages comes from the header Accept-Language. A registration cannot say that an
+// address is confirmed: a field "verified" is an unknown field and the request is
+// refused with 400.
 //
 // A cookie session is opened by /login, whose answer holds the CSRF token of the
 // session and sets the session cookie. The cookie is HttpOnly, Secure and
@@ -179,9 +217,24 @@ func (a *Auth) routes() []route {
 		{EndpointSessions, http.MethodGet, "/sessions/current", false, a.handleCurrentSession},
 		{EndpointSessions, http.MethodDelete, sessionsPrefix, true, a.handleEndSession},
 		{EndpointJWKS, http.MethodGet, "/.well-known/jwks.json", false, a.handleJWKS},
+		{EndpointRegister, http.MethodPost, "/register", false, a.handleRegister},
+		{EndpointVerify, http.MethodPost, "/verify", false, a.handleVerificationRequest},
+		{EndpointVerify, http.MethodPost, "/verify/confirm", false, a.handleVerify},
+		{EndpointPasswordReset, http.MethodPost, "/password/reset", false, a.handleResetRequest},
+		{EndpointPasswordReset, http.MethodPost, "/password/reset/confirm", false, a.handleReset},
 	}
 	return slices.DeleteFunc(all, func(rt route) bool {
-		return a.disabled[rt.endpoint] || (rt.endpoint == EndpointIntrospect && len(a.services) == 0)
+		switch {
+		case a.disabled[rt.endpoint]:
+			return true
+		case rt.endpoint == EndpointIntrospect:
+			return len(a.services) == 0
+		case rt.endpoint == EndpointRegister:
+			return !a.signup
+		case rt.endpoint == EndpointVerify, rt.endpoint == EndpointPasswordReset:
+			return !a.recoveryReady()
+		}
+		return false
 	})
 }
 

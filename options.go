@@ -424,11 +424,21 @@ const (
 	// EndpointIntrospect is POST /token/introspect. It exists only when a service
 	// key is given with WithServiceKey.
 	EndpointIntrospect Endpoint = "introspect"
+	// EndpointRegister is POST /register. It exists only with WithSignup.
+	EndpointRegister Endpoint = "register"
+	// EndpointVerify is POST /verify and POST /verify/confirm. They exist only
+	// when the service can send messages, see WithSender.
+	EndpointVerify Endpoint = "verify"
+	// EndpointPasswordReset is POST /password/reset and POST
+	// /password/reset/confirm. They exist only when the service can send
+	// messages, see WithSender.
+	EndpointPasswordReset Endpoint = "password_reset"
 )
 
 var allEndpoints = []Endpoint{
 	EndpointLogin, EndpointToken, EndpointRefresh, EndpointLogout, EndpointLogoutAll,
 	EndpointPasswordChange, EndpointSessions, EndpointJWKS, EndpointIntrospect,
+	EndpointRegister, EndpointVerify, EndpointPasswordReset,
 }
 
 // WithoutEndpoints turns routes of the handler off: a request for one gets the

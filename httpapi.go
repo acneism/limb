@@ -32,6 +32,11 @@ const (
 	codeMethodNotAllowed       = "method_not_allowed"
 	codeUnsupportedMediaType   = "unsupported_media_type"
 	codeInternal               = "internal_error"
+	codeInvalidSecret          = "invalid_secret"
+	codeValidationFailed       = "validation_failed"
+	codeRegistrationRefused    = "registration_refused"
+	codeVerificationRequired   = "verification_required"
+	codeBusy                   = "busy"
 	messageRequestTooLarge     = "request_too_large"
 )
 
@@ -48,6 +53,11 @@ var statusOfCode = map[string]int{
 	codeMethodNotAllowed:       http.StatusMethodNotAllowed,
 	codeUnsupportedMediaType:   http.StatusUnsupportedMediaType,
 	codeInternal:               http.StatusInternalServerError,
+	codeInvalidSecret:          http.StatusBadRequest,
+	codeValidationFailed:       http.StatusUnprocessableEntity,
+	codeRegistrationRefused:    http.StatusForbidden,
+	codeVerificationRequired:   http.StatusForbidden,
+	codeBusy:                   http.StatusServiceUnavailable,
 }
 
 var messages = map[string]map[string]string{
@@ -64,6 +74,11 @@ var messages = map[string]map[string]string{
 		codeMethodNotAllowed:       "This method is not allowed here.",
 		codeUnsupportedMediaType:   "Send the request as application/json.",
 		codeInternal:               "Something went wrong. Try again later.",
+		codeInvalidSecret:          "The link or the code is not valid or has expired.",
+		codeValidationFailed:       "Some of the values are not valid.",
+		codeRegistrationRefused:    "The registration was refused.",
+		codeVerificationRequired:   "Confirm your address or phone number first.",
+		codeBusy:                   "The service is busy. Try again in a few seconds.",
 		messageRequestTooLarge:     "The request is too large.",
 	},
 	"ru": { //nolint:gosec
@@ -79,6 +94,11 @@ var messages = map[string]map[string]string{
 		codeMethodNotAllowed:       "Этот метод здесь не разрешён.",
 		codeUnsupportedMediaType:   "Отправьте запрос как application/json.",
 		codeInternal:               "Что-то пошло не так. Повторите позже.",
+		codeInvalidSecret:          "Ссылка или код недействительны или устарели.",
+		codeValidationFailed:       "Некоторые значения недопустимы.",
+		codeRegistrationRefused:    "Регистрация отклонена.",
+		codeVerificationRequired:   "Сначала подтвердите адрес или номер телефона.",
+		codeBusy:                   "Сервис занят. Повторите через несколько секунд.",
 		messageRequestTooLarge:     "Запрос слишком большой.",
 	},
 }
@@ -88,6 +108,8 @@ type apiError struct {
 	code    string
 	message string
 	rules   []string
+	field   string
+	reason  string
 	header  http.Header
 }
 
@@ -111,6 +133,8 @@ type errorFields struct {
 	Code    string   `json:"code"`
 	Message string   `json:"message"`
 	Rules   []string `json:"rules,omitempty"`
+	Field   string   `json:"field,omitempty"`
+	Reason  string   `json:"reason,omitempty"`
 }
 
 func setCommonHeaders(h http.Header) {
@@ -141,7 +165,7 @@ func writeError(w http.ResponseWriter, r *http.Request, e *apiError) {
 	if !ok {
 		text = messages[defaultLanguage][e.message]
 	}
-	writeJSON(w, e.status, errorBody{Error: errorFields{Code: e.code, Message: text, Rules: e.rules}})
+	writeJSON(w, e.status, errorBody{Error: errorFields{Code: e.code, Message: text, Rules: e.rules, Field: e.field, Reason: e.reason}})
 }
 
 func negotiateLanguage(header string) string {
