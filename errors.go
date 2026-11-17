@@ -65,6 +65,14 @@ var (
 	// panicked. The error that the hook returned is logged and is not given to the
 	// caller.
 	ErrRegistrationRefused = errors.New("limb: the registration was refused")
+
+	// ErrAdminNotFound is returned by the operations on administrators when there
+	// is no administrator with the login, or the login cannot be one.
+	ErrAdminNotFound = errors.New("limb: the administrator does not exist")
+
+	// ErrAdminLoginTaken is returned by CreateAdmin when another administrator has
+	// the login.
+	ErrAdminLoginTaken = errors.New("limb: the login of an administrator is taken")
 )
 
 // RateLimitError reports that there were too many failed attempts and says how

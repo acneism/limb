@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/acneism/limb/identifier"
+	"github.com/acneism/limb/internal/admin"
 	"github.com/acneism/limb/internal/password"
 	"github.com/acneism/limb/internal/secret"
 	"github.com/acneism/limb/sqlstore"
@@ -91,6 +92,7 @@ type Auth struct {
 	signup       bool
 	needVerified bool
 	events       *eventQueue
+	admins       *admin.Service
 }
 
 // New creates the service on top of the database db, which the application
@@ -266,6 +268,7 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 		signup:       cfg.signup,
 		needVerified: needVerified,
 	}
+	a.admins = a.newAdminService(cfg.serviceName)
 	if cfg.sender != nil {
 		a.dispatcher = newDispatcher(sending, logger, a.reportMessageFailure)
 	}
