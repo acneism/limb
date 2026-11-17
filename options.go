@@ -42,6 +42,9 @@ type config struct {
 	refreshJar  bool
 	sameSite    http.SameSite
 	disabled    []Endpoint
+	sender      Sender
+	serviceName string
+	templates   []templateOverride
 	err         error
 }
 

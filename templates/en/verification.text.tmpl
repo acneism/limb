@@ -1,0 +1,13 @@
+{{.ServiceName}}
+
+Someone gave this address and asked to confirm it.
+{{if .Link}}
+To confirm it, open this link. It works for {{.LinkExpiresIn}}:
+
+{{.Link}}
+{{end}}{{if .Code}}
+{{if .Link}}Or enter this code{{else}}To confirm it, enter this code{{end}}. It works for {{.CodeExpiresIn}}:
+
+{{.Code}}
+{{end}}
+If this was not you, ignore this message. Nothing will change.
