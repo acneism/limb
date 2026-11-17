@@ -11,7 +11,7 @@ import (
 	"github.com/acneism/limb/store"
 )
 
-const latestVersion = 3
+const latestVersion = 4
 
 type userKey struct{ tenant, id string }
 
@@ -25,6 +25,7 @@ type data struct {
 	secrets  map[secretKey]store.Secret
 	attempts map[string]store.Attempt
 	keys     map[string]store.SigningKey
+	settings map[settingKey]store.Setting
 }
 
 func newData() *data {
@@ -36,6 +37,7 @@ func newData() *data {
 		secrets:  map[secretKey]store.Secret{},
 		attempts: map[string]store.Attempt{},
 		keys:     map[string]store.SigningKey{},
+		settings: map[settingKey]store.Setting{},
 	}
 }
 
@@ -48,6 +50,7 @@ func (d *data) clone() *data {
 		secrets:  maps.Clone(d.secrets),
 		attempts: maps.Clone(d.attempts),
 		keys:     maps.Clone(d.keys),
+		settings: maps.Clone(d.settings),
 	}
 }
 
@@ -89,6 +92,10 @@ func (s *Store) Attempts() store.Attempts {
 
 func (s *Store) SigningKeys() store.SigningKeys {
 	return signingKeys{d: func() *data { return s.data }, mu: &s.mu}
+}
+
+func (s *Store) Settings() store.Settings {
+	return settings{d: func() *data { return s.data }, mu: &s.mu}
 }
 
 func (s *Store) InTx(ctx context.Context, fn func(ctx context.Context, tx store.Repositories) error) error {
@@ -155,6 +162,10 @@ func (r txRepositories) Attempts() store.Attempts {
 
 func (r txRepositories) SigningKeys() store.SigningKeys {
 	return signingKeys{d: func() *data { return r.d }}
+}
+
+func (r txRepositories) Settings() store.Settings {
+	return settings{d: func() *data { return r.d }}
 }
 
 type users struct {

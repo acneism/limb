@@ -54,4 +54,30 @@ const (
 	// MaxKeyMaterialLength is the longest private or public key of a signing key,
 	// as it is stored. A sealed RSA key of 8192 bits takes less than 5 KiB.
 	MaxKeyMaterialLength = 16384
+
+	// MaxSettingNameLength is the longest name of a setting.
+	MaxSettingNameLength = 64
+
+	// MaxSettingValueLength is the longest value of a setting.
+	MaxSettingValueLength = 512
+
+	// MaxAdminLoginLength is the longest login of an administrator.
+	MaxAdminLoginLength = 64
+
+	// MaxSealedSecretLength is the longest sealed secret of an administrator: the
+	// seed of the one-time passwords with the version, the nonce and the tag of
+	// the encryption around it.
+	MaxSealedSecretLength = 256
+
+	// MaxAuditActionLength is the longest name of an action in the audit log.
+	MaxAuditActionLength = 64
+
+	// MaxAuditDetailsLength is the longest details of a record in the audit log.
+	MaxAuditDetailsLength = 4000
+
+	// MaxUsersPage is the largest number of users that one query returns.
+	MaxUsersPage = 500
+
+	// MaxAuditPage is the largest number of records that one query returns.
+	MaxAuditPage = 500
 )

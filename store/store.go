@@ -61,6 +61,9 @@ type Repositories interface {
 	Attempts() Attempts
 	// SigningKeys returns the repository of the keys that sign access tokens.
 	SigningKeys() SigningKeys
+	// Settings returns the repository of the settings that administrators
+	// change at run time.
+	Settings() Settings
 }
 
 // Store is the storage that limb runs on. Implementations are safe for

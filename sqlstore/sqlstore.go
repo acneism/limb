@@ -146,6 +146,12 @@ func (s *Store) SigningKeys() store.SigningKeys {
 	return signingKeys{s: s, x: s.auto}
 }
 
+// Settings returns the repository of the settings that administrators change at
+// run time.
+func (s *Store) Settings() store.Settings {
+	return settings{s: s, x: s.auto}
+}
+
 type repositories struct {
 	s *Store
 	x executor
@@ -177,6 +183,10 @@ func (r repositories) Attempts() store.Attempts {
 
 func (r repositories) SigningKeys() store.SigningKeys {
 	return signingKeys(r)
+}
+
+func (r repositories) Settings() store.Settings {
+	return settings(r)
 }
 
 // InTx runs fn in a database transaction at the isolation level that the dialect

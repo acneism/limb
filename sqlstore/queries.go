@@ -19,6 +19,8 @@ const (
 
 	attemptColumns = "attempt_key, window_start, hit_count, blocked_until, next_allowed_at"
 	keyColumns     = "kid, algorithm, generation, private_key, public_key, created_at, retire_after"
+
+	settingColumns = "tenant_id, name, value, updated_at, updated_by"
 )
 
 type queries struct {
@@ -69,6 +71,12 @@ type queries struct {
 	retireKey        string
 	keyExists        string
 	deleteKeys       string
+	selectSetting    string
+	listSettings     string
+	updateSetting    string
+	insertSetting    string
+	settingExists    string
+	deleteSetting    string
 	schemaVersion    string
 	probeSchema      string
 	touchSchema      string
@@ -90,6 +98,7 @@ func newQueries(prefix string, d Dialect) queries {
 			"{secrets}", prefix+"secrets",
 			"{attempts}", prefix+"attempts",
 			"{signing_keys}", prefix+"signing_keys",
+			"{settings}", prefix+"settings",
 			"{schema}", prefix+"schema",
 		).Replace(template)
 		var out strings.Builder
@@ -169,10 +178,17 @@ func newQueries(prefix string, d Dialect) queries {
 			"AND (blocked_until IS NULL OR blocked_until < ?) AND (next_allowed_at IS NULL OR next_allowed_at < ?)"),
 		insertKey: build("INSERT INTO {signing_keys} (kid, algorithm, generation, private_key, public_key, created_at) " +
 			"VALUES (?, ?, ?, ?, ?, ?)"),
-		listKeys:        build("SELECT " + keyColumns + " FROM {signing_keys} ORDER BY generation"),
-		retireKey:       build("UPDATE {signing_keys} SET retire_after = ? WHERE kid = ? AND retire_after IS NULL"),
-		keyExists:       build("SELECT 1 FROM {signing_keys} WHERE kid = ?"),
-		deleteKeys:      build("DELETE FROM {signing_keys} WHERE retire_after < ?"),
+		listKeys:      build("SELECT " + keyColumns + " FROM {signing_keys} ORDER BY generation"),
+		retireKey:     build("UPDATE {signing_keys} SET retire_after = ? WHERE kid = ? AND retire_after IS NULL"),
+		keyExists:     build("SELECT 1 FROM {signing_keys} WHERE kid = ?"),
+		deleteKeys:    build("DELETE FROM {signing_keys} WHERE retire_after < ?"),
+		selectSetting: build("SELECT " + settingColumns + " FROM {settings} WHERE tenant_id = ? AND name = ?"),
+		listSettings:  build("SELECT " + settingColumns + " FROM {settings} WHERE tenant_id = ?"),
+		updateSetting: build("UPDATE {settings} SET value = ?, updated_at = ?, updated_by = ? WHERE tenant_id = ? AND name = ?"),
+		insertSetting: build(d.InsertIgnoring("{settings}", strings.Split(settingColumns, ", "),
+			[]string{"?", "?", "?", "?", "?"}, []string{"tenant_id", "name"})),
+		settingExists:   build("SELECT 1 FROM {settings} WHERE tenant_id = ? AND name = ?"),
+		deleteSetting:   build("DELETE FROM {settings} WHERE tenant_id = ? AND name = ?"),
 		schemaVersion:   build("SELECT version FROM {schema} WHERE id = 1"),
 		probeSchema:     build("SELECT 1 FROM {schema} WHERE id = 1"),
 		touchSchema:     build("UPDATE {schema} SET version = version WHERE id = 1"),
