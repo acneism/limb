@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/acneism/limb/identifier"
 )
@@ -478,4 +479,66 @@ func TestAResetRequestAndTheNoticeCarryTheLanguageOfTheClient(t *testing.T) {
 	if _, err := f.signIn(t, "nina_n", resetPassword); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestASlowHookOfEventsDoesNotShowWhetherAnAddressIsTakenOverHTTP(t *testing.T) {
+	f, api := newRecoveryAPI(t)
+	f.verify(t, "email", "nina@example.com")
+	release := make(chan struct{})
+	entered := make(chan Event, 4)
+	f.a.hooks.OnEvent = func(_ context.Context, e Event) {
+		entered <- e
+		<-release
+	}
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	send := func(what, path string, body any) *httptest.ResponseRecorder {
+		t.Helper()
+		var rec *httptest.ResponseRecorder
+		finishes(t, what, func() { rec = api.send(t, http.MethodPost, path, body) })
+		return rec
+	}
+	free := send("POST /register with a free address", "/register", registration("olga@example.com", "olga_o"))
+	select {
+	case e := <-entered:
+		if e.Type != EventUserCreated {
+			t.Fatalf("event = %+v", e)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the event of the new user never reached the hook")
+	}
+	taken := send("POST /register with a taken address", "/register", registration("nina@example.com", "other_o"))
+	again := send("POST /register with another free address, while the first event is in the hook", "/register", registration("boris@example.com", "boris_b"))
+	for _, rec := range []*httptest.ResponseRecorder{free, taken, again} {
+		if rec.Code != http.StatusAccepted || rec.Body.String() != free.Body.String() {
+			t.Fatalf("answer = %d %q, want the same for every registration: %d %q", rec.Code, rec.Body.String(), free.Code, free.Body.String())
+		}
+	}
+	for _, login := range []string{"nina_n", "nobody@example.com"} {
+		for _, path := range []string{"/verify", "/password/reset"} {
+			if rec := send("POST "+path+" for "+login, path, map[string]string{"login": login}); rec.Code != http.StatusAccepted {
+				t.Fatalf("POST %s for %s = %d: %s", path, login, rec.Code, rec.Body.String())
+			}
+		}
+	}
+	close(release)
+	select {
+	case e := <-entered:
+		if e.Type != EventUserCreated {
+			t.Fatalf("event = %+v", e)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the event of the second user never reached the hook")
+	}
+	select {
+	case e := <-entered:
+		t.Fatalf("the registration that used a taken address, or a request for a message, reported %+v", e)
+	case <-time.After(100 * time.Millisecond):
+	}
+	f.idle(t)
 }
