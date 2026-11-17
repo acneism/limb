@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"runtime"
 	"slices"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -90,6 +91,9 @@ type Auth struct {
 
 	immediate    bool
 	retention    time.Duration
+	auditKept    time.Duration
+	unconfirmed  time.Duration
+	maintaining  atomic.Bool
 	keepSessions bool
 	signup       bool
 	needVerified bool
@@ -270,6 +274,8 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 
 		immediate:    cfg.immediate,
 		retention:    cmp.Or(cfg.retention, defaultDeletedRetention),
+		auditKept:    cmp.Or(cfg.auditKept, defaultAuditRetention),
+		unconfirmed:  unconfirmedLifetime(cfg),
 		keepSessions: cfg.keepOpen,
 		signup:       cfg.signup,
 		needVerified: needVerified,

@@ -91,6 +91,20 @@ func (k *keyring) signer(ctx context.Context) (*signingKey, error) {
 	return current, nil
 }
 
+func (k *keyring) maintain(ctx context.Context) error {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	now := k.a.now()
+	if err := k.refresh(ctx, now, false); err != nil {
+		return err
+	}
+	current := k.pick(now)
+	if current == nil || !k.rotationDue(now, current) {
+		return nil
+	}
+	return k.rotate(ctx, now)
+}
+
 func (k *keyring) lookup(ctx context.Context, kid string) (*signingKey, error) {
 	k.mu.Lock()
 	defer k.mu.Unlock()

@@ -39,6 +39,13 @@ const (
 	// EventUserRestored is reported when an administrator restored a deleted user.
 	EventUserRestored EventType = "user_restored"
 
+	// EventUserPurged is reported when the record of a user was removed for good by
+	// the maintenance, see Auth.Cleanup, with everything that belongs to it.
+	// Details["reason"] is "retention" for a deleted user whose retention ended and
+	// "unconfirmed" for an account of Signup that nobody confirmed. It is the last
+	// word of limb about the user, so an application can clear what it keeps of them.
+	EventUserPurged EventType = "user_purged"
+
 	// EventLogin is reported when a user signed in. Details["kind"] is "cookie" or
 	// "token".
 	EventLogin EventType = "login"

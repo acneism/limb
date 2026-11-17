@@ -31,6 +31,7 @@ const (
 	SettingChanged     = "setting.changed"
 
 	UserCreated            = "user.created"
+	UserPurged             = "user.purged"
 	UserDeleted            = "user.deleted"
 	UserRestored           = "user.restored"
 	UserInvited            = "user.invited"
@@ -69,6 +70,8 @@ var (
 	CLI = Actor{Kind: store.ActorSystem, ID: "cli"}
 	// API is the code of the application that calls the methods of Admin.
 	API = Actor{Kind: store.ActorSystem, ID: "api"}
+	// Maintenance is the maintenance of the service, see Auth.Cleanup.
+	Maintenance = Actor{Kind: store.ActorSystem, ID: "maintenance"}
 )
 
 // Entry is what a record is made of, apart from its ID and its time.

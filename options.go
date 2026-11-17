@@ -55,6 +55,9 @@ type config struct {
 	unverified  bool
 	immediate   bool
 	retention   time.Duration
+	auditKept   time.Duration
+	unconfirmed time.Duration
+	hasUnconf   bool
 	err         error
 }
 
