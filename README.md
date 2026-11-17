@@ -5,6 +5,42 @@ It works with PostgreSQL, MySQL/MariaDB and Oracle through `database/sql`.
 
 **Status:** early development, not ready for use.
 
+## Registration, confirmation and password reset
+
+limb sends no e-mail and no SMS itself. The application gives `limb.WithSender` an implementation of `limb.Sender`, and limb calls it in the background with a `limb.Message`: the kind of the message, the recipient, the language, the link, the code and a text made from the built-in templates in Russian and English. `limb.WithMessageTemplate` replaces a template, `limb.WithServiceName` names the service in the texts, and `Auth.Shutdown` waits for the messages that are still waiting when the application stops.
+
+```go
+auth, err := limb.New(db, limb.Postgres, masterKey,
+	limb.WithIdentifiers(identifier.Email(identifier.Required()), identifier.Username()),
+	limb.WithSender(mailer),
+	limb.WithSignup(),
+	limb.WithVerifyURL("https://app.example.com/confirm"),
+	limb.WithResetURL("https://app.example.com/reset"),
+	limb.WithServiceName("Acme"),
+	limb.WithHooks(limb.Hooks{BeforeRegister: checkInvitation}),
+)
+```
+
+The routes of `auth.Handler()` for these scenarios are below. They need no session and set no cookie. `/verify` and `/password/reset` answer the same for a login that has an account and one that has not.
+
+| Route | Body | Answer |
+| --- | --- | --- |
+| `POST /register`, with `WithSignup` | `{"identifiers": {"email": "...", "username": "..."}, "password": "...", "extra": {...}}` | `202` with `{"verification_required": true}` |
+| `POST /verify` | `{"login": "..."}` | `202` |
+| `POST /verify/confirm` | `{"token": "..."}`, or `{"login": "...", "code": "..."}`, or `{"channel": "...", "code": "..."}` | `204` |
+| `POST /password/reset` | `{"login": "..."}` | `202` |
+| `POST /password/reset/confirm` | the same as `/verify/confirm` and `{"password": "..."}` | `204` |
+
+The link in a message is the address given with `WithVerifyURL` or `WithResetURL` with the secret in its fragment, for example `https://app.example.com/reset#token=...`. A browser does not send the fragment to a server, so it does not reach the logs: the page of the application reads it with a script and sends it in the body of the request. Without these options the messages carry a code only.
+
+- A registration whose e-mail address or phone number belongs to someone else is answered like any other, creates nothing and sends the owner a notice. A taken nickname is reported with `422 validation_failed`, because it has to be chosen.
+- With `WithSignup`, and when an identifier type is a delivery channel, a user signs in only after confirming an address or a phone number: until then `/login` and `/token` answer `403 verification_required`, after the right password only. `WithoutVerificationRequired` turns this off, and `Registration.Verified` lets the code of the application confirm values when it makes a user with `Auth.Register`.
+- `Hooks.BeforeRegister` can refuse a registration, for example for an invitation code that the client sends in `extra`: a `*limb.ValidationError` becomes `422` with its field and reason, any other error or a panic becomes `403 registration_refused`.
+- A link that resets a password works for 30 minutes and one that confirms an address for 24 hours. A code of six digits works for ten minutes and survives five guesses. A link or a code works once, and using one ends the other. The database keeps only hashes.
+- A password is reset only through a channel that is confirmed, and by default it ends every session of the user. The user gets a message about every change of the password. A message of a kind goes to one user at most five times in an hour.
+- The limits count registrations and requests for messages by the address of the client and by the address, the phone number or the login that they name, and wrong links and codes by the address of the client. They answer `429` with `Retry-After`, see `limb.WithRecoveryLimits`. A queue of messages that is full answers `503 busy`.
+- `Hooks.OnEvent` hears about every registration, sign-in, change and reset of a password, confirmed channel and message that failed, after the operation was committed, and never gets a password, a link or a code.
+
 ## Databases
 
 The application opens the `*sql.DB` with the driver it prefers and gives `limb.New` the dialect of the database. limb imports no driver. The tests use the drivers in the table.
