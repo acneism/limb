@@ -16,6 +16,7 @@ import (
 
 	"github.com/acneism/limb"
 	"github.com/acneism/limb/identifier"
+	"github.com/acneism/limb/internal/memstore"
 )
 
 func ExampleNew() {
@@ -278,4 +279,42 @@ func ExampleHooks() {
 		},
 	}
 	_ = limb.WithHooks(hooks)
+}
+
+func newExampleService() *limb.Auth {
+	masterKey := []byte(strings.Repeat("example master ", 3))
+	auth, err := limb.NewWithStore(memstore.New(), masterKey, limb.WithAutoMigrate())
+	if err != nil {
+		log.Fatal(err)
+	}
+	return auth
+}
+
+func ExampleAuth_Admin() {
+	auth := newExampleService()
+	created, err := auth.Admin().CreateAdmin(context.Background(), "Root", "a password that is long enough")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(created.Login, created.TOTPBound)
+	_, err = auth.Admin().CreateAdmin(context.Background(), "root", "a password that is long enough")
+	fmt.Println(errors.Is(err, limb.ErrAdminLoginTaken))
+	// Output:
+	// root false
+	// true
+}
+
+func ExampleAuth_RunCommandInput() {
+	auth := newExampleService()
+	password := strings.NewReader("a password that is long enough\n")
+	code := auth.RunCommandInput(context.Background(), password,
+		[]string{"admin", "create", "--login", "root", "--password-stdin"}, os.Stdout, os.Stderr)
+	fmt.Println("exit code", code)
+	code = auth.RunCommandInput(context.Background(), nil, []string{"admin", "disable", "root"}, os.Stdout, os.Stderr)
+	fmt.Println("exit code", code)
+	// Output:
+	// the administrator root is created: the authenticator is bound at the first sign-in to the administration
+	// exit code 0
+	// the administrator root cannot sign in and has no sessions
+	// exit code 0
 }
