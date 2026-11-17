@@ -80,6 +80,32 @@ The driver does not interrupt a running statement when its context ends: a cance
 
 Every time column of Oracle is `TIMESTAMP(6) WITH TIME ZONE`, because a plain `TIMESTAMP` is compared through the time zone of the session and the expiry times would drift by the offset of the machine. Oracle does not accept a primary key, a unique key or a unique index on such a column (ORA-02329), so no migration may make one. A test fails when one does.
 
+## Command line
+
+`Auth.RunCommand` runs the commands of the command line of the application, which connects it in its `main` function, for example when the first argument is `limb`:
+
+```go
+if len(os.Args) > 1 && os.Args[1] == "limb" {
+	os.Exit(auth.RunCommand(context.Background(), os.Args[2:], os.Stdout, os.Stderr))
+}
+```
+
+The commands are `admin create --login LOGIN`, `admin delete`, `admin list`, `admin disable`, `admin enable`, `admin reset-password` and `admin reset-totp`, and `migrate` and `cleanup`; `help` lists them. The administrators of the web administration are made only here and with `Auth.Admin()`, never from the web. The password is never an argument of the command line: in a terminal the command asks for it twice without echo, and without a terminal it is the first line of the standard input, which `--password-stdin` has to say is meant, as in `echo "$PASSWORD" | ./app limb admin create --login root --password-stdin`. What the commands change is written to the audit log as done by the command line.
+
+## Dependencies
+
+The library links these packages, all with licenses that are compatible with Apache 2.0. The drivers of the databases are not among them: the application chooses its own.
+
+| Package | What it is for | License |
+| --- | --- | --- |
+| `golang.org/x/crypto` | Argon2id for passwords | BSD-3-Clause |
+| `golang.org/x/text` | Unicode NFKC for nicknames, logins and passwords | BSD-3-Clause |
+| `golang.org/x/net` | punycode for the domains of e-mail addresses | BSD-3-Clause |
+| `golang.org/x/term` | reading a password in the terminal without echo, in the command line | BSD-3-Clause |
+| `github.com/golang-jwt/jwt/v5` | signing and checking JWT | MIT |
+| `github.com/google/uuid` | UUIDv7 | BSD-3-Clause |
+| `github.com/nyaruka/phonenumbers` | normalizing phone numbers, only in `identifier/phone` | MIT |
+
 ## License
 
 Apache 2.0, see [LICENSE](LICENSE).
