@@ -18,10 +18,17 @@ const (
 	// Hooks.OnEvent.
 	EventUserCreated EventType = "user_created"
 
-	// EventUserChanged is reported when an administrator changes a user. It is
-	// declared for the administration of users, which comes later, and limb does
-	// not report it yet.
+	// EventUserChanged is reported when an administrator changes a user in a way
+	// that has no event of its own: Details["change"] is "password_reset_sent" for a
+	// link that was sent and "password_temporary" for a temporary password.
 	EventUserChanged EventType = "user_changed"
+
+	// EventUserBlocked is reported when an administrator blocked a user. Details
+	// holds the "reason" and, for a block that ends, the time "until" in RFC 3339.
+	EventUserBlocked EventType = "user_blocked"
+
+	// EventUserUnblocked is reported when an administrator lifted a block.
+	EventUserUnblocked EventType = "user_unblocked"
 
 	// EventLogin is reported when a user signed in. Details["kind"] is "cookie" or
 	// "token".

@@ -77,6 +77,16 @@ var (
 	// ErrUserNotFound is returned by the operations on users of the
 	// administration when there is no user with the ID, or the ID cannot be one.
 	ErrUserNotFound = errors.New("limb: the user does not exist")
+
+	// ErrUserDeleted is returned by the operations on users of the administration
+	// that make no sense for an account that is deleted. Restore it first.
+	ErrUserDeleted = errors.New("limb: the user is deleted")
+
+	// ErrNoConfirmedChannel is returned when a link has to be sent to the user and
+	// they have no address or phone number that is confirmed, because a mistyped
+	// one would hand the account to a stranger. Give them a temporary password
+	// instead.
+	ErrNoConfirmedChannel = errors.New("limb: the user has no confirmed address or phone number")
 )
 
 // RateLimitError reports that there were too many failed attempts and says how

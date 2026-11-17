@@ -220,6 +220,13 @@ type faultSessions struct {
 	faults *faultSet
 }
 
+func (s faultSessions) Revoke(ctx context.Context, tenantID, userID, id string, at time.Time) error {
+	if err := s.faults.check("sessions.revoke_one"); err != nil {
+		return err
+	}
+	return s.Sessions.Revoke(ctx, tenantID, userID, id, at)
+}
+
 func (s faultSessions) RevokeAllForUser(ctx context.Context, tenantID, userID, exceptID string, at time.Time) (int, error) {
 	if err := s.faults.check("sessions.revoke"); err != nil {
 		return 0, err

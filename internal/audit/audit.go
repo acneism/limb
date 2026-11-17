@@ -29,6 +29,13 @@ const (
 	AdminPasswordReset = "admin.password_reset"
 	AdminTOTPReset     = "admin.totp_reset"
 	SettingChanged     = "setting.changed"
+
+	UserBlocked           = "user.blocked"
+	UserUnblocked         = "user.unblocked"
+	UserSessionEnded      = "user.session_ended"
+	UserSessionsEnded     = "user.sessions_ended"
+	UserPasswordResetSent = "user.password_reset_sent"
+	UserPasswordTemporary = "user.password_temporary"
 )
 
 const (
