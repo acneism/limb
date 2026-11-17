@@ -88,6 +88,8 @@ type Auth struct {
 	verifyURL  string
 
 	keepSessions bool
+	signup       bool
+	needVerified bool
 }
 
 // New creates the service on top of the database db, which the application
@@ -198,6 +200,10 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 	if err != nil {
 		return nil, err
 	}
+	needVerified := cfg.signup && !cfg.unverified && slices.ContainsFunc(types, identifier.Type.IsDelivery)
+	if needVerified && cfg.sender == nil {
+		return nil, errors.New("limb: WithSignup with an identifier type that is a delivery channel needs WithSender to confirm the addresses, or WithoutVerificationRequired")
+	}
 	messages, err := newRenderer(cfg.templates, cfg.serviceName, cfg.development)
 	if err != nil {
 		return nil, err
@@ -256,6 +262,8 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 		verifyURL: cfg.verifyURL,
 
 		keepSessions: cfg.keepOpen,
+		signup:       cfg.signup,
+		needVerified: needVerified,
 	}
 	if cfg.sender != nil {
 		a.dispatcher = newDispatcher(sending, logger, a.reportMessageFailure)

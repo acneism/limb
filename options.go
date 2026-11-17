@@ -51,6 +51,8 @@ type config struct {
 	resetURL    string
 	verifyURL   string
 	keepOpen    bool
+	signup      bool
+	unverified  bool
 	err         error
 }
 

@@ -95,6 +95,13 @@ func (u faultUsers) Get(ctx context.Context, tenantID, id string) (store.User, e
 	return u.Users.Get(ctx, tenantID, id)
 }
 
+func (u faultUsers) Create(ctx context.Context, user store.User) error {
+	if err := u.faults.check("users.create"); err != nil {
+		return err
+	}
+	return u.Users.Create(ctx, user)
+}
+
 func (u faultUsers) Update(ctx context.Context, user store.User) (store.User, error) {
 	if err := u.faults.check("users.update"); err != nil {
 		return store.User{}, err
@@ -105,6 +112,13 @@ func (u faultUsers) Update(ctx context.Context, user store.User) (store.User, er
 type faultIdentifiers struct {
 	store.Identifiers
 	faults *faultSet
+}
+
+func (i faultIdentifiers) Add(ctx context.Context, identifier store.Identifier) error {
+	if err := i.faults.check("identifiers.add"); err != nil {
+		return err
+	}
+	return i.Identifiers.Add(ctx, identifier)
 }
 
 func (i faultIdentifiers) Find(ctx context.Context, tenantID, typ, value string) (store.Identifier, error) {

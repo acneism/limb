@@ -93,15 +93,12 @@ func linkLifetime(purpose store.SecretPurpose) time.Duration {
 	return verifyLinkLifetime
 }
 
-func (a *Auth) recoveryChannels(purpose store.SecretPurpose, identifiers []store.Identifier) []store.Identifier {
+func (a *Auth) deliveryChannels(identifiers []store.Identifier, verified bool) []store.Identifier {
 	var channels []store.Identifier
 	for _, i := range identifiers {
 		kind, declared := a.known[i.Type]
-		if !declared || !kind.IsDelivery() {
-			continue
-		}
-		verified := !i.VerifiedAt.IsZero()
-		if verified == (purpose == store.PurposeReset) {
+		confirmed := !i.VerifiedAt.IsZero()
+		if declared && kind.IsDelivery() && confirmed == verified {
 			channels = append(channels, i)
 		}
 	}
@@ -161,7 +158,7 @@ func (a *Auth) sendSecretsToUser(ctx context.Context, userID string, j recoveryJ
 	if err != nil {
 		return fmt.Errorf("limb: list the identifiers: %w", err)
 	}
-	for _, channel := range a.recoveryChannels(j.purpose, identifiers) {
+	for _, channel := range a.deliveryChannels(identifiers, j.purpose == store.PurposeReset) {
 		if err = a.sendSecretsTo(ctx, user, channel, j); err != nil {
 			a.failMessage(ctx, err)
 		}

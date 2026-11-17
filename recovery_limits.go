@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"net/netip"
+	"slices"
 	"time"
 
 	"github.com/acneism/limb/store"
@@ -24,12 +25,14 @@ const (
 // so the limits tell nothing about which accounts exist.
 type RecoveryLimits struct {
 	// ChannelRequests limits the requests for one login: 3 within an hour, and
-	// then every request is refused until the hour is over. Pause is not used.
+	// then every request is refused until the hour is over. Pause is not used. A
+	// registration counts once for each address and phone number that it names, as
+	// a request for a confirmation.
 	ChannelRequests Limit
 
 	// IPRequests limits the requests from one address, whatever the logins are:
 	// 20 within an hour, then a pause of 15 minutes. IPv6 addresses are counted by
-	// their /64 network.
+	// their /64 network. A registration counts as a request for a confirmation.
 	IPRequests Limit
 
 	// IPFailures limits the links and the codes that were wrong, from one address:
@@ -70,13 +73,19 @@ func WithRecoveryLimits(l RecoveryLimits) Option {
 	}
 }
 
-func (a *Auth) requestKeys(purpose store.SecretPurpose, login string, ip netip.Addr) (channel, address string) {
-	kind, value := a.accountLabel(login)
-	channel = a.keys.AttemptKey("recovery-channel", a.tenant, string(purpose), kind, value)
+type channelLabel struct {
+	kind  string
+	value string
+}
+
+func (a *Auth) requestKeys(purpose store.SecretPurpose, labels []channelLabel, ip netip.Addr) (channels []string, address string) {
+	for _, l := range labels {
+		channels = append(channels, a.keys.AttemptKey("recovery-channel", a.tenant, string(purpose), l.kind, l.value))
+	}
 	if ip.IsValid() {
 		address = a.keys.AttemptKey("recovery-ip", a.tenant, string(purpose), limitedAddress(ip))
 	}
-	return channel, address
+	return channels, address
 }
 
 func (a *Auth) failureKey(purpose store.SecretPurpose, ip netip.Addr) string {
@@ -87,24 +96,31 @@ func (a *Auth) failureKey(purpose store.SecretPurpose, ip netip.Addr) string {
 }
 
 func (a *Auth) admitRequest(ctx context.Context, purpose store.SecretPurpose, login string, ip netip.Addr) error {
+	kind, value := a.accountLabel(login)
+	return a.admitLabels(ctx, purpose, []channelLabel{{kind: kind, value: value}}, ip)
+}
+
+func (a *Auth) admitLabels(ctx context.Context, purpose store.SecretPurpose, labels []channelLabel, ip netip.Addr) error {
 	release, err := a.acquireSlot(ctx)
 	if err != nil {
 		return err
 	}
 	defer release()
-	channelKey, addressKey := a.requestKeys(purpose, login, ip)
-	if err = a.checkKeys(ctx, channelKey, addressKey); err != nil {
+	channelKeys, addressKey := a.requestKeys(purpose, labels, ip)
+	if err = a.checkKeys(ctx, append(slices.Clone(channelKeys), addressKey)...); err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), recordTimeout)
 	defer cancel()
 	now := a.now()
-	a.countAttempt(ctx, channelKey, now, a.recovery.channel.Window, func(c store.Attempt) store.Hold {
-		if c.Count >= a.recovery.channel.Attempts {
-			return store.Hold{BlockedUntil: c.WindowStart.Add(a.recovery.channel.Window)}
-		}
-		return store.Hold{}
-	})
+	for _, channelKey := range channelKeys {
+		a.countAttempt(ctx, channelKey, now, a.recovery.channel.Window, func(c store.Attempt) store.Hold {
+			if c.Count >= a.recovery.channel.Attempts {
+				return store.Hold{BlockedUntil: c.WindowStart.Add(a.recovery.channel.Window)}
+			}
+			return store.Hold{}
+		})
+	}
 	if addressKey != "" {
 		a.countAttempt(ctx, addressKey, now, a.recovery.ip.Window, func(c store.Attempt) store.Hold {
 			if c.Count >= a.recovery.ip.Attempts {

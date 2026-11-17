@@ -27,11 +27,12 @@ const (
 	EventLogin EventType = "login"
 
 	// EventLoginFailed is reported when a sign-in was refused for a login or a
-	// password that is wrong or for an account that is blocked. UserID is set when
-	// the login belongs to an account and is empty when it does not, Address is
-	// the login that was tried, masked, and Details["reason"] is
-	// "invalid_credentials" or "blocked". Attempts that the limits turn down
-	// before the password is looked at are not reported.
+	// password that is wrong, for an account that is blocked or for an account
+	// that has no confirmed address or phone number where the service asks for
+	// one. UserID is set when the login belongs to an account and is empty when it
+	// does not, Address is the login that was tried, masked, and Details["reason"]
+	// is "invalid_credentials", "blocked" or "verification_required". Attempts
+	// that the limits turn down before the password is looked at are not reported.
 	EventLoginFailed EventType = "login_failed"
 
 	// EventLogout is reported when a user ended their own session.

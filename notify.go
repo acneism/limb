@@ -35,7 +35,7 @@ func (a *Auth) sendNoticeToUser(ctx context.Context, userID string, kind Message
 	if err != nil {
 		return fmt.Errorf("limb: list the identifiers: %w", err)
 	}
-	for _, channel := range a.recoveryChannels(store.PurposeReset, identifiers) {
+	for _, channel := range a.deliveryChannels(identifiers, true) {
 		if err = a.sendNoticeTo(ctx, user.ID, channel, kind, language); err != nil {
 			a.failMessage(ctx, err)
 		}

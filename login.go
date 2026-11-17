@@ -18,8 +18,10 @@ import (
 // kind Credentials.Kind asks for.
 //
 // It returns ErrInvalidCredentials when the login or the password is wrong,
-// the same error and after the same work whether the account exists or not, and
-// ErrUserBlocked when the password is right but the account is blocked. Too
+// the same error and after the same work whether the account exists or not,
+// ErrUserBlocked when the password is right but the account is blocked and
+// ErrVerificationRequired when the password is right but the service asks for a
+// confirmed address or phone number, see WithSignup, and the user has none. Too
 // many failed attempts turn the next ones down with a *RateLimitError before the
 // password is looked at; the limits come from WithLoginLimits and the counters
 // live in the database, so every instance of the application counts. When the
@@ -45,6 +47,9 @@ func (a *Auth) Login(ctx context.Context, c Credentials) (Login, error) {
 		user, _, checkErr = a.lookupAndVerify(ctx, c.Login, c.Password, &known)
 		return checkErr
 	})
+	if err == nil {
+		err = a.requireVerified(ctx, user)
+	}
 	if err != nil {
 		a.reportFailedLogin(ctx, c, known, err)
 		return Login{}, err
@@ -68,6 +73,20 @@ func (a *Auth) Login(ctx context.Context, c Credentials) (Login, error) {
 	return login, nil
 }
 
+func (a *Auth) requireVerified(ctx context.Context, user store.User) error {
+	if !a.needVerified {
+		return nil
+	}
+	identifiers, err := a.store.Identifiers().ListByUser(ctx, a.tenant, user.ID)
+	if err != nil {
+		return fmt.Errorf("limb: list the identifiers: %w", err)
+	}
+	if len(a.deliveryChannels(identifiers, true)) == 0 {
+		return ErrVerificationRequired
+	}
+	return nil
+}
+
 func (a *Auth) reportFailedLogin(ctx context.Context, c Credentials, userID string, err error) {
 	var reason string
 	switch {
@@ -75,6 +94,8 @@ func (a *Auth) reportFailedLogin(ctx context.Context, c Credentials, userID stri
 		reason = "invalid_credentials"
 	case errors.Is(err, ErrUserBlocked):
 		reason = "blocked"
+	case errors.Is(err, ErrVerificationRequired):
+		reason = "verification_required"
 	default:
 		return
 	}

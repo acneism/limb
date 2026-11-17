@@ -49,6 +49,22 @@ var (
 	// or a channel that no code was sent to and a secret meant for something
 	// else, so it reveals nothing about which accounts exist.
 	ErrInvalidSecret = errors.New("limb: the link or the code is not valid")
+
+	// ErrVerificationRequired is returned by Login when the password is right but
+	// the user has not confirmed any address or phone number, and the service asks
+	// for that, see WithSignup. It is never returned for a wrong password. The user
+	// asks for a new link or code with RequestVerification.
+	ErrVerificationRequired = errors.New("limb: no address or phone number is confirmed")
+
+	// ErrSignupDisabled is returned by Signup when the service was not created
+	// with WithSignup.
+	ErrSignupDisabled = errors.New("limb: signup is not enabled")
+
+	// ErrRegistrationRefused is returned by Signup when the hook BeforeRegister
+	// refused the registration with an error that is not a *ValidationError, or
+	// panicked. The error that the hook returned is logged and is not given to the
+	// caller.
+	ErrRegistrationRefused = errors.New("limb: the registration was refused")
 )
 
 // RateLimitError reports that there were too many failed attempts and says how
