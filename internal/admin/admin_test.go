@@ -759,6 +759,10 @@ func TestAFailureInTheMiddleOfAChangeIsReportedAndLeavesNothingBehind(t *testing
 			_, err := f.List(t.Context())
 			return err
 		}, broken},
+		{"counting the recovery codes that are left", faults{count: broken}, func(f *fixture) error {
+			_, err := f.RecoveryCodesLeft(t.Context(), "root")
+			return err
+		}, broken},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -540,3 +540,13 @@ func (s *Service) End(ctx context.Context, ses Session, c Client) error {
 		})
 	})
 }
+
+// RecoveryCodesLeft returns how many recovery codes of the administrator have not
+// been used.
+func (s *Service) RecoveryCodesLeft(ctx context.Context, adminID string) (int, error) {
+	left, err := s.store.Admins().CountRecoveryCodes(ctx, s.tenant, adminID)
+	if err != nil {
+		return 0, fmt.Errorf("admin: count the recovery codes: %w", err)
+	}
+	return left, nil
+}

@@ -473,6 +473,27 @@ func TestARecoveryCodeSignsInOnceAndTheRestAreCounted(t *testing.T) {
 	}
 }
 
+func TestTheRecoveryCodesThatAreLeftAreCountedForTheAdministratorAlone(t *testing.T) {
+	f := newFixture(t)
+	e := f.enroll(t, "root")
+	other := f.enroll(t, "second")
+	for name, want := range map[string]int{e.account.ID: RecoveryCodeCount, other.account.ID: RecoveryCodeCount, "no-such-administrator": 0} {
+		if left, err := f.RecoveryCodesLeft(t.Context(), name); err != nil || left != want {
+			t.Fatalf("RecoveryCodesLeft(%q) = %d, %v, want %d", name, left, err, want)
+		}
+	}
+	in, _ := f.begin(t, "root")
+	if _, err := f.Complete(t.Context(), in, e.codes[0], browser); err != nil {
+		t.Fatalf("Complete with a recovery code failed: %v", err)
+	}
+	if left, err := f.RecoveryCodesLeft(t.Context(), e.account.ID); err != nil || left != RecoveryCodeCount-1 {
+		t.Fatalf("after one code was used there are %d, %v", left, err)
+	}
+	if left, err := f.RecoveryCodesLeft(t.Context(), other.account.ID); err != nil || left != RecoveryCodeCount {
+		t.Fatalf("the codes of another administrator are %d, %v: they must not be counted together", left, err)
+	}
+}
+
 func TestASignInThatWaitsIsNotValidAfterItsTimeOrAfterTheAccountChanged(t *testing.T) {
 	f := newFixture(t)
 	f.enroll(t, "root")
