@@ -67,7 +67,7 @@ func newFixture(t *testing.T, wrap ...func(store.Store) store.Store) *fixture {
 	policy := password.DefaultPolicy()
 	service := New(Config{
 		Store: s, Keys: keys, Hasher: hasher, Tenant: store.DefaultTenant, Issuer: "Acme", Now: c.read,
-		Policy: policy.Check,
+		Policy: policy.Check, SessionAbsolute: 12 * time.Hour, SessionIdle: 30 * time.Minute,
 		NewID: func() (string, error) {
 			mu.Lock()
 			defer mu.Unlock()
