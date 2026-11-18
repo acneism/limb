@@ -169,21 +169,26 @@ func writeError(w http.ResponseWriter, r *http.Request, e *apiError) {
 }
 
 func negotiateLanguage(header string) string {
+	return negotiateAmong(header, func(tag string) bool {
+		_, supported := messages[tag]
+		return supported
+	}, defaultLanguage)
+}
+
+func negotiateAmong(header string, supported func(tag string) bool, fallback string) string {
 	if len(header) > maxLanguageText {
 		header = header[:maxLanguageText]
 	}
-	best, bestQuality := defaultLanguage, 0.0
+	best, bestQuality := fallback, 0.0
 	for i, part := range strings.Split(header, ",") {
 		if i >= maxLanguages {
 			break
 		}
 		tag, quality := parseLanguageRange(part)
-		if quality <= bestQuality {
+		if quality <= bestQuality || !supported(tag) {
 			continue
 		}
-		if _, supported := messages[tag]; supported {
-			best, bestQuality = tag, quality
-		}
+		best, bestQuality = tag, quality
 	}
 	return best
 }

@@ -107,6 +107,33 @@ func decodeError(t *testing.T, rec *httptest.ResponseRecorder) (errorFields, map
 	return typed.Error, generic
 }
 
+func TestALanguageIsChosenAmongThoseThatTheCallerSupportsAndFallsBack(t *testing.T) {
+	supported := func(tag string) bool { return tag == "de" || tag == "ru" }
+	cases := []struct {
+		header, fallback, want string
+	}{
+		{"", "en", "en"},
+		{"de", "en", "de"},
+		{"en,de;q=0.5", "en", "de"},
+		{"de;q=0.4,ru;q=0.8", "en", "ru"},
+		{"de,ru", "en", "de"},
+		{"fr,es", "ru", "ru"},
+		{"fr,es", "", ""},
+		{"de;q=0", "en", "en"},
+		{strings.Repeat("fr,", 40) + "de", "en", "en"},
+	}
+	for _, c := range cases {
+		if got := negotiateAmong(c.header, supported, c.fallback); got != c.want {
+			t.Errorf("negotiateAmong(%.40q, fallback %q) = %q, want %q", c.header, c.fallback, got, c.want)
+		}
+	}
+	calls := 0
+	negotiateAmong("ru,de,fr", func(string) bool { calls++; return false }, "en")
+	if calls != 3 {
+		t.Errorf("the supported function was asked %d times for three languages", calls)
+	}
+}
+
 func TestWriteErrorAnswersInTheLanguageOfTheClient(t *testing.T) {
 	for _, tc := range []struct {
 		language string
