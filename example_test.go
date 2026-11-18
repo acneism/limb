@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"net/netip"
 	"os"
 	"strings"
@@ -310,6 +311,46 @@ func ExampleAuth_Admin() {
 	// Output:
 	// root false
 	// true
+}
+
+func ExampleAuth_AdminHandler() {
+	auth := newExampleService(limb.WithAdminMountPath("/admin"), limb.WithDevelopmentMode())
+	mux := http.NewServeMux()
+	mux.Handle("/admin/", http.StripPrefix("/admin", auth.AdminHandler()))
+
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/admin/login", nil))
+	fmt.Println(recorder.Code, recorder.Header().Get("Content-Type"))
+	fmt.Println(recorder.Header().Get("X-Frame-Options"))
+	fmt.Println(strings.Contains(recorder.Body.String(), `action="/admin/login"`))
+
+	recorder = httptest.NewRecorder()
+	mux.ServeHTTP(recorder, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/admin/", nil))
+	fmt.Println(recorder.Code, recorder.Header().Get("Location"))
+	// Output:
+	// 200 text/html; charset=utf-8
+	// DENY
+	// true
+	// 303 /admin/login
+}
+
+func ExampleWithAdminTexts() {
+	auth := newExampleService(limb.WithAdminMountPath("/admin"),
+		limb.WithAdminTexts("ru", map[string]string{"login.title": "Вход для сотрудников"}),
+		limb.WithAdminTexts("de", map[string]string{"login.title": "Anmelden"}))
+	handler := auth.AdminHandler()
+	for _, language := range []string{"ru", "de", "fr"} {
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/login", nil)
+		request.Header.Set("Accept-Language", language)
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		body := recorder.Body.String()
+		fmt.Println(language, strings.Contains(body, "Вход для сотрудников"), strings.Contains(body, "Anmelden"), strings.Contains(body, "Sign in"))
+	}
+	// Output:
+	// ru true false false
+	// de false true false
+	// fr false false true
 }
 
 func ExampleAuth_RunCommandInput() {

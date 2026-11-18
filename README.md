@@ -73,6 +73,43 @@ go func() {
 }()
 ```
 
+## The web administration
+
+`auth.AdminHandler()` is the web administration: pages for the administrators of the service. The application mounts it under a path of its own and tells limb the path with `limb.WithAdminMountPath`, because the cookies of the administration are scoped to it and its pages link to it:
+
+```go
+auth, err := limb.New(db, limb.Postgres, masterKey, limb.WithAdminMountPath("/admin"))
+if err != nil {
+	log.Fatal(err)
+}
+mux.Handle("/admin/", http.StripPrefix("/admin", auth.AdminHandler()))
+```
+
+`AdminHandler` panics without the mount path, so that a mistake shows when the application starts. The administrators are made by the command line or by `auth.Admin().CreateAdmin`, never from the web. The pages are HTML made on the server. They run no script and ask nothing of another site, so every answer carries a `Content-Security-Policy` that allows only the stylesheet of the administration and the forms of the page and forbids framing, and the headers that tell a browser to keep nothing, to guess no type and to send no referrer. The stylesheet is part of the library.
+
+**Signing in.** The password is the first step. The second is a one-time password of an authenticator app (RFC 6238) or a recovery code. At the first sign-in the administrator binds an authenticator: the page shows a QR code that the server draws and the key to type by hand, the first one-time password confirms it, and ten recovery codes are shown once and kept only as hashes. A one-time password works once, and so does a recovery code. A sign-in that passed the password and not the second step gives no access, ends in five minutes and takes three guesses. A wrong password, one-time password or recovery code counts against limits that are stricter than those of the users, see `limb.WithAdminLoginLimits`: five failures of one login from one address, or twenty from one address, within 15 minutes pause it for 30 minutes, and the failures of one login from anywhere make every attempt wait, up to a minute, so that nobody can lock an administrator out of their account. The audit log holds every sign-in, sign-out and failure with the address, and a failure holds the reason and never the password.
+
+**Sessions.** A session ends after 12 hours and after 30 minutes without a request, see `limb.WithAdminSessionTTL`, when the administrator signs out, when the password or the authenticator of the account is changed or reset, and when the account is disabled or deleted. The cookie is `HttpOnly` and `SameSite=Strict`, scoped to the mount path, `Secure` and named `__Secure-limb_admin`; with `limb.WithDevelopmentMode` it is not `Secure` and has no prefix, so that it works over plain HTTP on a development machine. A form must come from the application, which the browser says in `Sec-Fetch-Site` or `Origin`, and the form of a signed-in administrator carries the token of its session, which is made for the administration alone.
+
+**The account.** At `/account` an administrator changes their password, makes new recovery codes, binds another authenticator and sees and ends their sessions. The first three ask for the current password again, and a wrong one counts against the limits of the sign-in. A change of the password or of the authenticator ends the other sessions and keeps the one that made it. The other authenticator is stored only when its one-time password confirms it, and until then the one that works stays.
+
+**Where from.** `limb.WithAdminIPs(prefixes...)` lets only some networks in, and a request from any other address gets the answer for a page that does not exist. The address is the one that `limb.WithTrustedProxies` tells, and behind a proxy that ends TLS the scheme comes from `X-Forwarded-Proto` the same way.
+
+**Languages.** The pages are in English and in Russian, in the language of the `Accept-Language` header or the one that the administrator chose with the links at the foot of every page, which is kept in a cookie. `limb.WithAdminTexts` replaces texts and adds languages, and [docs/admin-texts.md](docs/admin-texts.md) lists the keys:
+
+```go
+limb.WithAdminTexts("de", map[string]string{"login.title": "Anmelden", "login.password": "Passwort"})
+```
+
+| Option | What it does |
+| --- | --- |
+| `WithAdminMountPath(path)` | The path that the handler is mounted at, as the browser sees it. Required |
+| `WithAdminIPs(prefixes...)` | The networks that may use the administration. Without it every address may, and the limits stand in the way |
+| `WithAdminLoginLimits(limits)` | The limits on failed sign-ins and failed second steps. A field that is zero keeps its default |
+| `WithAdminSessionTTL(absolute, idle)` | How long a session lasts, 12 hours and 30 minutes by default |
+| `WithAdminTexts(language, texts)` | Replaces texts or gives the administration another language |
+| `WithoutAdminTOTP()` | Lets an administrator in with the password alone. It needs `WithDevelopmentMode`, and `New` fails without it |
+
 ## Databases
 
 The application opens the `*sql.DB` with the driver it prefers and gives `limb.New` the dialect of the database. limb imports no driver. The tests use the drivers in the table.

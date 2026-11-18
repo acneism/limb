@@ -139,6 +139,15 @@
 // application that has no service yet: they create the schema and run the command
 // line.
 //
+// AdminHandler is the web administration for the administrators of the service:
+// the sign-in with a password and an authenticator app, the binding of the
+// authenticator, and the account page where an administrator changes their
+// password and recovery codes and ends their sessions. The application mounts it
+// under the path that it gives to WithAdminMountPath. The pages run no script, ask
+// nothing of another site and carry a Content-Security-Policy, and a form must come
+// from the application and, once an administrator is signed in, carry the token of
+// the session.
+//
 // # HTTP
 //
 // Handler serves the routes for signing in and out, for the sessions of the user
