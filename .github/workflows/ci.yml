@@ -62,6 +62,32 @@ jobs:
           go-version-input: "1.27.x"
           repo-checkout: false
 
+  css:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TAILWIND_VERSION: "4.3.3"
+      TAILWIND_SHA256: "dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Download the pinned Tailwind CSS
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --location --output tailwindcss \
+            "https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAILWIND_VERSION}/tailwindcss-linux-x64"
+          actual="$(sha256sum tailwindcss | cut -d ' ' -f 1)"
+          if [ "${actual}" != "${TAILWIND_SHA256}" ]; then
+            echo "tailwindcss ${TAILWIND_VERSION} has the SHA-256 ${actual}, the pinned one is ${TAILWIND_SHA256}"
+            exit 1
+          fi
+          chmod +x tailwindcss
+      - name: Build the stylesheet
+        run: make css TAILWIND=./tailwindcss
+      - name: Compare the stylesheet with the committed one
+        run: git diff --exit-code -- internal/adminui/static/admin.css
+
   integration-postgres:
     runs-on: ubuntu-latest
     timeout-minutes: 15

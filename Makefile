@@ -1,4 +1,6 @@
-.PHONY: fmt lint test cover vuln check
+TAILWIND ?= tailwindcss
+
+.PHONY: fmt lint test cover vuln check css
 
 fmt:
 	golangci-lint fmt
@@ -17,3 +19,6 @@ vuln:
 	govulncheck ./...
 
 check: lint test vuln
+
+css:
+	$(TAILWIND) --input internal/adminui/styles/input.css --output internal/adminui/static/admin.css --minify
