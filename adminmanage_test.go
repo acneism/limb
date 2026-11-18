@@ -92,6 +92,17 @@ func TestBlockingAUserEndsTheirAccessAtOnce(t *testing.T) {
 	}
 }
 
+func TestTheEndOfABlockIsKeptToTheMicrosecond(t *testing.T) {
+	f, _ := newManageFixture(t)
+	until := f.clock.now().Add(time.Hour + 123456789*time.Nanosecond)
+	if err := f.a.Admin().BlockUser(t.Context(), f.user.ID, "spam", until); err != nil {
+		t.Fatalf("BlockUser failed: %v", err)
+	}
+	if got, want := f.stored(t).BlockedUntil, until.UTC().Truncate(time.Microsecond); !got.Equal(want) {
+		t.Fatalf("the block ends at %v, want %v", got, want)
+	}
+}
+
 func TestABlockWithoutAnEndHoldsUntilItIsLifted(t *testing.T) {
 	f, log := newManageFixture(t)
 	if err := f.a.Admin().BlockUser(t.Context(), f.user.ID, "fraud", time.Time{}); err != nil {
@@ -340,6 +351,9 @@ func TestSessionsAreEndedOneByOneOrAllAtOnce(t *testing.T) {
 	if got := len(recordsOf(t, f.a, "user.session_ended")); got != 1 {
 		t.Fatalf("the audit log holds %d records of one ended session, want 1", got)
 	}
+	if ended := recordsOf(t, f.a, "user.session_ended"); detailsOf(t, ended[0])["session"] != first.Principal.SessionID {
+		t.Fatalf("the ended session is recorded as %+v, want %s", ended, first.Principal.SessionID)
+	}
 	all := recordsOf(t, f.a, "user.sessions_ended")
 	if len(all) != 1 || detailsOf(t, all[0])["count"] != float64(2) || all[0].ActorID != "api" {
 		t.Fatalf("the ended sessions are recorded as %+v", all)
@@ -537,6 +551,23 @@ func TestATemporaryPasswordFollowsThePolicyOfTheService(t *testing.T) {
 		if !f.canSignInWith(t, temporary) {
 			t.Errorf("%s: the temporary password does not work", name)
 		}
+	}
+}
+
+func TestATemporaryPasswordThatBreaksThePolicyIsNotGiven(t *testing.T) {
+	f, log := newManageFixture(t)
+	f.a.policy.Custom = []func(context.Context, string) error{func(context.Context, string) error { return errors.New("never_good") }}
+	log.take()
+	temporary, err := f.a.Admin().SetTemporaryPassword(t.Context(), f.user.ID, "")
+	var weak *PolicyError
+	if !errors.As(err, &weak) || temporary != "" {
+		t.Fatalf("SetTemporaryPassword = %q, %v, want a *PolicyError and no password", temporary, err)
+	}
+	if events := log.take(); len(events) != 0 {
+		t.Fatalf("the events are %+v, want none", events)
+	}
+	if !f.canSignInWith(t, goodPassword) || f.stored(t).MustChangePassword {
+		t.Fatal("a temporary password that breaks the policy replaced the password")
 	}
 }
 

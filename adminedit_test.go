@@ -162,6 +162,13 @@ func TestAValueOfAUserIsAddedChangedAndRemoved(t *testing.T) {
 			t.Errorf("the audit log holds %d records of %s, want %d", got, action, want)
 		}
 	}
+	removed := detailsOf(t, recordsOf(t, f.a, "user.identifier_removed")[0])
+	if removed["type"] != "username" || removed["old"] != "nina_n" || removed["old_verified"] != false {
+		t.Fatalf("the removal is recorded as %v", removed)
+	}
+	if got := detailsOf(t, recordsOf(t, f.a, "user.identifier_added")[0]); got["type"] != "username" || got["new"] != "nina_new" || got["old"] != nil {
+		t.Fatalf("the new value is recorded as %v", got)
+	}
 	changed := recordsOf(t, f.a, "user.identifier_changed")[0]
 	details := detailsOf(t, changed)
 	if details["type"] != "email" || details["old"] != "nina@example.com" || details["new"] != "nina.new@example.com" || details["old_verified"] != true || changed.ActorID != "api" {
@@ -200,6 +207,20 @@ func TestAChangedValueIsToldToTheChannelsThatWereConfirmedBefore(t *testing.T) {
 	}
 	if got := f.messages(t, sender, 2); got[1].Kind != MessageIdentifierChanged || got[1].To != "nina.new@example.com" {
 		t.Fatalf("the second notice is %+v: it goes to the address that is confirmed now", got[1])
+	}
+}
+
+func TestAChangedValueIsNotToldWhenTheServiceHasNothingToSendWith(t *testing.T) {
+	logger, logs := capturingLogger()
+	f, log := newManageFixture(t, WithLogger(logger))
+	f.confirm(t, "nina@example.com")
+	log.take()
+	if err := f.a.Admin().SetUserIdentifier(t.Context(), f.user.ID, "username", "nina_other"); err != nil {
+		t.Fatal(err)
+	}
+	wantTypes(t, log.take(), EventUserChanged)
+	if logs.String() != "" {
+		t.Fatalf("a notice was tried though there is no way to send it: %s", logs.String())
 	}
 }
 

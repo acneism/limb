@@ -261,9 +261,24 @@ func TestACursorThatDoesNotFitTheListIsRefused(t *testing.T) {
 			t.Errorf("%s: ListUsers = %v, want a *ValidationError for the cursor", name, err)
 		}
 	}
+	padded := func(size int) string {
+		prefix, suffix := `{"o":"created","i":"x","c":5,"p":"`, `"}`
+		return prefix + strings.Repeat("a", size-len(prefix)-len(suffix)) + suffix
+	}
+	if got := len(encode(padded(longestCursor / 4 * 3))); got != longestCursor {
+		t.Fatalf("the cursor that is meant to have the longest length has %d characters, want %d", got, longestCursor)
+	}
+	if _, err := f.a.Admin().ListUsers(t.Context(), UserFilter{Cursor: encode(padded(longestCursor/4*3 + 1))}); !errors.As(err, &validation) || validation.Field != "cursor" {
+		t.Errorf("a cursor of %d characters: ListUsers = %v, want a *ValidationError for the cursor", len(encode(padded(longestCursor/4*3+1))), err)
+	}
 	for name, filter := range map[string]UserFilter{
-		"a user who never signed in": {Order: UserOrderLastLogin, Cursor: encode(`{"o":"last_login","i":"x"}`)},
-		"a status":                   {Order: UserOrderStatus, Descending: true, Cursor: encode(`{"o":"status","d":true,"i":"x","s":"blocked"}`)},
+		"a user who never signed in":   {Order: UserOrderLastLogin, Cursor: encode(`{"o":"last_login","i":"x"}`)},
+		"a status":                     {Order: UserOrderStatus, Descending: true, Cursor: encode(`{"o":"status","d":true,"i":"x","s":"blocked"}`)},
+		"the longest cursor":           {Cursor: encode(padded(longestCursor / 4 * 3))},
+		"the first year":               {Cursor: encode(`{"o":"created","i":"x","c":-62135596799000000}`)},
+		"the last moment":              {Cursor: encode(`{"o":"created","i":"x","c":253402300799999999}`)},
+		"the last moment of a sign-in": {Order: UserOrderLastLogin, Cursor: encode(`{"o":"last_login","i":"x","l":253402300799999999}`)},
+		"an ID of the longest length":  {Cursor: encode(`{"o":"created","i":"` + strings.Repeat("a", store.MaxIDLength) + `","c":5}`)},
 	} {
 		if _, err := f.a.Admin().ListUsers(t.Context(), filter); err != nil {
 			t.Errorf("%s: ListUsers failed: %v", name, err)
@@ -445,6 +460,7 @@ func TestTheAuditLogIsListedNewestFirstAndFiltered(t *testing.T) {
 		}
 	}
 	user := string(f.user.ID)
+	write(user, store.ActorUser, "auth.login", user, nil)
 	write(adminID, store.ActorAdmin, "user.blocked", user, map[string]any{"reason": "spam"})
 	write(other, store.ActorAdmin, "user.unblocked", user, nil)
 	write(adminID, store.ActorAdmin, "user.deleted", "00000000-0000-7000-8000-000000000777", nil)
@@ -479,18 +495,28 @@ func TestTheAuditLogIsListedNewestFirstAndFiltered(t *testing.T) {
 		filter AuditFilter
 		want   []string
 	}{
-		"of an administrator": {AuditFilter{AdminID: adminID}, []string{"user.deleted", "user.blocked"}},
-		"of another":          {AuditFilter{AdminID: other}, []string{"user.unblocked"}},
-		"about a user":        {AuditFilter{UserID: f.user.ID, Actions: []string{"user.blocked", "user.unblocked", "user.purged"}}, []string{"user.purged", "user.unblocked", "user.blocked"}},
-		"of an action":        {AuditFilter{Actions: []string{"user.deleted"}}, []string{"user.deleted"}},
-		"of two actions":      {AuditFilter{Actions: []string{"user.deleted", "user.blocked"}}, []string{"user.deleted", "user.blocked"}},
-		"in a period":         {AuditFilter{AdminID: adminID, From: f.clock.now().Add(-2 * time.Minute), To: f.clock.now()}, []string{"user.deleted"}},
-		"of nobody":           {AuditFilter{AdminID: "00000000-0000-7000-8000-0000000000ff"}, nil},
+		"of an administrator":                  {AuditFilter{AdminID: adminID}, []string{"user.deleted", "user.blocked"}},
+		"of another":                           {AuditFilter{AdminID: other}, []string{"user.unblocked"}},
+		"about a user":                         {AuditFilter{UserID: f.user.ID, Actions: ours}, []string{"user.purged", "user.unblocked", "user.blocked"}},
+		"of a user taken for an administrator": {AuditFilter{AdminID: user}, nil},
+		"of an action":                         {AuditFilter{Actions: []string{"user.deleted"}}, []string{"user.deleted"}},
+		"of two actions":                       {AuditFilter{Actions: []string{"user.deleted", "user.blocked"}}, []string{"user.deleted", "user.blocked"}},
+		"in a period":                          {AuditFilter{AdminID: adminID, From: f.clock.now().Add(-2 * time.Minute), To: f.clock.now()}, []string{"user.deleted"}},
+		"of nobody":                            {AuditFilter{AdminID: "00000000-0000-7000-8000-0000000000ff"}, nil},
 	}
 	for name, c := range cases {
 		if got := actions(c.filter); !slices.Equal(got, c.want) {
 			t.Errorf("%s: the actions are %v, want %v", name, got, c.want)
 		}
+	}
+	if page, listErr := admin.ListAudit(t.Context(), AuditFilter{Actions: ours, Limit: 4}); listErr != nil || len(page.Entries) != 4 || page.Next != "" {
+		t.Fatalf("a page that holds all the records = %d entries, next %q, %v; want 4 and no next page", len(page.Entries), page.Next, listErr)
+	}
+	if page, listErr := admin.ListAudit(t.Context(), AuditFilter{Actions: ours, Limit: 3}); listErr != nil || len(page.Entries) != 3 || page.Next == "" {
+		t.Fatalf("a page that holds all but one = %d entries, next %q, %v; want 3 and a next page", len(page.Entries), page.Next, listErr)
+	}
+	if _, listErr := admin.ListAudit(t.Context(), AuditFilter{Limit: largestAuditPage}); listErr != nil {
+		t.Fatalf("the largest page failed: %v", listErr)
 	}
 	var paged []string
 	cursor := ""
@@ -544,6 +570,26 @@ func TestAnAuditFilterThatCannotBeAppliedIsRefused(t *testing.T) {
 	if _, err := f.a.Admin().ListAudit(t.Context(), AuditFilter{Cursor: encode(`{"t":0,"i":"x"}`), From: time.Date(9999, time.December, 31, 23, 59, 59, 999999000, time.UTC)}); err != nil {
 		t.Errorf("a cursor at the first moment of the epoch and a filter at the last moment of the years that are kept failed: %v", err)
 	}
+	padded := func(size int) string {
+		prefix, suffix := `{"t":5,"i":"x","p":"`, `"}`
+		return prefix + strings.Repeat("a", size-len(prefix)-len(suffix)) + suffix
+	}
+	for name, cursor := range map[string]string{
+		"the longest cursor":          padded(longestCursor / 4 * 3),
+		"the first year":              `{"t":-62135596799000000,"i":"x"}`,
+		"the last moment":             `{"t":253402300799999999,"i":"x"}`,
+		"an ID of the longest length": `{"t":5,"i":"` + strings.Repeat("a", store.MaxIDLength) + `"}`,
+	} {
+		if _, err := f.a.Admin().ListAudit(t.Context(), AuditFilter{Cursor: encode(cursor)}); err != nil {
+			t.Errorf("%s: ListAudit failed: %v", name, err)
+		}
+	}
+	if _, err := f.a.Admin().ListAudit(t.Context(), AuditFilter{Cursor: encode(padded(longestCursor/4*3 + 1))}); !errors.As(err, &validation) || validation.Field != "cursor" {
+		t.Errorf("a cursor over the longest length: ListAudit = %v, want a *ValidationError for the cursor", err)
+	}
+	if _, err := f.a.Admin().ListAudit(t.Context(), AuditFilter{Actions: make([]string, store.MaxAuditActions)}); err != nil {
+		t.Errorf("the most actions that a filter takes: ListAudit failed: %v", err)
+	}
 	if _, err := f.a.Admin().ListAudit(t.Context(), AuditFilter{Limit: largestAuditPage + 1}); !errors.As(err, &validation) {
 		t.Errorf("a limit over the largest = %v, want a *ValidationError", err)
 	}
@@ -588,6 +634,8 @@ func TestATypedNumberIsRecognizedOnlyWhenItLooksLikeOne(t *testing.T) {
 		"+7 916 abc":   "",
 		"a+7 916":      "",
 		"+ 7 916":      "+7916",
+		"7 (9+1":       "",
+		"+7 +9 (1":     "",
 		"":             "",
 	}
 	for text, want := range cases {

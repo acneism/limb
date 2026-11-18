@@ -75,6 +75,62 @@ func TestTheEventsOfAUserAreWrittenToTheAuditLog(t *testing.T) {
 	}
 }
 
+func TestTheConfirmationOfAChannelAndTheResetOfAPasswordAreWrittenToTheAuditLog(t *testing.T) {
+	f := newRecoveryFixture(t, manyRequests())
+	m := f.sendVerification(t)
+	if err := f.a.Verify(t.Context(), VerifyRequest{Token: tokenOf(m.Link), IP: ipOne}); err != nil {
+		t.Fatalf("Verify failed: %v", err)
+	}
+	verified := recordsOf(t, f.a, "auth.channel_verified")
+	if len(verified) != 1 || verified[0].ActorKind != store.ActorUser || verified[0].ActorID != string(f.user.ID) ||
+		verified[0].TargetUserID != string(f.user.ID) || verified[0].IP != ipOne.String() {
+		t.Fatalf("the confirmation is recorded as %+v", verified)
+	}
+	if details := detailsOf(t, verified[0]); details["channel"] != "email" || details["address"] != "n***@example.com" {
+		t.Fatalf("the details of the confirmation are %v", details)
+	}
+	reset := f.sendReset(t)
+	if err := f.a.ResetPassword(t.Context(), ResetPasswordRequest{Token: tokenOf(reset.Link), Password: resetPassword, IP: ipOne}); err != nil {
+		t.Fatalf("ResetPassword failed: %v", err)
+	}
+	resets := recordsOf(t, f.a, "auth.password_reset")
+	if len(resets) != 1 || resets[0].ActorID != string(f.user.ID) || resets[0].IP != ipOne.String() {
+		t.Fatalf("the reset is recorded as %+v", resets)
+	}
+	if details := detailsOf(t, resets[0]); details["channel"] != "email" || details["address"] != "n***@example.com" {
+		t.Fatalf("the details of the reset are %v", details)
+	}
+	if strings.Contains(resets[0].Details, resetPassword) || strings.Contains(verified[0].Details, tokenOf(m.Link)) {
+		t.Fatal("a secret was written to the audit log")
+	}
+}
+
+func TestAReusedRefreshTokenIsWrittenToTheAuditLogWithTheEndOfTheSession(t *testing.T) {
+	f := newSessionFixture(t)
+	login := f.tokenLogin(t)
+	f.mustRefresh(t, login.Tokens.RefreshToken)
+	f.clock.advance(time.Minute)
+	f.refused(t, "a stolen token", login.Tokens.RefreshToken)
+	reused := recordsOf(t, f.a, "auth.refresh_token_reused")
+	if len(reused) != 1 || reused[0].ActorID != string(f.user.ID) || reused[0].TargetUserID != string(f.user.ID) || detailsOf(t, reused[0])["session"] != login.Principal.SessionID {
+		t.Fatalf("the reuse is recorded as %+v", reused)
+	}
+	ended := recordsOf(t, f.a, "auth.session_ended")
+	if len(ended) != 1 || detailsOf(t, ended[0])["reason"] != "refresh_token_reused" {
+		t.Fatalf("the end of the session is recorded as %+v", ended)
+	}
+}
+
+func TestARecordHasTheTimeOfTheEventAndNotTheTimeItWasWritten(t *testing.T) {
+	f := newSessionFixture(t)
+	happened := f.clock.now().Add(-time.Hour).Truncate(time.Microsecond)
+	f.a.recordEvent(t.Context(), Event{Type: EventLogout, UserID: string(f.user.ID), IP: ipOne.String(), At: happened})
+	records := recordsOf(t, f.a, "auth.logout")
+	if len(records) != 1 || !records[0].At.Equal(happened) || records[0].IP != ipOne.String() {
+		t.Fatalf("the record is %+v, want the time %v and the address", records, happened)
+	}
+}
+
 func TestAFailedLoginIsWrittenInTheBackgroundWithAMaskedLogin(t *testing.T) {
 	f := newSessionFixture(t)
 	c := f.credentials()

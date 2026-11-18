@@ -67,6 +67,27 @@ func TestADeletedUserIsKeptCannotSignInAndKeepsTheirValues(t *testing.T) {
 	}
 }
 
+func TestALinkSentBeforeTheDeletionDoesNotWorkAfterTheRestoration(t *testing.T) {
+	f, _, sender := newMailFixture(t)
+	f.confirm(t, "nina@example.com")
+	if err := f.a.Admin().SendPasswordReset(t.Context(), f.user.ID, ""); err != nil {
+		t.Fatal(err)
+	}
+	link := f.messages(t, sender, 1)[0].Link
+	if err := f.a.Admin().DeleteUser(t.Context(), f.user.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.a.Admin().RestoreUser(t.Context(), f.user.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.a.ResetPassword(t.Context(), ResetPasswordRequest{Token: tokenOf(link), Password: "a new password that is long enough 1"}); !errors.Is(err, ErrInvalidSecret) {
+		t.Fatalf("a link sent before the deletion = %v after the restoration, want ErrInvalidSecret", err)
+	}
+	if !f.canSignInWith(t, goodPassword) {
+		t.Fatal("the password changed")
+	}
+}
+
 func TestTheRetentionOfDeletedUsersCanBeSet(t *testing.T) {
 	f, _ := newManageFixture(t, WithDeletedUserRetention(36*time.Hour))
 	if err := f.a.Admin().DeleteUser(t.Context(), f.user.ID); err != nil {
@@ -117,6 +138,9 @@ func TestAnImmediateDeletionErasesTheUserAndFreesTheirValues(t *testing.T) {
 	records := recordsOf(t, f.a, "user.deleted")
 	if len(records) != 1 || detailsOf(t, records[0])["mode"] != "immediate" || records[0].TargetUserID != string(f.user.ID) {
 		t.Fatalf("the deletion is recorded as %+v: the audit log keeps what happened to a user who is gone", records)
+	}
+	if values, _ := detailsOf(t, records[0])["identifiers"].(map[string]any); values["email"] != "nina@example.com" || values["username"] != "nina_n" {
+		t.Fatalf("the record holds the values %v, want the ones that the user signed in with, which nothing else will say", values)
 	}
 	if got := len(recordsOf(t, f.a, "auth.login")); got != 2 {
 		t.Fatalf("the audit log holds %d sign-ins of the erased user, want 2: it outlives them", got)

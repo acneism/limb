@@ -142,6 +142,53 @@ func TestAnInvitationIsSentAgainAndTheOldLinkEnds(t *testing.T) {
 	}
 }
 
+func TestAnInvitationIsSentAgainToAChannelThatIsConfirmed(t *testing.T) {
+	f, _, sender := newMailFixture(t)
+	invited, err := f.a.Admin().InviteUser(t.Context(), Invitation{Identifiers: map[string]string{"email": invitedAddress}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.messages(t, sender, 1)
+	if err = f.a.Admin().VerifyUserIdentifier(t.Context(), invited.ID, "email"); err != nil {
+		t.Fatal(err)
+	}
+	if err = f.a.Admin().ResendInvitation(t.Context(), invited.ID, ""); err != nil {
+		t.Fatalf("ResendInvitation to an address that an administrator confirmed failed: %v", err)
+	}
+	f.messages(t, sender, 2)
+	records := recordsOf(t, f.a, "user.invitation_resent")
+	if channels, _ := detailsOf(t, records[0])["channels"].([]any); len(records) != 1 || len(channels) != 1 || channels[0] != "email:i***@example.com" {
+		t.Fatalf("the second sending is recorded as %+v", records)
+	}
+}
+
+func TestAnInvitationIsNotSentAgainWhenTheUserHasNoChannelLeft(t *testing.T) {
+	sender := &recordingSender{}
+	f, _ := newManageFixture(t, WithIdentifiers(identifier.Email(), identifier.Username()), WithSender(sender), WithResetURL("https://app.example.com/reset"))
+	invited, err := f.a.Admin().InviteUser(t.Context(), Invitation{Identifiers: map[string]string{"email": invitedAddress}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.messages(t, sender, 1)
+	if err = f.a.Admin().SetUserIdentifier(t.Context(), invited.ID, "username", "ivan_i"); err != nil {
+		t.Fatal(err)
+	}
+	if err = f.a.Admin().RemoveUserIdentifier(t.Context(), invited.ID, "email"); err != nil {
+		t.Fatal(err)
+	}
+	var validation *ValidationError
+	if err = f.a.Admin().ResendInvitation(t.Context(), invited.ID, ""); !errors.As(err, &validation) || validation.Field != "user" {
+		t.Fatalf("ResendInvitation to a user with no address or phone number = %v, want a *ValidationError", err)
+	}
+	eventually(t, "the queue of messages to empty", func() bool { return f.a.dispatcher.pending.Load() == 0 })
+	if got := len(sender.sent()); got != 1 {
+		t.Fatalf("%d messages were sent, want only the first invitation", got)
+	}
+	if got := len(recordsOf(t, f.a, "user.invitation_resent")); got != 0 {
+		t.Fatalf("%d sendings that did not happen were recorded", got)
+	}
+}
+
 func TestAnInvitationDoesNotOutliveThePasswordOfTheAccount(t *testing.T) {
 	f, _, sender := newMailFixture(t)
 	invited, err := f.a.Admin().InviteUser(t.Context(), Invitation{Identifiers: map[string]string{"email": invitedAddress}})

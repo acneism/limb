@@ -52,10 +52,10 @@ func TestASettingIsReadOnceForAWhile(t *testing.T) {
 	if got := reads.lists.Load(); got != 1 {
 		t.Fatalf("the settings were read %d times in a row, want 1", got)
 	}
-	f.clock.advance(settingsTTL - time.Second)
+	f.clock.advance(14 * time.Second)
 	mustRequire(t, f.a)
 	if got := reads.lists.Load(); got != 1 {
-		t.Fatalf("the settings were read again after %v, which is less than their time to live", settingsTTL-time.Second)
+		t.Fatal("the settings were read again after 14 seconds, which is less than their time to live")
 	}
 	f.clock.advance(time.Second)
 	mustRequire(t, f.a)
@@ -81,7 +81,7 @@ func TestAChangeMadeByAnotherInstanceIsSeenWhenTheCacheExpires(t *testing.T) {
 	if mustRequire(t, f.a) {
 		t.Fatal("a change of another instance was seen before the cache expired")
 	}
-	f.clock.advance(settingsTTL)
+	f.clock.advance(15 * time.Second)
 	if !mustRequire(t, f.a) {
 		t.Fatal("a change of another instance was not seen after the cache expired")
 	}
@@ -241,7 +241,7 @@ func TestSettingsThatCannotBeReadStopTheOperationUnlessTheyAreCached(t *testing.
 	if !mustRequire(t, f.a) {
 		t.Fatal("the setting is not on")
 	}
-	f.clock.advance(settingsTTL)
+	f.clock.advance(15 * time.Second)
 	faults.set("settings.list", broken)
 	if !mustRequire(t, f.a) {
 		t.Fatal("the cached setting was not used while the settings could not be read")
@@ -250,7 +250,7 @@ func TestSettingsThatCannotBeReadStopTheOperationUnlessTheyAreCached(t *testing.
 		t.Fatalf("the failure was not logged: %s", logs.String())
 	}
 	faults.clear()
-	f.clock.advance(settingsRetry - time.Second)
+	f.clock.advance(4 * time.Second)
 	if err := f.a.store.Settings().Set(t.Context(), store.Setting{
 		TenantID: f.a.tenant, Name: settingPasswordToEndSessions, Value: "false", UpdatedAt: f.clock.now(),
 	}); err != nil {

@@ -51,7 +51,8 @@ func TestABlockEndsTheAccessOnTheOtherInstanceAtOnceOnEveryDatabase(t *testing.T
 		if !in.can(t, in.b, cookie) || !in.can(t, in.a, token) {
 			t.Fatal("a session of one instance does not work on the other before the block")
 		}
-		if err := in.b.Admin().BlockUser(ctx, nina.ID, "spam wave", in.clock.now().Add(48*time.Hour)); err != nil {
+		until := in.clock.now().Add(48*time.Hour + 987654999*time.Nanosecond)
+		if err := in.b.Admin().BlockUser(ctx, nina.ID, "spam wave", until); err != nil {
 			t.Fatalf("BlockUser failed: %v", err)
 		}
 		if in.can(t, in.a, cookie) || in.can(t, in.b, cookie) || in.can(t, in.a, token) || in.can(t, in.b, token) {
@@ -64,7 +65,7 @@ func TestABlockEndsTheAccessOnTheOtherInstanceAtOnceOnEveryDatabase(t *testing.T
 			t.Fatalf("Login of a blocked user = %v, want ErrUserBlocked", err)
 		}
 		card, err := in.a.Admin().User(ctx, nina.ID)
-		if err != nil || card.Status != StatusBlocked || card.BlockedReason != "spam wave" || !card.BlockedUntil.Equal(in.clock.now().Add(48*time.Hour).Truncate(time.Microsecond)) {
+		if err != nil || card.Status != StatusBlocked || card.BlockedReason != "spam wave" || !card.BlockedUntil.Equal(until.Truncate(time.Microsecond)) {
 			t.Fatalf("the card is %+v, %v", card, err)
 		}
 		sessions, err := in.a.Admin().UserSessions(ctx, nina.ID)
@@ -400,7 +401,7 @@ func TestTheSettingOfOneInstanceReachesTheOtherOnEveryDatabase(t *testing.T) {
 		if needed, _ := in.b.Admin().PasswordToEndSessions(ctx); needed {
 			t.Fatal("the other instance saw the change before its cache expired")
 		}
-		in.clock.advance(settingsTTL)
+		in.clock.advance(15 * time.Second)
 		if needed, err := in.b.Admin().PasswordToEndSessions(ctx); err != nil || !needed {
 			t.Fatalf("the other instance does not see the change after the cache expired: %v, %v", needed, err)
 		}

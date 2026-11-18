@@ -135,6 +135,40 @@ func TestDetailsThatFitAreKeptAsTheyAre(t *testing.T) {
 	}
 }
 
+func TestDetailsOfTheLongestLengthAreKeptAndOneByteMoreIsCut(t *testing.T) {
+	exact, err := Encode(map[string]any{"k": strings.Repeat("a", store.MaxAuditDetailsLength-len(`{"k":""}`))})
+	if err != nil || len(exact) != store.MaxAuditDetailsLength || strings.Contains(exact, truncatedKey) {
+		t.Fatalf("details of the longest length came out as %d bytes %.80q, %v", len(exact), exact, err)
+	}
+	over, err := Encode(map[string]any{"k": strings.Repeat("a", store.MaxAuditDetailsLength-len(`{"k":""}`)+1)})
+	if err != nil || len(over) > store.MaxAuditDetailsLength || !strings.Contains(over, truncatedKey) {
+		t.Fatalf("details of one byte more came out as %d bytes %.80q, %v", len(over), over, err)
+	}
+}
+
+func TestDetailsThatAreCutToTheLongestLengthAreKeptWhole(t *testing.T) {
+	whole := strings.Repeat("v", longestValue)
+	found := false
+	for pad := range longestValue + 1 {
+		details := map[string]any{"a": strings.Repeat("a", pad), "b": whole}
+		for i := range 120 {
+			details[fmt.Sprintf("k%03d", i)] = strings.Repeat("v", longestValue+10)
+		}
+		text, err := Encode(details)
+		if err != nil || len(text) > store.MaxAuditDetailsLength {
+			t.Fatalf("Encode = %d bytes, %v", len(text), err)
+		}
+		var got map[string]any
+		if err = json.Unmarshal([]byte(text), &got); err != nil || got["b"] != whole || got[truncatedKey] != true {
+			t.Fatalf("the details are %v, %v: a value of the longest length stays whole and the cut is said", got, err)
+		}
+		found = found || len(text) == store.MaxAuditDetailsLength
+	}
+	if !found {
+		t.Fatal("no details were cut to exactly the longest length: the test does not try the edge")
+	}
+}
+
 func TestDetailsThatDoNotFitAreCutShort(t *testing.T) {
 	huge := strings.Repeat("a", 3000)
 	text, err := Encode(map[string]any{"old": huge, "new": huge, "login": "root"})

@@ -713,3 +713,93 @@ func TestTheMaintenanceRotatesTheKeyOfARunningService(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func (f *sessionFixture) changeAfterTheList(t *testing.T, change func()) {
+	t.Helper()
+	eventually(t, "the audit records that wait to be written", func() bool { return f.a.auditing.pending.Load() == 0 })
+	f.a.store = restoringStore{Store: f.a.store, users: &restoringUsers{Users: f.a.store.Users(), restore: change}}
+}
+
+func TestAUserWhoseRetentionIsExtendedWhileTheMaintenanceRunsIsNotRemoved(t *testing.T) {
+	f, _ := newManageFixture(t)
+	now := f.clock.now().UTC().Truncate(time.Microsecond)
+	doomed := userRecord(1, func(u *store.User) {
+		u.Status, u.DeletedAt, u.PurgeAfter = store.StatusDeleted, now.Add(-time.Hour), now.Add(-time.Minute)
+	})
+	f.put(t, doomed)
+	f.changeAfterTheList(t, func() { f.setUser(t, doomed.ID, func(u *store.User) { u.PurgeAfter = now.Add(24 * time.Hour) }) })
+	if err := f.a.Cleanup(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if !f.userExists(t, doomed.ID) || len(recordsOf(t, f.a, "user.purged")) != 0 {
+		t.Fatal("a user whose retention was extended meanwhile was removed")
+	}
+}
+
+func TestAnAccountThatStopsBeingUnconfirmedWhileTheMaintenanceRunsIsNotRemoved(t *testing.T) {
+	for name, change := range map[string]func(f *sessionFixture, id string){
+		"the visitor signs in": func(f *sessionFixture, id string) {
+			f.setUser(t, id, func(u *store.User) { u.LastLoginAt = f.clock.now() })
+		},
+		"the address is confirmed": func(f *sessionFixture, _ string) {
+			if err := f.a.store.Identifiers().MarkVerified(t.Context(), f.a.tenant, "email", "olga@example.com", f.clock.now()); err != nil {
+				t.Error(err)
+			}
+		},
+	} {
+		f, _ := newVisitorFixture(t)
+		id := f.visitor(t, "olga")
+		f.clock.advance(8 * 24 * time.Hour)
+		f.changeAfterTheList(t, func() { change(f, id) })
+		if err := f.a.Cleanup(t.Context()); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if !f.userExists(t, id) || len(recordsOf(t, f.a, "user.purged")) != 0 {
+			t.Errorf("%s: an account that was not unconfirmed any longer was removed", name)
+		}
+	}
+}
+
+func TestABlockThatIsChangedWhileTheMaintenanceRunsIsNotLifted(t *testing.T) {
+	for name, change := range map[string]func(u *store.User, now time.Time){
+		"it is made longer":  func(u *store.User, now time.Time) { u.BlockedUntil = now.Add(time.Hour) },
+		"it is made endless": func(u *store.User, _ time.Time) { u.BlockedUntil = time.Time{} },
+	} {
+		f, _ := newManageFixture(t)
+		now := f.clock.now().UTC().Truncate(time.Microsecond)
+		blocked := userRecord(1, func(u *store.User) {
+			u.Status, u.BlockedReason, u.BlockedUntil = store.StatusBlocked, "spam", now.Add(-time.Minute)
+		})
+		f.put(t, blocked)
+		f.changeAfterTheList(t, func() { f.setUser(t, blocked.ID, func(u *store.User) { change(u, now) }) })
+		if err := f.a.Cleanup(t.Context()); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if got := f.storedUser(t, UserID(blocked.ID)); got.Status != store.StatusBlocked || got.BlockedReason != "spam" {
+			t.Errorf("%s: the block was lifted: %+v", name, got)
+		}
+		if got := len(recordsOf(t, f.a, "user.unblocked")); got != 0 {
+			t.Errorf("%s: %d liftings were recorded", name, got)
+		}
+	}
+}
+
+func TestEveryUserThatCannotBeRemovedIsTriedOnceAndTheLaterPagesAreReached(t *testing.T) {
+	f, _ := newManageFixture(t)
+	now := f.clock.now().UTC().Truncate(time.Microsecond)
+	const count = maintenancePage + 40
+	for n := range count {
+		f.put(t, userRecord(100+n, func(u *store.User) {
+			u.Status, u.DeletedAt, u.PurgeAfter = store.StatusDeleted, now.Add(-time.Hour), now.Add(-time.Minute)
+			u.CreatedAt = now.Add(-time.Duration(n) * time.Second)
+		}))
+	}
+	faults := newFaults()
+	f.a.store = faultStore{Store: f.a.store, faults: faults}
+	broken := errors.New("the audit log is gone")
+	faults.set("audit.add", broken)
+	err := f.a.Cleanup(t.Context())
+	if got := strings.Count(fmt.Sprint(err), "the audit log is gone"); got != count {
+		t.Fatalf("%d removals failed, want %d: every user is tried once, and the second page is reached", got, count)
+	}
+}

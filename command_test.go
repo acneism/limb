@@ -302,6 +302,10 @@ func TestTheCommandLineNeedsNoStreams(t *testing.T) {
 	if code := a.RunCommandInput(t.Context(), nil, []string{"admin", "create", "root", "--password-stdin"}, nil, nil); code != 1 {
 		t.Fatalf("a password without an input = %d, want 1", code)
 	}
+	var errs strings.Builder
+	if code := a.RunCommandInput(t.Context(), nil, []string{"admin", "create", "root", "--password-stdin"}, nil, &errs); code != 1 || !strings.Contains(errs.String(), "the password is empty") {
+		t.Fatalf("a password without an input = %d %q, want 1 and the password is empty", code, errs.String())
+	}
 	if code := a.RunCommandInput(t.Context(), nil, []string{"bogus"}, nil, nil); code != 2 {
 		t.Fatalf("a command that is not understood = %d, want 2", code)
 	}
