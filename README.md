@@ -138,6 +138,7 @@ The library links these packages, all with licenses that are compatible with Apa
 | `golang.org/x/term` | reading a password in the terminal without echo, in the command line | BSD-3-Clause |
 | `github.com/golang-jwt/jwt/v5` | signing and checking JWT | MIT |
 | `github.com/google/uuid` | UUIDv7 | BSD-3-Clause |
+| `rsc.io/qr` | the QR code that binds an authenticator, drawn on the server as an inline SVG | BSD-3-Clause |
 | `github.com/nyaruka/phonenumbers` | normalizing phone numbers, only in `identifier/phone` | MIT |
 
 ## License

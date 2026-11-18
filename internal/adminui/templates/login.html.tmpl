@@ -1,0 +1,18 @@
+{{define "title"}}{{.T "login.title"}}{{end}}
+{{define "content"}}
+<section class="narrow">
+<h1 class="h1">{{.T "login.title"}}</h1>
+{{template "flash" .}}
+<form method="post" action="{{.Base}}/login" class="card stack">
+<div>
+<label for="login" class="label">{{.T "login.login"}}</label>
+<input id="login" name="login" type="text" class="input" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="256" value="{{.Data.Login}}">
+</div>
+<div>
+<label for="password" class="label">{{.T "login.password"}}</label>
+<input id="password" name="password" type="password" class="input" autocomplete="current-password" required maxlength="1024">
+</div>
+<button type="submit" class="btn btn-primary">{{.T "login.submit"}}</button>
+</form>
+</section>
+{{end}}

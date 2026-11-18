@@ -1,0 +1,14 @@
+{{define "title"}}{{.T "home.title"}}{{end}}
+{{define "content"}}
+<section class="stack">
+<h1 class="h1">{{.T "home.welcome" .Data.Login}}</h1>
+<p class="muted">{{.T "home.signed.in" (.Time .Data.SignedAt)}}</p>
+{{template "flash" .}}
+{{if eq .Data.RecoveryCodes 0}}<p role="status" class="alert alert-notice">{{.T "home.recovery.0"}}</p>
+{{else if lt .Data.RecoveryCodes 4}}<p role="status" class="alert alert-notice">{{.T "home.recovery" .Data.RecoveryCodes}}</p>{{end}}
+<div class="card">
+<h2 class="h2"><a href="{{.Base}}/account">{{.T "home.account"}}</a></h2>
+<p class="muted">{{.T "home.account.text"}}</p>
+</div>
+</section>
+{{end}}

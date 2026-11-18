@@ -1,0 +1,38 @@
+{{define "flash"}}{{if .Flash}}<div role="alert" class="alert alert-{{.FlashKind}}">{{.Flash}}</div>{{end}}{{end}}
+{{define "layout"}}<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex, nofollow">
+<title>{{template "title" .}} · {{.Service}}</title>
+<link rel="stylesheet" href="{{.Stylesheet}}">
+</head>
+<body class="page">
+<a class="skip" href="#main">{{.T "skip"}}</a>
+<header class="bar">
+<div class="bar-inner">
+<a class="brand" href="{{.Base}}/">{{.T "brand" .Service}}</a>
+{{if .Login}}<nav class="menu" aria-label="{{.T "nav.label"}}">
+<a href="{{.Base}}/">{{.T "nav.home"}}</a>
+<a href="{{.Base}}/account">{{.T "nav.account"}}</a>
+<form method="post" action="{{.Base}}/logout">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<button type="submit" class="link">{{.T "nav.logout"}}</button>
+</form>
+</nav>{{end}}
+</div>
+</header>
+<main id="main" tabindex="-1" class="main">
+{{template "content" .}}
+</main>
+<footer class="foot">
+{{if .Login}}<p>{{.T "signed.in.as" .Login}}</p>{{end}}
+<nav aria-label="{{.T "lang.label"}}" class="langs">
+{{range .Languages}}{{if .Current}}<span aria-current="true">{{.Name}}</span>{{else}}<a href="{{.Href}}" lang="{{.Code}}" hreflang="{{.Code}}">{{.Name}}</a>{{end}}
+{{end}}</nav>
+</footer>
+</body>
+</html>
+{{end}}

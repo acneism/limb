@@ -1,0 +1,13 @@
+{{define "title"}}{{.T "recovery.title"}}{{end}}
+{{define "content"}}
+<section class="narrow">
+<h1 class="h1">{{.T "recovery.title"}}</h1>
+<div class="card stack">
+<p>{{.T "recovery.intro"}}</p>
+<ul class="codes" aria-label="{{.T "recovery.list"}}">
+{{range .Data.Codes}}<li><code>{{.}}</code></li>
+{{end}}</ul>
+<a class="btn btn-primary" href="{{.Base}}/">{{.T "recovery.done"}}</a>
+</div>
+</section>
+{{end}}

@@ -1,0 +1,31 @@
+{{define "title"}}{{.T "enroll.title"}}{{end}}
+{{define "content"}}
+<section class="narrow">
+<h1 class="h1">{{.T "enroll.title"}}</h1>
+<p class="muted">{{.T "code.login" .Data.Login}}</p>
+{{template "flash" .}}
+<div class="card stack">
+<p>{{.T "enroll.intro"}}</p>
+<ol class="steps">
+<li>
+<p>{{.T "enroll.step1"}}</p>
+<div class="qr-box">{{.Data.QR}}</div>
+<p class="muted">{{.T "enroll.manual"}}</p>
+<p><span class="sr-only">{{.T "enroll.secret"}}: </span><code class="secret">{{.Data.Secret}}</code></p>
+<p><a href="{{.Data.URI}}">{{.T "enroll.open"}}</a></p>
+</li>
+<li>
+<form method="post" action="{{.Base}}/login/totp" class="stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div>
+<label for="code" class="label">{{.T "enroll.step2"}}</label>
+<input id="code" name="code" type="text" class="input code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]*" required maxlength="16">
+</div>
+<button type="submit" class="btn btn-primary">{{.T "enroll.submit"}}</button>
+</form>
+</li>
+</ol>
+</div>
+<p class="aside"><a href="{{.Base}}/login">{{.T "code.restart"}}</a></p>
+</section>
+{{end}}

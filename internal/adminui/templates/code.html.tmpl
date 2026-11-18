@@ -1,0 +1,18 @@
+{{define "title"}}{{.T "code.title"}}{{end}}
+{{define "content"}}
+<section class="narrow">
+<h1 class="h1">{{.T "code.title"}}</h1>
+<p class="muted">{{.T "code.login" .Data.Login}}</p>
+{{template "flash" .}}
+<form method="post" action="{{.Base}}/login/code" class="card stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<p id="code-hint">{{.T "code.hint"}}</p>
+<div>
+<label for="code" class="label">{{.T "code.label"}}</label>
+<input id="code" name="code" type="text" class="input code" inputmode="text" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" required maxlength="64" aria-describedby="code-hint" autofocus>
+</div>
+<button type="submit" class="btn btn-primary">{{.T "code.submit"}}</button>
+</form>
+<p class="aside"><a href="{{.Base}}/login">{{.T "code.restart"}}</a></p>
+</section>
+{{end}}
