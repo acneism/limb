@@ -30,6 +30,17 @@ const (
 	AdminTOTPReset     = "admin.totp_reset"
 	SettingChanged     = "setting.changed"
 
+	AdminLogin                = "admin.login"
+	AdminLoginFailed          = "admin.login_failed"
+	AdminLogout               = "admin.logout"
+	AdminTOTPEnrolled         = "admin.totp_enrolled"
+	AdminTOTPRebound          = "admin.totp_rebound"
+	AdminRecoveryCodeUsed     = "admin.recovery_code_used"
+	AdminRecoveryCodesRenewed = "admin.recovery_codes_renewed"
+	AdminPasswordChanged      = "admin.password_changed"
+	AdminSessionEnded         = "admin.session_ended"
+	AdminSessionsEnded        = "admin.sessions_ended"
+
 	UserCreated            = "user.created"
 	UserPurged             = "user.purged"
 	UserDeleted            = "user.deleted"

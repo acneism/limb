@@ -133,7 +133,7 @@ func TestAChangeOfAnAdministratorAndItsRecordStandOrFallTogetherOnEveryDatabase(
 		}
 		plain := in.a.store
 		in.a.store = auditFailingStore{Store: plain}
-		in.a.admins = in.a.newAdminService("")
+		in.a.admins = in.a.newAdminService("", adminConfig{})
 		api := in.a.Admin()
 		if _, err = api.CreateAdmin(ctx, "second", adminPassword); !errors.Is(err, errMissingAudit) {
 			t.Fatalf("CreateAdmin = %v, want the failure of the audit log", err)

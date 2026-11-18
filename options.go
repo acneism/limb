@@ -58,6 +58,7 @@ type config struct {
 	auditKept   time.Duration
 	unconfirmed time.Duration
 	hasUnconf   bool
+	admin       adminConfig
 	err         error
 }
 

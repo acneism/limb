@@ -154,7 +154,15 @@ func (h adminHasher) Hash(ctx context.Context, password string) (string, error) 
 	return h.a.hasher.Hash(ctx, password)
 }
 
-func (a *Auth) newAdminService(serviceName string) *admin.Service {
+func (h adminHasher) Verify(ctx context.Context, password, encoded string) (bool, bool, error) {
+	return h.a.hasher.Verify(ctx, password, encoded)
+}
+
+func (h adminHasher) DummyVerify(ctx context.Context, password string) error {
+	return h.a.hasher.DummyVerify(ctx, password)
+}
+
+func (a *Auth) newAdminService(serviceName string, cfg adminConfig) *admin.Service {
 	return admin.New(admin.Config{
 		Store:  a.store,
 		Keys:   a.keys,
@@ -168,5 +176,9 @@ func (a *Auth) newAdminService(serviceName string) *admin.Service {
 		Issuer: cmp.Or(serviceName, defaultIssuer),
 		Now:    func() time.Time { return a.now() },
 		NewID:  func() (string, error) { return a.newID() },
+
+		SessionAbsolute: a.adminAbsolute,
+		SessionIdle:     a.adminIdle,
+		WithoutTOTP:     cfg.noTOTP,
 	})
 }

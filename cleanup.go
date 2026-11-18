@@ -43,7 +43,7 @@ func (a *Auth) Cleanup(ctx context.Context) error {
 	secrets, secretsErr := a.store.Secrets().DeleteStale(ctx, a.tenant, now.Add(-secretRetention))
 	keys, keysErr := a.store.SigningKeys().DeleteRetired(ctx, now)
 	adminSessions, adminErr := a.step(ctx, "the removal of the sessions of administrators", func(ctx context.Context) (int, error) {
-		return a.store.AdminSessions().DeleteStale(ctx, a.tenant, now.Add(-adminSessionRetention), now.Add(-adminSessionIdle-adminSessionRetention))
+		return a.store.AdminSessions().DeleteStale(ctx, a.tenant, now.Add(-adminSessionRetention), now.Add(-a.adminIdle-adminSessionRetention))
 	})
 	records, recordsErr := a.step(ctx, "the removal of the audit log", func(ctx context.Context) (int, error) { return a.deleteOldAudit(ctx, now) })
 	lifted, liftedErr := a.step(ctx, "the lifting of the blocks", func(ctx context.Context) (int, error) { return a.liftEndedBlocks(ctx, now) })

@@ -101,6 +101,13 @@ type Auth struct {
 	auditing     *eventQueue
 	admins       *admin.Service
 	settings     settingsCache
+
+	adminMount    string
+	adminIPs      []netip.Prefix
+	adminLimits   loginLimits
+	adminAbsolute time.Duration
+	adminIdle     time.Duration
+	adminNoTOTP   bool
 }
 
 // New creates the service on top of the database db, which the application
@@ -197,6 +204,13 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 	if err != nil {
 		return nil, err
 	}
+	adminLimits, err := cfg.admin.limits.resolveOver(adminLimitDefaults)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.admin.noTOTP && !cfg.development {
+		return nil, errors.New("limb: WithoutAdminTOTP needs WithDevelopmentMode: an administration that is open to a password alone is not for production")
+	}
 	recovery, err := cfg.recovery.resolve()
 	if err != nil {
 		return nil, err
@@ -280,7 +294,11 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 		signup:       cfg.signup,
 		needVerified: needVerified,
 	}
-	a.admins = a.newAdminService(cfg.serviceName)
+	a.adminMount, a.adminIPs, a.adminLimits = cfg.admin.mountPath, cfg.admin.ips, adminLimits
+	a.adminAbsolute = cmp.Or(cfg.admin.absolute, defaultAdminSessionAbsolute)
+	a.adminIdle = cmp.Or(cfg.admin.idle, defaultAdminSessionIdle)
+	a.adminNoTOTP = cfg.admin.noTOTP
+	a.admins = a.newAdminService(cfg.serviceName, cfg.admin)
 	if cfg.sender != nil {
 		a.dispatcher = newDispatcher(sending, logger, a.reportMessageFailure)
 	}

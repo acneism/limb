@@ -68,14 +68,31 @@ type loginLimits struct {
 	account   Delay
 }
 
+var (
+	userLimitDefaults = loginLimits{
+		accountIP: Limit{Attempts: 5, Window: 15 * time.Minute, Pause: 15 * time.Minute},
+		ip:        Limit{Attempts: 100, Window: 15 * time.Minute, Pause: 15 * time.Minute},
+		account:   Delay{Attempts: 20, Window: 15 * time.Minute, Max: time.Minute},
+	}
+	adminLimitDefaults = loginLimits{
+		accountIP: Limit{Attempts: 5, Window: 15 * time.Minute, Pause: 30 * time.Minute},
+		ip:        Limit{Attempts: 20, Window: 15 * time.Minute, Pause: 30 * time.Minute},
+		account:   Delay{Attempts: 10, Window: 15 * time.Minute, Max: time.Minute},
+	}
+)
+
 func (l LoginLimits) resolve() (loginLimits, error) {
+	return l.resolveOver(userLimitDefaults)
+}
+
+func (l LoginLimits) resolveOver(defaults loginLimits) (loginLimits, error) {
 	if l.AccountAndIP.negative() || l.IP.negative() || l.Account.negative() {
 		return loginLimits{}, errors.New("limb: the limits on failed attempts must not be negative")
 	}
 	return loginLimits{
-		accountIP: l.AccountAndIP.over(Limit{Attempts: 5, Window: 15 * time.Minute, Pause: 15 * time.Minute}),
-		ip:        l.IP.over(Limit{Attempts: 100, Window: 15 * time.Minute, Pause: 15 * time.Minute}),
-		account:   l.Account.over(Delay{Attempts: 20, Window: 15 * time.Minute, Max: time.Minute}),
+		accountIP: l.AccountAndIP.over(defaults.accountIP),
+		ip:        l.IP.over(defaults.ip),
+		account:   l.Account.over(defaults.account),
 	}, nil
 }
 
@@ -177,6 +194,10 @@ func (a *Auth) acquireSlot(ctx context.Context) (func(), error) {
 }
 
 func (a *Auth) limited(ctx context.Context, keys attemptKeys, verify func() error) error {
+	return a.limitedOver(ctx, keys, a.limits, verify)
+}
+
+func (a *Auth) limitedOver(ctx context.Context, keys attemptKeys, limits loginLimits, verify func() error) error {
 	release, err := a.acquireSlot(ctx)
 	if err != nil {
 		return err
@@ -187,7 +208,7 @@ func (a *Auth) limited(ctx context.Context, keys attemptKeys, verify func() erro
 	}
 	err = verify()
 	if errors.Is(err, ErrInvalidCredentials) {
-		a.recordFailure(ctx, keys)
+		a.recordFailureOver(ctx, keys, limits)
 	}
 	return err
 }
@@ -236,32 +257,32 @@ func wholeSeconds(d time.Duration) time.Duration {
 	return max(time.Second, whole)
 }
 
-func (a *Auth) recordFailure(ctx context.Context, keys attemptKeys) {
+func (a *Auth) recordFailureOver(ctx context.Context, keys attemptKeys, limits loginLimits) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), recordTimeout)
 	defer cancel()
 	now := a.now()
 	if keys.accountIP != "" {
-		a.countFailure(ctx, keys.accountIP, now, a.limits.accountIP.Window, func(count int) store.Hold {
-			if count >= a.limits.accountIP.Attempts {
-				return store.Hold{BlockedUntil: now.Add(a.limits.accountIP.Pause)}
+		a.countFailure(ctx, keys.accountIP, now, limits.accountIP.Window, func(count int) store.Hold {
+			if count >= limits.accountIP.Attempts {
+				return store.Hold{BlockedUntil: now.Add(limits.accountIP.Pause)}
 			}
 			return store.Hold{}
 		})
 	}
 	if keys.ip != "" {
-		a.countFailure(ctx, keys.ip, now, a.limits.ip.Window, func(count int) store.Hold {
-			if count >= a.limits.ip.Attempts {
-				return store.Hold{BlockedUntil: now.Add(a.limits.ip.Pause)}
+		a.countFailure(ctx, keys.ip, now, limits.ip.Window, func(count int) store.Hold {
+			if count >= limits.ip.Attempts {
+				return store.Hold{BlockedUntil: now.Add(limits.ip.Pause)}
 			}
 			return store.Hold{}
 		})
 	}
-	a.countFailure(ctx, keys.account, now, a.limits.account.Window, func(count int) store.Hold {
-		if count < a.limits.account.Attempts {
+	a.countFailure(ctx, keys.account, now, limits.account.Window, func(count int) store.Hold {
+		if count < limits.account.Attempts {
 			return store.Hold{}
 		}
-		exponent := min(count-a.limits.account.Attempts, maxDelayExponent)
-		return store.Hold{NextAllowedAt: now.Add(min(time.Second<<exponent, a.limits.account.Max))}
+		exponent := min(count-limits.account.Attempts, maxDelayExponent)
+		return store.Hold{NextAllowedAt: now.Add(min(time.Second<<exponent, limits.account.Max))}
 	})
 }
 

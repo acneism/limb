@@ -65,6 +65,11 @@ func (e *PolicyError) Error() string {
 type Hasher interface {
 	// Hash returns the encoded hash of the password.
 	Hash(ctx context.Context, password string) (string, error)
+	// Verify checks the password against an encoded hash and says whether the
+	// hash was made with weaker parameters than the current ones.
+	Verify(ctx context.Context, password, encoded string) (ok, needsRehash bool, err error)
+	// DummyVerify does the work of Verify for an account that does not exist.
+	DummyVerify(ctx context.Context, password string) error
 }
 
 // Config is what the service needs from the application.
@@ -86,6 +91,13 @@ type Config struct {
 	Now func() time.Time
 	// NewID gives the ID of a new administrator and of a record of the audit log.
 	NewID func() (string, error)
+	// SessionAbsolute is how long a session lasts whatever its activity is.
+	SessionAbsolute time.Duration
+	// SessionIdle is how long a session lasts without being used.
+	SessionIdle time.Duration
+	// WithoutTOTP lets an administrator in with the password alone, for the
+	// development mode.
+	WithoutTOTP bool
 }
 
 // Service manages the administrators.
@@ -99,6 +111,10 @@ type Service struct {
 	now    func() time.Time
 	newID  func() (string, error)
 	audit  audit.Writer
+
+	absolute time.Duration
+	idle     time.Duration
+	noTOTP   bool
 }
 
 // New creates the service.
@@ -113,6 +129,10 @@ func New(c Config) *Service {
 		now:    c.Now,
 		newID:  c.NewID,
 		audit:  audit.Writer{Tenant: c.Tenant, Now: c.Now, NewID: c.NewID},
+
+		absolute: c.SessionAbsolute,
+		idle:     c.SessionIdle,
+		noTOTP:   c.WithoutTOTP,
 	}
 }
 

@@ -81,7 +81,7 @@ func TestCleanupRemovesTheSessionsOfAdministratorsThatEndedADayAgo(t *testing.T)
 	}
 	session(1, now.Add(-25*time.Hour), now.Add(-26*time.Hour))
 	session(2, now.Add(-23*time.Hour), now.Add(-23*time.Hour))
-	session(3, now.Add(6*time.Hour), now.Add(-25*time.Hour-adminSessionIdle))
+	session(3, now.Add(6*time.Hour), now.Add(-25*time.Hour-defaultAdminSessionIdle))
 	session(4, now.Add(6*time.Hour), now.Add(-time.Hour))
 	if err = f.a.Cleanup(t.Context()); err != nil {
 		t.Fatal(err)

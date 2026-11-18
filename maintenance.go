@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	adminSessionIdle      = 30 * time.Minute
 	adminSessionRetention = 24 * time.Hour
 
 	defaultAuditRetention  = 365 * 24 * time.Hour

@@ -266,6 +266,12 @@ type refusingHasher struct{ err error }
 
 func (h refusingHasher) Hash(context.Context, string) (string, error) { return "", h.err }
 
+func (h refusingHasher) Verify(context.Context, string, string) (bool, bool, error) {
+	return false, false, h.err
+}
+
+func (h refusingHasher) DummyVerify(context.Context, string) error { return h.err }
+
 func TestAFailureToHashOrToMakeAnIDIsReported(t *testing.T) {
 	f := newFixture(t)
 	f.create(t, "second")
