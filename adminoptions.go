@@ -3,6 +3,7 @@ package limb
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"net/netip"
 	"time"
 )
@@ -20,6 +21,7 @@ type adminConfig struct {
 	absolute  time.Duration
 	idle      time.Duration
 	noTOTP    bool
+	texts     map[string]map[string]string
 }
 
 // WithAdminMountPath tells limb where the application mounts AdminHandler, as the
@@ -100,5 +102,32 @@ func WithAdminSessionTTL(absolute, idle time.Duration) Option {
 func WithoutAdminTOTP() Option {
 	return func(c *config) {
 		c.admin.noTOTP = true
+	}
+}
+
+// WithAdminTexts replaces texts of the administration, or gives it a language
+// that it has no texts for, for example
+//
+//	limb.WithAdminTexts("ru", map[string]string{"login.title": "Вход для сотрудников"})
+//
+// texts maps the keys of the texts to their new values, and docs/admin-texts.md
+// of the repository lists the keys with the texts that the library has. A text
+// that has a %s or a %d in it is given an argument by the page and must use it as
+// the original does, in any order, as in %[1]s, and a text that takes none must
+// not hold a percent sign. A language that has no texts is added with the texts
+// that are given and shows English for the rest, and the page offers it with the
+// others. The option can be given for several languages. New fails for a
+// language tag that is not two or three lower case letters, for a key that no
+// text has, for a text that is empty and for one that does not use its
+// arguments.
+func WithAdminTexts(language string, texts map[string]string) Option {
+	return func(c *config) {
+		if c.admin.texts == nil {
+			c.admin.texts = map[string]map[string]string{}
+		}
+		if c.admin.texts[language] == nil {
+			c.admin.texts[language] = map[string]string{}
+		}
+		maps.Copy(c.admin.texts[language], texts)
 	}
 }

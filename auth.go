@@ -19,6 +19,7 @@ import (
 
 	"github.com/acneism/limb/identifier"
 	"github.com/acneism/limb/internal/admin"
+	"github.com/acneism/limb/internal/adminui"
 	"github.com/acneism/limb/internal/password"
 	"github.com/acneism/limb/internal/secret"
 	"github.com/acneism/limb/sqlstore"
@@ -108,6 +109,8 @@ type Auth struct {
 	adminAbsolute time.Duration
 	adminIdle     time.Duration
 	adminNoTOTP   bool
+	adminCatalog  *adminui.Catalog
+	brand         string
 }
 
 // New creates the service on top of the database db, which the application
@@ -208,6 +211,10 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 	if err != nil {
 		return nil, err
 	}
+	adminCatalog, err := adminui.NewCatalog(cfg.admin.texts)
+	if err != nil {
+		return nil, fmt.Errorf("limb: WithAdminTexts: %w", err)
+	}
 	if cfg.admin.noTOTP && !cfg.development {
 		return nil, errors.New("limb: WithoutAdminTOTP needs WithDevelopmentMode: an administration that is open to a password alone is not for production")
 	}
@@ -297,7 +304,7 @@ func create(s store.Store, masterKey []byte, cfg config, check func(context.Cont
 	a.adminMount, a.adminIPs, a.adminLimits = cfg.admin.mountPath, cfg.admin.ips, adminLimits
 	a.adminAbsolute = cmp.Or(cfg.admin.absolute, defaultAdminSessionAbsolute)
 	a.adminIdle = cmp.Or(cfg.admin.idle, defaultAdminSessionIdle)
-	a.adminNoTOTP = cfg.admin.noTOTP
+	a.adminNoTOTP, a.adminCatalog, a.brand = cfg.admin.noTOTP, adminCatalog, cmp.Or(cfg.serviceName, defaultIssuer)
 	a.admins = a.newAdminService(cfg.serviceName, cfg.admin)
 	if cfg.sender != nil {
 		a.dispatcher = newDispatcher(sending, logger, a.reportMessageFailure)

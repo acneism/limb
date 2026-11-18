@@ -123,6 +123,36 @@ func TestCleanupKeepsTheSessionsOfAdministratorsAsLongAsTheirIdleTimeCounts(t *t
 	}
 }
 
+func TestTheTextsOfTheAdministrationAreCheckedWhenTheServiceIsMade(t *testing.T) {
+	refused := map[string]struct {
+		option Option
+		reason string
+	}{
+		"a language that is no language": {WithAdminTexts("English", map[string]string{"login.title": "x"}), "not a language"},
+		"a language with a region":       {WithAdminTexts("en-GB", map[string]string{"login.title": "x"}), "not a language"},
+		"a key that no text has":         {WithAdminTexts("en", map[string]string{"login.titel": "x"}), "there is no text"},
+		"an empty text":                  {WithAdminTexts("de", map[string]string{"login.title": ""}), "is empty"},
+		"a text that drops its argument": {WithAdminTexts("en", map[string]string{"home.welcome": "Welcome"}), "arguments"},
+		"a percent sign of a plain text": {WithAdminTexts("en", map[string]string{"login.title": "100 %"}), "percent sign"},
+	}
+	for name, c := range refused {
+		if err := newFixtureErr(t, c.option); err == nil || !strings.Contains(err.Error(), "WithAdminTexts") || !strings.Contains(err.Error(), c.reason) {
+			t.Errorf("%s: New returned %v, want a refusal that names WithAdminTexts and says %q", name, err, c.reason)
+		}
+	}
+	if err := newFixtureErr(t,
+		WithAdminTexts("de", map[string]string{"login.title": "Anmelden"}),
+		WithAdminTexts("de", map[string]string{"login.login": "Benutzer"}),
+		WithAdminTexts("ru", map[string]string{"home.welcome": "Здравствуйте, %s!"}),
+	); err != nil {
+		t.Fatalf("texts that are fine and given in two options for one language were refused: %v", err)
+	}
+	a := newTestAuth(t, WithAdminTexts("de", map[string]string{"login.title": "Anmelden"}), WithAdminTexts("de", map[string]string{"login.login": "Benutzer"}))
+	if got := a.adminCatalog.Text("de", "login.title") + "/" + a.adminCatalog.Text("de", "login.login"); got != "Anmelden/Benutzer" {
+		t.Fatalf("the texts of two options for one language are %q: the second replaced the first", got)
+	}
+}
+
 func TestAnAdministrationWithoutTheSecondFactorIsForTheDevelopmentMode(t *testing.T) {
 	if err := newFixtureErr(t, WithoutAdminTOTP()); err == nil || !strings.Contains(err.Error(), "WithDevelopmentMode") {
 		t.Fatalf("WithoutAdminTOTP in production = %v, want a refusal that names WithDevelopmentMode", err)
