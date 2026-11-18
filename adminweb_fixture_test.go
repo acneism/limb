@@ -73,12 +73,18 @@ func newWebFixture(t *testing.T, opts ...Option) *webFixture {
 	return startWebFixture(t, a, clock)
 }
 
-func startWebFixture(t *testing.T, a *Auth, clock *fakeClock) *webFixture {
+func serveWeb(t *testing.T, a *Auth, clock *fakeClock) *webFixture {
 	t.Helper()
 	f := &webFixture{t: t, a: a, clock: clock}
 	f.server = httptest.NewServer(http.StripPrefix(adminMount, a.AdminHandler()))
 	t.Cleanup(f.server.Close)
 	f.browser = f.newBrowser()
+	return f
+}
+
+func startWebFixture(t *testing.T, a *Auth, clock *fakeClock) *webFixture {
+	t.Helper()
+	f := serveWeb(t, a, clock)
 	if _, err := a.Admin().CreateAdmin(t.Context(), adminLoginName, adminPassword); err != nil {
 		t.Fatalf("CreateAdmin failed: %v", err)
 	}
