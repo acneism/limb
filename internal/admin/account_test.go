@@ -669,3 +669,36 @@ func TestAFailureOfTheStoreAtAnyStepOfAChangeOfTheAccountIsReportedAndChangesNot
 		}
 	}
 }
+
+func FuzzTheTokenOfABinding(f *testing.F) {
+	f.Add("", uint16(0), byte(0))
+	f.Add("!!!", uint16(1), byte(1))
+	f.Add(strings.Repeat("A", 600), uint16(7), byte(0x80))
+	f.Add("AAAA", uint16(40), byte(0xff))
+	f.Fuzz(func(t *testing.T, token string, position uint16, flip byte) {
+		fx := newFixture(t)
+		e := fx.enroll(t, "root")
+		ses := fx.resolved(t, e.opened)
+		binding, err := fx.BeginRebind(t.Context(), ses, goodPassword)
+		if err != nil {
+			t.Fatal(err)
+		}
+		changed := []byte(binding.Token)
+		if flip != 0 {
+			changed[int(position)%len(changed)] ^= flip
+		}
+		for name, candidate := range map[string]string{"the fuzzed text": token, "the token with a byte changed": string(changed), "the token": binding.Token} {
+			_, openErr := fx.OpenRebind(t.Context(), ses, candidate)
+			_, confirmErr := fx.ConfirmRebind(t.Context(), ses, candidate, notAPassword(binding.Seed, fx.clock.read()), browser)
+			if candidate == binding.Token {
+				if openErr != nil || !errors.Is(confirmErr, ErrBadFactor) {
+					t.Fatalf("%s: OpenRebind = %v, ConfirmRebind = %v, want a token that opens and a password that is wrong", name, openErr, confirmErr)
+				}
+				continue
+			}
+			if !errors.Is(openErr, ErrNoRebind) || !errors.Is(confirmErr, ErrNoRebind) {
+				t.Fatalf("%s %q: OpenRebind = %v, ConfirmRebind = %v, want ErrNoRebind", name, candidate, openErr, confirmErr)
+			}
+		}
+	})
+}
