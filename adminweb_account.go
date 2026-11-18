@@ -249,7 +249,7 @@ func (c *adminCall) confirmRebind() {
 		return
 	}
 	a := c.auth()
-	token, input := form.Get("token"), strings.TrimSpace(form.Get("code"))
+	token, input := form.Get("token"), form.Get("code")
 	keys := a.adminAttemptKeys(ses.Login, c.ip)
 	var codes []string
 	err := a.limitedOver(c.ctx(), keys, a.adminLimits, func() error {

@@ -1,15 +1,18 @@
 package limb
 
 import (
+	"context"
 	"encoding/base32"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/acneism/limb/internal/admin"
 	"github.com/acneism/limb/internal/audit"
 	"github.com/acneism/limb/internal/totp"
 	"github.com/acneism/limb/store"
@@ -113,6 +116,7 @@ func TestAnAdministratorChangesTheirPasswordThroughTheBrowser(t *testing.T) {
 		{"the current password again", form(adminPassword, adminPassword, adminPassword), http.StatusUnprocessableEntity, "it is the current password"},
 		{"a new password that is too long", form(adminPassword, strings.Repeat("a", maxAdminPasswordInput+1), strings.Repeat("a", maxAdminPasswordInput+1)), http.StatusUnprocessableEntity, "it is too long"},
 		{"a current password that is too long", form(strings.Repeat("a", maxAdminPasswordInput+1), changedPassword, changedPassword), http.StatusUnauthorized, "The current password is wrong."},
+		{"a wrong password and a new one that is too long", form("not the password", strings.Repeat("b", maxAdminPasswordInput+1), strings.Repeat("b", maxAdminPasswordInput+1)), http.StatusUnprocessableEntity, "it is too long"},
 	}
 	for _, c := range refused {
 		r := f.post("/account/password", c.form)
@@ -134,6 +138,9 @@ func TestAnAdministratorChangesTheirPasswordThroughTheBrowser(t *testing.T) {
 	}
 	if got := len(f.failures("account", "too_long")); got != 1 {
 		t.Fatalf("%d passwords that are too long were recorded, want 1", got)
+	}
+	if got := len(f.records(audit.AdminLoginFailed)); got != 2 {
+		t.Fatalf("%d failures were recorded, want the wrong password and the one that is too long: a new password that is too long is refused before anything is checked", got)
 	}
 	for _, b := range others {
 		if isSignedOut(b) {
@@ -256,7 +263,7 @@ func decodeSecret(t *testing.T, page webResponse) []byte {
 }
 
 func TestAnotherAuthenticatorIsBoundThroughTheBrowser(t *testing.T) {
-	f := newWebFixture(t)
+	f := newWebFixture(t, WithAdminSessionTTL(6*time.Hour, 2*time.Hour))
 	f.enroll()
 	oldSeed := f.seed()
 	others := f.signedInBrowsers(1)
@@ -314,6 +321,13 @@ func TestAnotherAuthenticatorIsBoundThroughTheBrowser(t *testing.T) {
 	if string(f.seed()) != string(newSeed) {
 		t.Fatal("the authenticator was not replaced")
 	}
+	wrongPassword := url.Values{"current": {"not the password"}, "new": {changedPassword}, "again": {changedPassword}, "csrf": {token}}
+	for i := 1; i <= 5; i++ {
+		if r := f.post("/account/password", wrongPassword); r.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("the wrong password %d after the binding gave %d: the count of failures was not cleared", i, r.StatusCode)
+		}
+	}
+	f.clock.advance(31 * time.Minute)
 	if !isSignedOut(others[0]) {
 		t.Fatal("a session of another browser survived the binding of another authenticator")
 	}
@@ -548,5 +562,84 @@ func TestAFailureOfTheStoreDuringAChangeOfThePasswordIsAnErrorPageAndChangesNoth
 	}
 	if got := f.records(audit.AdminPasswordChanged); len(got) != 1 || got[0].ActorKind != store.ActorAdmin {
 		t.Fatalf("the change is recorded as %+v", got)
+	}
+}
+
+func TestASuccessfulStepOfTheAccountClearsTheCountOfWrongPasswords(t *testing.T) {
+	f := newWebFixture(t)
+	f.enroll()
+	token := f.accountToken()
+	wrong := url.Values{"password": {"not the password"}, "csrf": {token}}
+	for range 4 {
+		if r := f.post("/account/recovery", wrong); r.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("a wrong password gave %d", r.StatusCode)
+		}
+	}
+	if r := f.post("/account/recovery", url.Values{"password": {adminPassword}, "csrf": {token}}); r.StatusCode != http.StatusOK {
+		t.Fatalf("the right password gave %d", r.StatusCode)
+	}
+	for i := 1; i <= 5; i++ {
+		if r := f.post("/account/recovery", wrong); r.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("the wrong password %d after the success gave %d: the count was not cleared", i, r.StatusCode)
+		}
+	}
+	if r := f.post("/account/recovery", wrong); r.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("the sixth wrong password after the success gave %d", r.StatusCode)
+	}
+}
+
+func TestAPasswordThatChecksOfTheApplicationRefuseIsRefusedWithoutTheTextOfTheChecks(t *testing.T) {
+	refuse := func(word, code string) func(context.Context, string) error {
+		return func(_ context.Context, password string) error {
+			if strings.Contains(password, word) {
+				return errors.New(code)
+			}
+			return nil
+		}
+	}
+	f := newWebFixture(t, WithPasswordPolicy(PasswordPolicy{Checks: []func(context.Context, string) error{refuse("alpha", "leaked-code"), refuse("beta", "other-code")}}))
+	f.enroll()
+	token := f.accountToken()
+	change := func(next string) webResponse {
+		return f.post("/account/password", url.Values{"current": {adminPassword}, "new": {next}, "again": {next}, "csrf": {token}})
+	}
+	both := change("alpha and beta words together")
+	if both.StatusCode != http.StatusUnprocessableEntity || strings.Count(both.body, "it breaks a rule of the service") != 1 || both.has("leaked-code") || both.has("other-code") {
+		t.Fatalf("two checks that refuse gave %d: %.400s", both.StatusCode, both.body)
+	}
+	mixed := change("alpha")
+	if mixed.StatusCode != http.StatusUnprocessableEntity || !mixed.has("it is too short, it breaks a rule of the service") {
+		t.Fatalf("a rule of the service and a rule of the check gave %d: %.400s", mixed.StatusCode, mixed.body)
+	}
+}
+
+func TestAFailureOfAStepOfTheAccountIsAnsweredAsItShouldBe(t *testing.T) {
+	a, _ := newLimitedAuth(t, WithAdminMountPath(adminMount), WithDevelopmentMode())
+	site, ok := a.AdminHandler().(*adminSite)
+	if !ok {
+		t.Fatal("the handler of the administration is not a site")
+	}
+	cases := []struct {
+		name     string
+		err      error
+		status   int
+		location string
+		text     string
+	}{
+		{"a pause", &RateLimitError{RetryAfter: 90 * time.Second}, http.StatusTooManyRequests, "", "Try again in 2 min."},
+		{"a session that ended", admin.ErrNoSession, http.StatusSeeOther, adminMount + "/login", ""},
+		{"a service without a second factor", admin.ErrNoSecondFactor, http.StatusNotFound, "", "Page not found"},
+		{"another error", errors.New("the store failed"), http.StatusInternalServerError, "", "Something went wrong"},
+	}
+	for _, c := range cases {
+		recorder := httptest.NewRecorder()
+		call := &adminCall{s: site, w: recorder, r: httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/account/password", nil), lang: "en"}
+		call.accountFailure(admin.Session{ID: "session", AdminID: "admin", Login: "root"}, c.err)
+		if recorder.Code != c.status || recorder.Header().Get("Location") != c.location || !strings.Contains(recorder.Body.String(), c.text) {
+			t.Errorf("%s: the answer is %d %q with %.100s", c.name, recorder.Code, recorder.Header().Get("Location"), recorder.Body.String())
+		}
+		if c.status == http.StatusSeeOther && !strings.Contains(strings.Join(recorder.Header().Values("Set-Cookie"), ";"), "limb_admin=;") {
+			t.Errorf("%s: the cookie of the session was not cleared: %v", c.name, recorder.Header().Values("Set-Cookie"))
+		}
 	}
 }

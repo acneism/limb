@@ -26,8 +26,7 @@ const (
 	// current one.
 	RuleSameAsCurrent = "same_as_current"
 
-	maxRebindToken = 512
-	rebindContext  = "totp-rebind"
+	rebindContext = "totp-rebind"
 )
 
 var (
@@ -266,9 +265,6 @@ func (s *Service) rebindToken(seed []byte, a store.Admin, sessionID string, expi
 }
 
 func (s *Service) openRebindToken(token string, a store.Admin, sessionID string) ([]byte, time.Time, error) {
-	if token == "" || len(token) > maxRebindToken {
-		return nil, time.Time{}, ErrNoRebind
-	}
 	sealed, err := base64.RawURLEncoding.Strict().DecodeString(token)
 	if err != nil {
 		return nil, time.Time{}, ErrNoRebind

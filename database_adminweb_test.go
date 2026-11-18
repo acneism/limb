@@ -159,6 +159,9 @@ func TestTheAccountOfAnAdministratorIsKeptByEveryDatabase(t *testing.T) {
 			t.Fatal("the second instance does not see the new recovery codes, or the renewal ended its session")
 		}
 
+		if r := first.post("/account/sessions/end", url.Values{"session": {strings.Repeat("x", 500)}, "csrf": {token}}); r.StatusCode != http.StatusSeeOther {
+			t.Fatalf("ending a session by an ID that is far too long gave %d", r.StatusCode)
+		}
 		changed := first.post("/account/password", url.Values{"current": {adminPassword}, "new": {changedPassword}, "again": {changedPassword}, "csrf": {token}})
 		if changed.StatusCode != http.StatusSeeOther {
 			t.Fatalf("the change of the password gave %d: %.200s", changed.StatusCode, changed.body)

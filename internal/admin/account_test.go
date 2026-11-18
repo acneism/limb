@@ -97,6 +97,17 @@ func TestTheProfileShowsTheAccountAndTheSessionsThatWork(t *testing.T) {
 		t.Fatalf("a session that was idle for too long is shown: %+v, %v", profile.Sessions, err)
 	}
 
+	stale := store.AdminSession{
+		TenantID: e.admin.TenantID, ID: "stale-session", AdminID: e.admin.ID, Stage: store.AdminStageFull, SecretHash: []byte(fmt.Sprintf("%032d", 99)),
+		AdminVersion: e.admin.Version - 1, CreatedAt: f.clock.read(), LastSeenAt: f.clock.read(), ExpiresAt: f.clock.read().Add(time.Hour),
+	}
+	if err = f.store.AdminSessions().Create(t.Context(), stale); err != nil {
+		t.Fatal(err)
+	}
+	if profile, err = f.Profile(t.Context(), f.resolved(t, e.opened)); err != nil || len(profile.Sessions) != 1 {
+		t.Fatalf("a session that is bound to an old version of the account is listed: %+v, %v", profile.Sessions, err)
+	}
+
 	second := f.enroll(t, "second")
 	if profile, err = f.Profile(t.Context(), f.resolved(t, second.opened)); err != nil || len(profile.Sessions) != 1 || profile.Account.Login != "second" {
 		t.Fatalf("the sessions of another administrator are shown: %+v, %v", profile, err)
@@ -334,6 +345,29 @@ func TestAnotherAuthenticatorIsBoundOnlyWhenItsOneTimePasswordIsRight(t *testing
 	}
 	if _, err = f.ConfirmRebind(t.Context(), f.resolved(t, e.opened), rebinding.Token, f.code(rebinding.Seed), browser); !errors.Is(err, ErrNoRebind) {
 		t.Fatalf("a token that was used = %v, want ErrNoRebind", err)
+	}
+}
+
+func TestAnotherAuthenticatorIsNotBoundWithATimeStepThatWasUsed(t *testing.T) {
+	f := newFixture(t)
+	e := f.enroll(t, "root")
+	f.another(t, e)
+	ses := f.resolved(t, e.opened)
+	rebinding, err := f.BeginRebind(t.Context(), ses, goodPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := f.stored(t, "root")
+	code := f.code(rebinding.Seed)
+	if _, err = f.ConfirmRebind(t.Context(), ses, rebinding.Token, code, browser); !errors.Is(err, ErrBadFactor) {
+		t.Fatalf("a confirmation in the time step of the last sign-in = %v, want ErrBadFactor", err)
+	}
+	if got := f.stored(t, "root"); got.Version != before.Version || string(got.TOTPSecret) != string(before.TOTPSecret) {
+		t.Fatal("a confirmation that was refused changed the account")
+	}
+	f.nextStep()
+	if _, err = f.ConfirmRebind(t.Context(), ses, rebinding.Token, f.code(rebinding.Seed), browser); err != nil {
+		t.Fatalf("the confirmation in the next time step = %v", err)
 	}
 }
 
