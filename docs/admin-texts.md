@@ -6,6 +6,11 @@ This file is made from the texts of the library by a test. After a text changes,
 
 | Key | English | Русский |
 | --- | --- | --- |
+| `account.notice.password` | The password was changed. Every other session was ended. | Пароль изменён. Все остальные сеансы завершены. |
+| `account.notice.session` | The session was ended. | Сеанс завершён. |
+| `account.notice.sessions` | Every other session was ended. | Все остальные сеансы завершены. |
+| `account.since` | The account was made on %s. | Учётная запись создана: %s. |
+| `account.title` | Your account | Ваша учётная запись |
 | `back.to.login` | Back to the sign-in | Назад ко входу |
 | `brand` | %s administration | Администрирование: %s |
 | `code.failed` | The code is wrong, or it was used already. Wait for the next one and try again. | Код неверный или уже использован. Дождитесь следующего и попробуйте ещё раз. |
@@ -46,6 +51,12 @@ This file is made from the texts of the library by a test. After a text changes,
 | `error.hours` | %d h | %d ч |
 | `error.minutes` | %d min | %d мин |
 | `error.seconds` | %d s | %d с |
+| `factor.left` | Recovery codes left: %d. | Осталось резервных кодов: %d. |
+| `factor.rebind` | Bind another authenticator | Привязать другой аутентификатор |
+| `factor.rebind.hint` | The old authenticator and the old recovery codes stop working, and every other session ends. | Прежний аутентификатор и прежние резервные коды перестанут действовать, а все остальные сеансы завершатся. |
+| `factor.renew` | Make new recovery codes | Создать новые резервные коды |
+| `factor.renew.hint` | The old recovery codes stop working. | Прежние резервные коды перестанут действовать. |
+| `factor.title` | Authenticator and recovery codes | Аутентификатор и резервные коды |
 | `home.account` | Your account | Ваша учётная запись |
 | `home.account.text` | Change your password, bind another authenticator, make new recovery codes and see where you are signed in. | Смените пароль, привяжите другой аутентификатор, создайте новые резервные коды и посмотрите, где вы вошли. |
 | `home.recovery` | You have %d recovery codes left. Make new ones on the page of your account. | Резервных кодов осталось: %d. Создайте новые на странице учётной записи. |
@@ -66,10 +77,41 @@ This file is made from the texts of the library by a test. After a text changes,
 | `nav.home` | Home | Главная |
 | `nav.label` | Main menu | Главное меню |
 | `nav.logout` | Sign out | Выйти |
+| `password.again` | New password again | Новый пароль ещё раз |
+| `password.current` | Current password | Текущий пароль |
+| `password.differ` | The two new passwords are not the same. | Новые пароли не совпадают. |
+| `password.hint` | When the password changes you stay signed in here and every other session ends. | После смены пароля вы остаётесь в этом сеансе, а все остальные завершаются. |
+| `password.new` | New password | Новый пароль |
+| `password.rule.common_password` | many people use it | его выбирают слишком многие |
+| `password.rule.login_identifier` | it is the same as the login | он совпадает с логином |
+| `password.rule.max_length` | it is too long | он слишком длинный |
+| `password.rule.min_length` | it is too short | он слишком короткий |
+| `password.rule.other` | it breaks a rule of the service | он нарушает правило сервиса |
+| `password.rule.same_as_current` | it is the current password | он совпадает с текущим |
+| `password.rules` | The new password is not allowed: %s. | Новый пароль не подходит: %s. |
+| `password.submit` | Change the password | Сменить пароль |
+| `password.title` | Change the password | Смена пароля |
+| `password.wrong` | The current password is wrong. | Текущий пароль неверный. |
+| `rebind.cancel` | Back to the account | Назад к учётной записи |
+| `rebind.expired` | The binding has expired. Start again. | Время привязки истекло. Начните заново. |
+| `rebind.intro` | Scan this QR code with the app that is to replace the old one. The old authenticator works until you confirm the new one. | Отсканируйте этот QR-код приложением, которое заменит прежнее. Прежний аутентификатор действует, пока вы не подтвердите новый. |
+| `rebind.submit` | Confirm and replace | Подтвердить и заменить |
+| `rebind.title` | Bind another authenticator | Привязка другого аутентификатора |
 | `recovery.done` | I have saved them, continue | Я сохранил(а) их, продолжить |
 | `recovery.intro` | Keep these codes in a safe place, apart from your phone. If you lose the authenticator, each of them lets you sign in once. They are shown only now. | Сохраните эти коды в надёжном месте, отдельно от телефона. Если вы потеряете аутентификатор, каждый из них позволит войти один раз. Они показываются только сейчас. |
 | `recovery.list` | Recovery codes | Резервные коды |
 | `recovery.title` | Your recovery codes | Ваши резервные коды |
+| `sessions.action` | Action | Действие |
+| `sessions.address` | Address | Адрес |
+| `sessions.browser` | Browser | Браузер |
+| `sessions.caption` | Your sessions | Ваши сеансы |
+| `sessions.current` | This session | Этот сеанс |
+| `sessions.end` | End | Завершить |
+| `sessions.end.others` | End every other session | Завершить все остальные сеансы |
+| `sessions.none` | There is no other session. | Других сеансов нет. |
+| `sessions.seen` | Last used | Последнее обращение |
+| `sessions.started` | Signed in | Вход |
+| `sessions.title` | Where you are signed in | Где вы вошли |
 | `signed.in.as` | Signed in as %s | Вы вошли как %s |
 | `skip` | Skip to the content | Перейти к содержимому |
 | `time.utc` | %s UTC | %s UTC |

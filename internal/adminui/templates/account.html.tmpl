@@ -1,0 +1,84 @@
+{{define "title"}}{{.T "account.title"}}{{end}}
+{{define "content"}}
+<section class="stack">
+<h1 class="h1">{{.T "account.title"}}</h1>
+<p class="muted">{{.T "account.since" (.Time .Data.CreatedAt)}}</p>
+{{template "flash" .}}
+<div class="card stack">
+<h2 class="h2">{{.T "password.title"}}</h2>
+<form method="post" action="{{.Base}}/account/password" class="stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div>
+<label for="password-current" class="label">{{.T "password.current"}}</label>
+<input id="password-current" name="current" type="password" class="input" autocomplete="current-password" required maxlength="1024">
+</div>
+<div>
+<label for="password-new" class="label">{{.T "password.new"}}</label>
+<input id="password-new" name="new" type="password" class="input" autocomplete="new-password" required maxlength="1024">
+</div>
+<div>
+<label for="password-again" class="label">{{.T "password.again"}}</label>
+<input id="password-again" name="again" type="password" class="input" autocomplete="new-password" required maxlength="1024">
+</div>
+<p class="muted">{{.T "password.hint"}}</p>
+<button type="submit" class="btn btn-primary">{{.T "password.submit"}}</button>
+</form>
+</div>
+{{if .Data.SecondFactor}}<div class="card stack">
+<h2 class="h2">{{.T "factor.title"}}</h2>
+<p>{{.T "factor.left" .Data.RecoveryCodes}}</p>
+<form method="post" action="{{.Base}}/account/recovery" class="stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div>
+<label for="recovery-password" class="label">{{.T "password.current"}}</label>
+<input id="recovery-password" name="password" type="password" class="input" autocomplete="current-password" required maxlength="1024">
+</div>
+<p class="muted">{{.T "factor.renew.hint"}}</p>
+<button type="submit" class="btn btn-secondary">{{.T "factor.renew"}}</button>
+</form>
+<form method="post" action="{{.Base}}/account/authenticator" class="stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div>
+<label for="rebind-password" class="label">{{.T "password.current"}}</label>
+<input id="rebind-password" name="password" type="password" class="input" autocomplete="current-password" required maxlength="1024">
+</div>
+<p class="muted">{{.T "factor.rebind.hint"}}</p>
+<button type="submit" class="btn btn-secondary">{{.T "factor.rebind"}}</button>
+</form>
+</div>
+{{end}}<div class="card stack">
+<h2 class="h2">{{.T "sessions.title"}}</h2>
+<div class="scroll">
+<table class="table">
+<caption class="sr-only">{{.T "sessions.caption"}}</caption>
+<thead>
+<tr>
+<th scope="col">{{.T "sessions.started"}}</th>
+<th scope="col">{{.T "sessions.seen"}}</th>
+<th scope="col">{{.T "sessions.address"}}</th>
+<th scope="col">{{.T "sessions.browser"}}</th>
+<th scope="col"><span class="sr-only">{{.T "sessions.action"}}</span></th>
+</tr>
+</thead>
+<tbody>
+{{range .Data.Sessions}}<tr>
+<td>{{$.Time .SignedAt}}</td>
+<td>{{$.Time .LastSeenAt}}</td>
+<td>{{.IP}}</td>
+<td class="break">{{.UserAgent}}</td>
+<td>{{if .Current}}<strong>{{$.T "sessions.current"}}</strong>{{else}}<form method="post" action="{{$.Base}}/account/sessions/end">
+<input type="hidden" name="csrf" value="{{$.CSRF}}">
+<input type="hidden" name="session" value="{{.ID}}">
+<button type="submit" class="btn btn-secondary btn-small">{{$.T "sessions.end"}}</button>
+</form>{{end}}</td>
+</tr>
+{{end}}</tbody>
+</table>
+</div>
+{{if .Data.HasOthers}}<form method="post" action="{{.Base}}/account/sessions/end-others">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<button type="submit" class="btn btn-danger">{{.T "sessions.end.others"}}</button>
+</form>{{else}}<p class="muted">{{.T "sessions.none"}}</p>{{end}}
+</div>
+</section>
+{{end}}

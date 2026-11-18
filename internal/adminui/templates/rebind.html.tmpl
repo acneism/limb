@@ -1,0 +1,31 @@
+{{define "title"}}{{.T "rebind.title"}}{{end}}
+{{define "content"}}
+<section class="narrow">
+<h1 class="h1">{{.T "rebind.title"}}</h1>
+{{template "flash" .}}
+<div class="card stack">
+<p>{{.T "rebind.intro"}}</p>
+<ol class="steps">
+<li>
+<p>{{.T "enroll.step1"}}</p>
+<div class="qr-box">{{.Data.QR}}</div>
+<p class="muted">{{.T "enroll.manual"}}</p>
+<p><span class="sr-only">{{.T "enroll.secret"}}: </span><code class="secret">{{.Data.Secret}}</code></p>
+<p><a href="{{.Data.URI}}">{{.T "enroll.open"}}</a></p>
+</li>
+<li>
+<form method="post" action="{{.Base}}/account/authenticator/confirm" class="stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<input type="hidden" name="token" value="{{.Data.Token}}">
+<div>
+<label for="code" class="label">{{.T "enroll.step2"}}</label>
+<input id="code" name="code" type="text" class="input code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]*" required maxlength="16">
+</div>
+<button type="submit" class="btn btn-primary">{{.T "rebind.submit"}}</button>
+</form>
+</li>
+</ol>
+</div>
+<p class="aside"><a href="{{.Base}}/account">{{.T "rebind.cancel"}}</a></p>
+</section>
+{{end}}

@@ -39,7 +39,12 @@ func samplePage(t *testing.T, c *Catalog, language string) map[string]*Page {
 		"enroll":   EnrollData{Login: "root", QR: qr, Secret: key, URI: template.URL(uri)}, //nolint:gosec
 		"recovery": RecoveryData{Codes: []string{"ABCDE-FGHJK-MNPQR-STVWX", "23456-789AB-CDEFG-HJKMN"}},
 		"home":     HomeData{Login: "root", SignedAt: signedAt, RecoveryCodes: 2},
-		"error":    ErrorData{Title: "Page not found", Text: "There is nothing at this address."},
+		"account": AccountData{Login: "root", CreatedAt: signedAt, SecondFactor: true, RecoveryCodes: 7, HasOthers: true, Sessions: []SessionRow{
+			{ID: "first-session", SignedAt: signedAt, LastSeenAt: signedAt, IP: "203.0.113.7", UserAgent: `Mozilla/5.0 "<script>alert(1)</script>"`, Current: true},
+			{ID: "second-session", SignedAt: signedAt, LastSeenAt: signedAt, IP: "2001:db8::7"},
+		}},
+		"rebind": RebindData{Login: "root", QR: qr, Secret: key, URI: template.URL(uri), Token: "token-of-the-binding"}, //nolint:gosec
+		"error":  ErrorData{Title: "Page not found", Text: "There is nothing at this address."},
 	}
 	pages := map[string]*Page{}
 	for name, d := range data {
@@ -66,7 +71,7 @@ func TestEveryPageIsRenderedInEveryLanguageAsWellFormedHTMLThatHasNoScriptAndNoS
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := len(templates.Pages()); got != 6 {
+	if got := len(templates.Pages()); got != 8 {
 		t.Fatalf("there are %d pages: %v", got, templates.Pages())
 	}
 	key := regexp.MustCompile(`\b(?:[a-z]+\.){1,3}[a-z]+\b`)
