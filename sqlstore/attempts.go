@@ -30,8 +30,14 @@ func (r attempts) Hit(ctx context.Context, key string, at time.Time, window time
 		return store.Attempt{}, err
 	}
 	moment, cutoff := storedTime(at), storedTime(at.Add(-window))
+	_, outside := r.x.(retryingDB)
+	var aborted error
 	for range hitRetries {
 		counted, err := r.count(ctx, key, moment, cutoff)
+		if err != nil && outside && r.s.dialect.IsRetryable(err) {
+			aborted = err
+			continue
+		}
 		if err != nil {
 			return store.Attempt{}, err
 		}
@@ -43,12 +49,19 @@ func (r attempts) Hit(ctx context.Context, key string, at time.Time, window time
 			return counter, readErr
 		}
 		inserted, err := r.exec(ctx, r.s.q.insertAttempt, key, moment)
+		if err != nil && outside && r.s.dialect.IsRetryable(err) {
+			aborted = err
+			continue
+		}
 		if err != nil && !r.s.dialect.IsUniqueViolation(err) {
 			return store.Attempt{}, err
 		}
 		if err == nil && inserted > 0 {
 			return store.Attempt{Key: key, WindowStart: moment, Count: 1}, nil
 		}
+	}
+	if aborted != nil {
+		return store.Attempt{}, aborted
 	}
 	return store.Attempt{}, errors.New("sqlstore: count attempt: the counter kept changing under the call")
 }
