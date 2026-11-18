@@ -106,7 +106,7 @@ func TestTheStylesheetIsServedUnderItsHashAndKeptForGood(t *testing.T) {
 
 func TestAPageThatIsNotThereOrIsUsedTheWrongWayIsRefusedAsAPage(t *testing.T) {
 	f := newWebFixture(t)
-	for _, path := range []string{"/nowhere", "/login/", "/login/code/", "//login", "/Login", "/login/other", "/assets/", "/logout/x", "/account", "/users"} {
+	for _, path := range []string{"/nowhere", "/login/", "/login/code/", "//login", "/Login", "/login/other", "/assets/", "/logout/x", "/account/", "/account/other", "/users"} {
 		if r := f.get(path); r.StatusCode != http.StatusNotFound || !r.has("Page not found") || !r.has("There is nothing at this address.") {
 			t.Errorf("GET %s = %d", path, r.StatusCode)
 		}
@@ -121,6 +121,13 @@ func TestAPageThatIsNotThereOrIsUsedTheWrongWayIsRefusedAsAPage(t *testing.T) {
 		{http.MethodPut, "/login/totp", "GET, HEAD, POST"},
 		{http.MethodGet, "/logout", "POST"},
 		{http.MethodDelete, "/logout", "POST"},
+		{http.MethodPost, "/account", "GET, HEAD"},
+		{http.MethodGet, "/account/password", "POST"},
+		{http.MethodGet, "/account/recovery", "POST"},
+		{http.MethodPut, "/account/authenticator", "POST"},
+		{http.MethodGet, "/account/authenticator/confirm", "POST"},
+		{http.MethodGet, "/account/sessions/end", "POST"},
+		{http.MethodGet, "/account/sessions/end-others", "POST"},
 	} {
 		r := f.request(c.method, c.path)
 		if r.StatusCode != http.StatusMethodNotAllowed || r.Header.Get("Allow") != c.allow || !r.has("This method is not allowed") {

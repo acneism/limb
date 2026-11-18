@@ -107,6 +107,13 @@ func (a *Auth) AdminHandler() http.Handler {
 		{http.MethodGet, "/login/totp", (*adminCall).showEnroll},
 		{http.MethodPost, "/login/totp", (*adminCall).submitEnroll},
 		{http.MethodPost, "/logout", (*adminCall).logout},
+		{http.MethodGet, "/account", (*adminCall).showAccount},
+		{http.MethodPost, "/account/password", (*adminCall).changePassword},
+		{http.MethodPost, "/account/recovery", (*adminCall).renewRecoveryCodes},
+		{http.MethodPost, "/account/authenticator", (*adminCall).beginRebind},
+		{http.MethodPost, "/account/authenticator/confirm", (*adminCall).confirmRebind},
+		{http.MethodPost, "/account/sessions/end", (*adminCall).endSession},
+		{http.MethodPost, "/account/sessions/end-others", (*adminCall).endOtherSessions},
 		{http.MethodGet, adminAssetsPrefix + s.asset, (*adminCall).stylesheet},
 	}
 	return s

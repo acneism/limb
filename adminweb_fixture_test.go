@@ -239,6 +239,12 @@ func (b *browser) signIn() webResponse {
 	return b.post("/login/code", url.Values{"code": {b.f.code()}, "csrf": {b.csrfOf(page)}})
 }
 
+func (b *browser) signInAgain() webResponse {
+	b.f.t.Helper()
+	b.f.clock.advance(totp.StepSeconds * time.Second)
+	return b.signIn()
+}
+
 func (f *webFixture) seed() []byte {
 	f.t.Helper()
 	found, err := f.a.store.Admins().FindByLogin(f.t.Context(), f.a.tenant, adminLoginName)

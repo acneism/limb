@@ -116,14 +116,10 @@ func (c *adminCall) showLogin() {
 	}
 }
 
-func (c *adminCall) recordFailure(login string, refusal *admin.CredentialsError, stage, reason string) {
-	adminID := ""
-	if refusal != nil {
-		adminID, reason = refusal.AdminID, refusal.Reason
-	}
+func (c *adminCall) recordFailure(login string, refusal *admin.CredentialsError, stage string) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(c.ctx()), recordTimeout)
 	defer cancel()
-	if err := c.auth().admins.RecordFailure(ctx, c.client, login, adminID, stage, reason); err != nil {
+	if err := c.auth().admins.RecordFailure(ctx, c.client, login, refusal.AdminID, stage, refusal.Reason); err != nil {
 		c.auth().logger.ErrorContext(ctx, "limb: a failed sign-in to the administration cannot be recorded", "error", err)
 	}
 }
@@ -155,7 +151,7 @@ func (c *adminCall) submitLogin() {
 	case errors.As(err, &wait):
 		c.limited(wait.RetryAfter)
 	case errors.Is(err, ErrInvalidCredentials):
-		c.recordFailure(login, refusal, "password", "")
+		c.recordFailure(login, refusal, "password")
 		c.loginPage(http.StatusUnauthorized, cutAtRune(login, maxAdminLoginInput), "login.failed")
 	case err != nil:
 		c.internal(err)
@@ -253,7 +249,7 @@ func (c *adminCall) submitCode() {
 	case errors.As(err, &wait):
 		c.limited(wait.RetryAfter)
 	case errors.Is(err, ErrInvalidCredentials):
-		c.recordFailure(in.Admin.Login, &admin.CredentialsError{AdminID: in.Admin.ID, Reason: "wrong_code"}, "second_factor", "")
+		c.recordFailure(in.Admin.Login, &admin.CredentialsError{AdminID: in.Admin.ID, Reason: "wrong_code"}, "second_factor")
 		c.codePage(http.StatusUnauthorized, in, "code.failed")
 	case errors.Is(err, admin.ErrNoSignIn):
 		c.expired()
@@ -352,7 +348,7 @@ func (c *adminCall) submitEnroll() {
 	case errors.As(err, &wait):
 		c.limited(wait.RetryAfter)
 	case errors.Is(err, ErrInvalidCredentials):
-		c.recordFailure(in.Admin.Login, &admin.CredentialsError{AdminID: in.Admin.ID, Reason: "wrong_code"}, "second_factor", "")
+		c.recordFailure(in.Admin.Login, &admin.CredentialsError{AdminID: in.Admin.ID, Reason: "wrong_code"}, "second_factor")
 		c.enrollPage(http.StatusUnauthorized, in, "enroll.failed")
 	case errors.Is(err, admin.ErrNoSignIn):
 		c.expired()
