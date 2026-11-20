@@ -110,6 +110,12 @@ func (a *Auth) AdminHandler() http.Handler {
 		{http.MethodPost, "/logout", (*adminCall).logout},
 		{http.MethodGet, "/users", (*adminCall).showUsers},
 		{http.MethodGet, "/users/{id}", (*adminCall).showUser},
+		{http.MethodPost, "/users/{id}/block", (*adminCall).submitBlock},
+		{http.MethodPost, "/users/{id}/unblock", (*adminCall).submitUnblock},
+		{http.MethodPost, "/users/{id}/sessions/end", (*adminCall).submitEndSession},
+		{http.MethodPost, "/users/{id}/sessions/end-all", (*adminCall).submitEndSessions},
+		{http.MethodPost, "/users/{id}/delete", (*adminCall).submitDelete},
+		{http.MethodPost, "/users/{id}/restore", (*adminCall).submitRestore},
 		{http.MethodGet, "/account", (*adminCall).showAccount},
 		{http.MethodPost, "/account/password", (*adminCall).changePassword},
 		{http.MethodPost, "/account/recovery", (*adminCall).renewRecoveryCodes},
@@ -208,6 +214,10 @@ func validPathID(id string) bool {
 		}
 	}
 	return true
+}
+
+func (c *adminCall) by(ses admin.Session) actorRef {
+	return actorRef{actor: adminActor(ses.AdminID), ip: c.client.IP}
 }
 
 func (c *adminCall) recoverPanic() {

@@ -29,7 +29,28 @@
 <dd>{{.T "user.must.change"}}</dd>
 {{end}}</dl>
 </div>
-<div class="card stack">
+{{if ne .Data.Status "deleted"}}<div class="card stack">
+<h2 class="h2">{{if eq .Data.Status "blocked"}}{{.T "user.block.change"}}{{else}}{{.T "user.block.title"}}{{end}}</h2>
+<form method="post" action="{{.Base}}/users/{{.Data.ID}}/block" class="stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div>
+<label for="block-reason" class="label">{{.T "user.block.reason"}}</label>
+<input id="block-reason" name="reason" type="text" class="input" required maxlength="{{.Data.ReasonLimit}}" value="{{.Data.BlockReason}}">
+</div>
+<div>
+<label for="block-until" class="label">{{.T "user.block.until"}}</label>
+<input id="block-until" name="until" type="date" class="input" value="{{.Data.BlockUntil}}" aria-describedby="block-until-hint">
+<p id="block-until-hint" class="muted">{{.T "user.block.until.hint"}}</p>
+</div>
+<p class="muted">{{.T "user.block.hint"}}</p>
+<div class="actions"><button type="submit" class="btn btn-danger">{{if eq .Data.Status "blocked"}}{{.T "user.block.change.submit"}}{{else}}{{.T "user.block.submit"}}{{end}}</button></div>
+</form>
+{{if eq .Data.Status "blocked"}}<form method="post" action="{{.Base}}/users/{{.Data.ID}}/unblock" class="stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="actions"><button type="submit" class="btn btn-secondary">{{.T "user.unblock"}}</button></div>
+</form>
+{{end}}</div>
+{{end}}<div class="card stack">
 <h2 class="h2">{{.T "user.identifiers"}}</h2>
 {{if .Data.Identifiers}}<div class="scroll">
 <table class="table">
@@ -64,6 +85,7 @@
 <th scope="col">{{.T "user.sessions.kind"}}</th>
 <th scope="col">{{.T "sessions.address"}}</th>
 <th scope="col">{{.T "sessions.browser"}}</th>
+<th scope="col"><span class="sr-only">{{.T "sessions.action"}}</span></th>
 </tr>
 </thead>
 <tbody>
@@ -74,10 +96,19 @@
 <td>{{.Kind}}</td>
 <td>{{.IP}}</td>
 <td class="break">{{.UserAgent}}</td>
+<td><form method="post" action="{{$.Base}}/users/{{$.Data.ID}}/sessions/end">
+<input type="hidden" name="csrf" value="{{$.CSRF}}">
+<input type="hidden" name="session" value="{{.ID}}">
+<button type="submit" class="btn btn-secondary btn-small">{{$.T "sessions.end"}}</button>
+</form></td>
 </tr>
 {{end}}</tbody>
 </table>
-</div>{{else}}<p class="muted">{{.T "user.sessions.none"}}</p>{{end}}
+</div>
+<form method="post" action="{{.Base}}/users/{{.Data.ID}}/sessions/end-all">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<button type="submit" class="btn btn-danger">{{.T "user.sessions.end.all"}}</button>
+</form>{{else}}<p class="muted">{{.T "user.sessions.none"}}</p>{{end}}
 </div>
 <div class="card stack">
 <h2 class="h2">{{.T "user.signins"}}</h2>
@@ -87,5 +118,25 @@
 <h2 class="h2">{{.T "user.journal"}}</h2>
 {{template "auditrows" (.AuditTable "user.journal.caption" "user.journal.none" false .Data.Journal)}}
 </div>
+{{if eq .Data.Status "deleted"}}<div class="card stack">
+<h2 class="h2">{{.T "user.restore.title"}}</h2>
+<p class="muted">{{.T "user.restore.hint"}}</p>
+<form method="post" action="{{.Base}}/users/{{.Data.ID}}/restore" class="stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="actions"><button type="submit" class="btn btn-primary">{{.T "user.restore.submit"}}</button></div>
+</form>
+</div>{{else}}<div class="card stack">
+<h2 class="h2">{{.T "user.delete.title"}}</h2>
+<p class="muted">{{if .Data.Immediate}}{{.T "user.delete.hint.immediate"}}{{else}}{{.T "user.delete.hint.soft"}}{{end}}</p>
+<form method="post" action="{{.Base}}/users/{{.Data.ID}}/delete" class="stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div>
+<label for="delete-confirm" class="label">{{.T "user.delete.confirm"}}</label>
+<input id="delete-confirm" name="confirm" type="text" class="input" required autocomplete="off" maxlength="256" aria-describedby="delete-confirm-hint">
+<p id="delete-confirm-hint" class="muted">{{.T "user.delete.confirm.hint" .Data.Title}}</p>
+</div>
+<div class="actions"><button type="submit" class="btn btn-danger">{{.T "user.delete.submit"}}</button></div>
+</form>
+</div>{{end}}
 </section>
 {{end}}

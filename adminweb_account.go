@@ -96,7 +96,7 @@ func (c *adminCall) showAccount() {
 	c.render(http.StatusOK, "account", p)
 }
 
-func (c *adminCall) accountForm() (admin.Session, url.Values, bool) {
+func (c *adminCall) signedForm() (admin.Session, url.Values, bool) {
 	form, ok := c.form()
 	if !ok {
 		return admin.Session{}, nil, false
@@ -156,7 +156,7 @@ func (c *adminCall) accountFailure(ses admin.Session, err error) {
 }
 
 func (c *adminCall) changePassword() {
-	ses, form, ok := c.accountForm()
+	ses, form, ok := c.signedForm()
 	if !ok {
 		return
 	}
@@ -186,7 +186,7 @@ func (c *adminCall) recoveryPage(ses admin.Session, codes []string) {
 }
 
 func (c *adminCall) renewRecoveryCodes() {
-	ses, form, ok := c.accountForm()
+	ses, form, ok := c.signedForm()
 	if !ok {
 		return
 	}
@@ -225,7 +225,7 @@ func (c *adminCall) rebindPage(ses admin.Session, status int, rebinding admin.Re
 }
 
 func (c *adminCall) beginRebind() {
-	ses, form, ok := c.accountForm()
+	ses, form, ok := c.signedForm()
 	if !ok {
 		return
 	}
@@ -244,7 +244,7 @@ func (c *adminCall) beginRebind() {
 }
 
 func (c *adminCall) confirmRebind() {
-	ses, form, ok := c.accountForm()
+	ses, form, ok := c.signedForm()
 	if !ok {
 		return
 	}
@@ -296,7 +296,7 @@ func (c *adminCall) rebindAgain(ses admin.Session, token string) {
 }
 
 func (c *adminCall) endSession() {
-	ses, form, ok := c.accountForm()
+	ses, form, ok := c.signedForm()
 	if !ok {
 		return
 	}
@@ -312,7 +312,7 @@ func (c *adminCall) endSession() {
 }
 
 func (c *adminCall) endOtherSessions() {
-	ses, _, ok := c.accountForm()
+	ses, _, ok := c.signedForm()
 	if !ok {
 		return
 	}

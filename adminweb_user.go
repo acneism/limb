@@ -4,12 +4,23 @@ import (
 	"cmp"
 	"errors"
 	"net/http"
+	"net/url"
 
+	"github.com/acneism/limb/internal/admin"
 	"github.com/acneism/limb/internal/adminui"
 	"github.com/acneism/limb/store"
 )
 
 const historyRows = 20
+
+var userNotices = map[string]string{
+	"blocked":   "user.notice.blocked",
+	"unblocked": "user.notice.unblocked",
+	"session":   "user.notice.session",
+	"sessions":  "user.notice.sessions",
+	"deleted":   "user.notice.deleted",
+	"restored":  "user.notice.restored",
+}
 
 func shownValue(i UserIdentifier) string {
 	return cmp.Or(i.DisplayValue, i.Value)
@@ -31,7 +42,7 @@ func (c *adminCall) userData(p *adminui.Page, u ManagedUser) adminui.UserData {
 	data := adminui.UserData{
 		ID: string(u.ID), Title: titleOf(u), Status: string(u.Status), StatusLabel: p.T("status." + string(u.Status)),
 		BlockedReason: u.BlockedReason, DeletedAt: u.DeletedAt, PurgeAfter: u.PurgeAfter, CreatedAt: u.CreatedAt, LastLoginAt: u.LastLoginAt,
-		Via: viaText(p, u.CreatedVia), MustChangePassword: u.MustChangePassword,
+		Via: viaText(p, u.CreatedVia), MustChangePassword: u.MustChangePassword, Immediate: c.auth().immediate, ReasonLimit: store.MaxBlockedReasonLength,
 	}
 	if u.Status == store.StatusBlocked {
 		data.BlockedUntil = u.BlockedUntil
@@ -75,11 +86,7 @@ func (c *adminCall) userCard(p *adminui.Page, u ManagedUser) (adminui.UserData, 
 	return data, nil
 }
 
-func (c *adminCall) showUser() {
-	ses, ok := c.requireSession()
-	if !ok {
-		return
-	}
+func (c *adminCall) userPage(ses admin.Session, status int, flash func(p *adminui.Page) string, form url.Values) {
 	user, err := c.auth().managedUserByID(c.ctx(), UserID(c.userID))
 	switch {
 	case errors.Is(err, ErrUserNotFound):
@@ -95,6 +102,25 @@ func (c *adminCall) showUser() {
 		c.internal(err)
 		return
 	}
+	data.BlockReason, data.BlockUntil = form.Get("reason"), form.Get("until")
+	if flash != nil {
+		p.Flash, p.FlashKind = flash(p), "notice"
+		if status >= http.StatusBadRequest {
+			p.FlashKind = "error"
+		}
+	}
 	p.Title, p.Data = data.Title, data
-	c.render(http.StatusOK, "user", p)
+	c.render(status, "user", p)
+}
+
+func (c *adminCall) showUser() {
+	ses, ok := c.requireSession()
+	if !ok {
+		return
+	}
+	var flash func(p *adminui.Page) string
+	if key, known := userNotices[c.r.URL.Query().Get("done")]; known {
+		flash = textOf(key)
+	}
+	c.userPage(ses, http.StatusOK, flash, nil)
 }

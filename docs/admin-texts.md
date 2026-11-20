@@ -179,13 +179,38 @@ This file is made from the texts of the library by a test. After a text changes,
 | `time.utc` | %s UTC | %s UTC |
 | `user.account` | Account | Учётная запись |
 | `user.back` | ← All users | ← Все пользователи |
+| `user.block.change` | Change the block | Изменить блокировку |
+| `user.block.change.submit` | Change the block | Изменить блокировку |
+| `user.block.hint` | A block ends all the sessions of the user at once, and the user cannot sign in until it is lifted or has run out. | Блокировка сразу завершает все сессии пользователя, и он не сможет войти, пока её не снимут или она не закончится. |
+| `user.block.reason` | Reason | Причина |
+| `user.block.submit` | Block | Заблокировать |
+| `user.block.title` | Block the user | Заблокировать пользователя |
+| `user.block.until` | Until (a day, UTC) | До (день, UTC) |
+| `user.block.until.hint` | The block ends at 00:00 UTC on this day. Leave it empty for a block without an end. | Блокировка закончится в 00:00 UTC этого дня. Оставьте пустым, чтобы блокировка была бессрочной. |
 | `user.blocked.forever` | never, until an administrator lifts it | никогда, пока её не снимет администратор |
 | `user.blocked.noreason` | none given | не указана |
 | `user.blocked.reason` | Reason of the block | Причина блокировки |
 | `user.blocked.until` | The block ends | Блокировка закончится |
 | `user.created` | Created | Создан |
+| `user.delete.confirm` | To confirm, type a value that the user signs in with | Для подтверждения введите значение, которым пользователь входит |
+| `user.delete.confirm.hint` | For example: %s | Например: %s |
+| `user.delete.hint.immediate` | The account is erased at once, with its values, sessions and tokens. This cannot be undone. | Учётная запись стирается сразу вместе со значениями для входа, сессиями и токенами. Отменить это нельзя. |
+| `user.delete.hint.soft` | The user cannot sign in any more and their sessions end, but the values they sign in with stay taken. An administrator can restore the account until the time of keeping runs out, and then it is removed for good. | Пользователь больше не сможет войти, его сессии завершатся, но значения, которыми он входил, останутся занятыми. Администратор может восстановить учётную запись, пока не истечёт срок хранения, потом она удаляется окончательно. |
+| `user.delete.submit` | Delete the user | Удалить пользователя |
+| `user.delete.title` | Delete the user | Удалить пользователя |
 | `user.deleted.at` | Deleted | Удалён |
 | `user.deleted.until` | Removed for good after | Будет удалён окончательно после |
+| `user.error.changed` | The user kept changing meanwhile. Check the card and try again. | Пользователь менялся в это же время. Проверьте карточку и повторите. |
+| `user.error.confirm` | What you typed is not a value that the user signs in with. | Введено не то значение, которым пользователь входит. |
+| `user.error.deleted` | The user is deleted. | Пользователь удалён. |
+| `user.error.invalid` | A value is not valid. | Значение не подходит. |
+| `user.error.notdeleted` | The user is not deleted. | Пользователь не удалён. |
+| `user.error.reason.invalid` | The reason has to be text without control characters, at most %d bytes. | Причина должна быть текстом без управляющих символов, не длиннее %d байт. |
+| `user.error.reason.required` | Give the reason of the block. | Укажите причину блокировки. |
+| `user.error.refused` | The application does not allow this user to be deleted. | Приложение не позволяет удалить этого пользователя. |
+| `user.error.retention` | The time to restore the user has run out. | Время для восстановления пользователя истекло. |
+| `user.error.until.invalid` | The day of the end of the block is not valid. | День окончания блокировки не подходит. |
+| `user.error.until.past` | The day of the end of the block has to be in the future. | День окончания блокировки должен быть в будущем. |
 | `user.id` | ID | ID |
 | `user.ident.confirmed` | Confirmed | Подтверждено |
 | `user.ident.no` | not confirmed | не подтверждено |
@@ -199,9 +224,19 @@ This file is made from the texts of the library by a test. After a text changes,
 | `user.journal.none` | Nothing was changed yet. | Изменений пока не было. |
 | `user.last` | Last sign-in | Последний вход |
 | `user.must.change` | has to be changed at the next sign-in | нужно сменить при следующем входе |
+| `user.notice.blocked` | The user is blocked and their sessions ended. | Пользователь заблокирован, его сессии завершены. |
+| `user.notice.deleted` | The user is deleted. | Пользователь удалён. |
+| `user.notice.restored` | The user is restored. | Пользователь восстановлен. |
+| `user.notice.session` | The session ended. | Сессия завершена. |
+| `user.notice.sessions` | The sessions ended. | Сессии завершены. |
+| `user.notice.unblocked` | The block is lifted. | Блокировка снята. |
 | `user.password` | Password | Пароль |
+| `user.restore.hint` | The user can sign in again. The sessions that ended are not restored. | Пользователь снова сможет войти. Завершённые сессии не восстанавливаются. |
+| `user.restore.submit` | Restore | Восстановить |
+| `user.restore.title` | Restore the user | Восстановить пользователя |
 | `user.sessions` | Sessions in use | Сессии в работе |
 | `user.sessions.caption` | The sessions of the user that are in use | Сессии пользователя, которые в работе |
+| `user.sessions.end.all` | End all sessions | Завершить все сессии |
 | `user.sessions.ends` | Ends | Закончится |
 | `user.sessions.kind` | Kept by | Чем держится |
 | `user.sessions.none` | The user has no session in use. | У пользователя нет сессий в работе. |
@@ -209,6 +244,7 @@ This file is made from the texts of the library by a test. After a text changes,
 | `user.signins.caption` | The last sign-ins, failed attempts and sign-outs of the user | Последние входы, неудачные попытки и выходы пользователя |
 | `user.signins.none` | Nobody signed in as this user yet. | Входов этого пользователя пока не было. |
 | `user.status` | Status | Статус |
+| `user.unblock` | Lift the block | Снять блокировку |
 | `users.apply` | Apply | Применить |
 | `users.caption` | The users of the service | Пользователи сервиса |
 | `users.change` | has to change the password | должен сменить пароль |
@@ -241,6 +277,7 @@ This file is made from the texts of the library by a test. After a text changes,
 | `users.never.signed` | never | никогда |
 | `users.next` | Next page | Следующая страница |
 | `users.none` | Nobody matches. | Никто не подошёл. |
+| `users.notice.erased` | The user is erased. | Пользователь стёрт. |
 | `users.open` | Open | Открыть |
 | `users.open.user` | Open the user %s | Открыть пользователя %s |
 | `users.order` | Order by | Сортировать по |

@@ -258,6 +258,14 @@ type UserData struct {
 	// SignIns are the last records of signing in and out, and Journal the last
 	// records of what was changed.
 	SignIns, Journal []AuditRow
+	// Immediate tells that a deletion erases the user at once, so that nothing is
+	// left to restore.
+	Immediate bool
+	// ReasonLimit is the longest reason of a block, in bytes.
+	ReasonLimit int
+	// BlockReason and BlockUntil are what the form of a block was sent with, kept
+	// to be shown again when the block was refused.
+	BlockReason, BlockUntil string
 }
 
 // ErrorData is what the page of an error needs.

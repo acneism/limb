@@ -271,6 +271,9 @@ func (c *adminCall) showUsers() {
 	q := parseUsersQuery(c.r.URL.Query())
 	p := c.signedPage(ses)
 	p.Title = p.T("users.title")
+	if q.invalid == nil && c.r.URL.Query().Get("done") == "erased" {
+		p.Flash, p.FlashKind = p.T("users.notice.erased"), "notice"
+	}
 	data := adminui.UsersData{Form: c.usersForm(p, q), Filtered: q.filtered()}
 	status := http.StatusOK
 	var labels []string
