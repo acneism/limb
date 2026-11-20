@@ -183,6 +183,7 @@
 <div class="card stack">
 <h2 class="h2">{{.T "user.journal"}}</h2>
 {{template "auditrows" (.AuditTable "user.journal.caption" "user.journal.none" false .Data.Journal)}}
+<p><a href="{{.Data.AuditHref}}">{{.T "user.audit"}}</a></p>
 </div>
 {{if eq .Data.Status "deleted"}}<div class="card stack">
 <h2 class="h2">{{.T "user.restore.title"}}</h2>

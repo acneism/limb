@@ -1,0 +1,47 @@
+{{define "title"}}{{.T "audit.title"}}{{end}}
+{{define "content"}}
+<section class="stack">
+<h1 class="h1">{{.T "audit.title"}}</h1>
+{{template "flash" .}}
+<form method="get" action="{{.Base}}/audit" class="card stack">
+<h2 class="h2">{{.T "users.filters"}}</h2>
+<div class="filters">
+<div>
+<label for="audit-user" class="label">{{.T "audit.f.user"}}</label>
+<input id="audit-user" name="user" type="text" class="input" value="{{.Data.Form.User}}" maxlength="64">
+</div>
+<div>
+<label for="audit-admin" class="label">{{.T "audit.f.admin"}}</label>
+<select id="audit-admin" name="admin" class="select">{{range .Data.Form.Admins}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+</div>
+<div>
+<label for="audit-action" class="label">{{.T "audit.f.action"}}</label>
+<select id="audit-action" name="action" class="select">{{range .Data.Form.Actions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+</div>
+<div>
+<label for="audit-from" class="label">{{.T "audit.f.from"}}</label>
+<input id="audit-from" name="from" type="date" class="input" value="{{.Data.Form.From}}">
+</div>
+<div>
+<label for="audit-to" class="label">{{.T "audit.f.to"}}</label>
+<input id="audit-to" name="to" type="date" class="input" value="{{.Data.Form.To}}">
+</div>
+<div>
+<label for="audit-limit" class="label">{{.T "users.limit"}}</label>
+<select id="audit-limit" name="limit" class="select">{{range .Data.Form.Limit}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+</div>
+</div>
+<div class="actions">
+<button type="submit" class="btn btn-primary">{{.T "users.apply"}}</button>
+<a class="btn btn-secondary" href="{{.Base}}/audit">{{.T "users.reset"}}</a>
+</div>
+</form>
+<div class="card stack">
+{{if .Data.Filtered}}{{template "auditrows" (.AuditTable "audit.caption" "audit.none" true .Data.Rows)}}{{else}}{{template "auditrows" (.AuditTable "audit.caption" "audit.empty" true .Data.Rows)}}{{end}}
+{{if or .Data.First .Data.Next}}<nav class="pager" aria-label="{{.T "users.pages"}}">
+{{if .Data.First}}<a href="{{.Data.First}}">{{.T "users.first"}}</a>{{else}}<span></span>{{end}}
+{{if .Data.Next}}<a href="{{.Data.Next}}">{{.T "users.next"}}</a>{{else}}<span></span>{{end}}
+</nav>{{end}}
+</div>
+</section>
+{{end}}

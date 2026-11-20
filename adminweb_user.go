@@ -53,6 +53,7 @@ func (c *adminCall) userData(p *adminui.Page, u ManagedUser) adminui.UserData {
 		Via: viaText(p, u.CreatedVia), MustChangePassword: u.MustChangePassword, Immediate: c.auth().immediate, ReasonLimit: store.MaxBlockedReasonLength,
 		HasPassword: u.HasPassword, CanSend: c.auth().recoveryReady(), MessageLanguages: messageLanguages(p),
 		Invited: u.CreatedVia == string(store.CreatedViaInvite) && !u.HasPassword, CanInvite: c.auth().invitationsReady(),
+		AuditHref: c.s.base + "/audit?user=" + string(u.ID),
 	}
 	if u.Status == store.StatusBlocked {
 		data.BlockedUntil = u.BlockedUntil

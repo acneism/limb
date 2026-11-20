@@ -42,6 +42,7 @@
 {{if .Login}}<nav class="menu" aria-label="{{.T "nav.label"}}">
 <a href="{{.Base}}/">{{.T "nav.home"}}</a>
 <a href="{{.Base}}/users">{{.T "nav.users"}}</a>
+<a href="{{.Base}}/audit">{{.T "nav.audit"}}</a>
 <a href="{{.Base}}/account">{{.T "nav.account"}}</a>
 <form method="post" action="{{.Base}}/logout">
 <input type="hidden" name="csrf" value="{{.CSRF}}">

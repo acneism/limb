@@ -84,6 +84,18 @@ func samplePage(t *testing.T, c *Catalog, language string) map[string]*Page {
 			},
 			Mode: "invite", Keep: true, CanInvite: true, Languages: []Option{{Value: "en", Label: "English", Selected: true}, {Value: "ru", Label: "Русский"}},
 		},
+		"audit": AuditData{
+			Form: AuditForm{
+				User: `u"<b>`, Admins: []Option{{Value: "", Label: "Any", Selected: true}, {Value: "a1", Label: "root"}},
+				Actions: []Option{{Value: "", Label: "Any", Selected: true}, {Value: "user.blocked", Label: "User blocked"}},
+				Limit:   []Option{{Value: "50", Label: "50", Selected: true}}, From: "2026-01-02", To: "2026-02-03",
+			},
+			Rows: []AuditRow{
+				{At: signedAt, Actor: "root", Action: "user.blocked", Label: "User blocked", UserID: "one", UserHref: "/admin/users/one", IP: "203.0.113.8", Details: []DetailPair{{Key: "reason", Value: "<spam>"}}},
+				{At: signedAt, Actor: "command line", Action: "admin.created", Label: "Administrator created"},
+			},
+			Next: "/admin/audit?cursor=x", First: "/admin/audit", Filtered: true,
+		},
 		"temporary": TemporaryData{UserHref: "/admin/users/one", Title: "<alice>", Password: "ABCDE-FGHIJ-KLMNO-PQRST-UVWXY"},
 		"rebind":    RebindData{Login: "root", QR: qr, Secret: key, URI: template.URL(uri), Token: "token-of-the-binding"}, //nolint:gosec
 		"error":     ErrorData{Title: "Page not found", Text: "There is nothing at this address."},
@@ -113,7 +125,7 @@ func TestEveryPageIsRenderedInEveryLanguageAsWellFormedHTMLThatHasNoScriptAndNoS
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := len(templates.Pages()); got != 12 {
+	if got := len(templates.Pages()); got != 13 {
 		t.Fatalf("there are %d pages: %v", got, templates.Pages())
 	}
 	key := regexp.MustCompile(`\b(?:[a-z]+\.){1,3}[a-z]+\b`)

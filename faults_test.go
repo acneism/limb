@@ -257,6 +257,13 @@ func (a faultAdmins) Get(ctx context.Context, tenantID, id string) (store.Admin,
 	return a.Admins.Get(ctx, tenantID, id)
 }
 
+func (a faultAdmins) List(ctx context.Context, tenantID string) ([]store.Admin, error) {
+	if err := a.faults.check("admins.list"); err != nil {
+		return nil, err
+	}
+	return a.Admins.List(ctx, tenantID)
+}
+
 type failingHasher struct {
 	passwordHasher
 	err error

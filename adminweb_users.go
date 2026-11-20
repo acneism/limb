@@ -13,7 +13,7 @@ import (
 	"github.com/acneism/limb/store"
 )
 
-var usersPerPage = []int{10, 25, 50, 100, 200}
+var pageSizes = []int{10, 25, 50, 100, 200}
 
 var usersFieldTexts = map[string]string{
 	"limit": "users.limit", "order": "users.order", "statuses": "users.status", "created_via": "users.via", "created_from": "users.created.from",
@@ -40,12 +40,17 @@ func (q *usersQuery) reject(key string) {
 	}
 }
 
+func validDay(text string) bool {
+	at, err := time.Parse(time.DateOnly, text)
+	return err == nil && at.Year() >= firstYear && at.Year() <= lastYear
+}
+
 func (q *usersQuery) day(values url.Values, name, key string) string {
 	text := values.Get(name)
 	if text == "" {
 		return ""
 	}
-	if at, err := time.Parse(time.DateOnly, text); err != nil || at.Year() < firstYear || at.Year() > lastYear {
+	if !validDay(text) {
 		q.reject(key)
 		return ""
 	}
@@ -95,7 +100,7 @@ func parseUsersQuery(values url.Values) usersQuery {
 		q.reject("users.dir")
 	}
 	if text := values.Get("limit"); text != "" {
-		if n, err := strconv.Atoi(text); err == nil && slices.Contains(usersPerPage, n) {
+		if n, err := strconv.Atoi(text); err == nil && slices.Contains(pageSizes, n) {
 			q.limit = n
 		} else {
 			q.reject("users.limit")
@@ -213,7 +218,7 @@ func (c *adminCall) usersForm(p *adminui.Page, q usersQuery) adminui.UsersForm {
 			Name: "status", Value: string(status), Label: p.T("status." + string(status)), Checked: slices.Contains(q.statuses, status),
 		})
 	}
-	for _, n := range usersPerPage {
+	for _, n := range pageSizes {
 		form.Limit = append(form.Limit, adminui.Option{Value: strconv.Itoa(n), Label: strconv.Itoa(n), Selected: n == q.limit})
 	}
 	return form
@@ -285,7 +290,7 @@ func (c *adminCall) showUsers() {
 		var invalid *ValidationError
 		switch {
 		case errors.As(err, &invalid):
-			labels = append(labels, filterFieldLabel(p, invalid.Field))
+			labels = append(labels, fieldLabel(p, usersFieldTexts, invalid.Field))
 		case err != nil:
 			c.internal(err)
 			return
@@ -314,8 +319,8 @@ func (c *adminCall) showUsers() {
 	c.render(status, "users", p)
 }
 
-func filterFieldLabel(p *adminui.Page, field string) string {
-	if key, known := usersFieldTexts[field]; known {
+func fieldLabel(p *adminui.Page, texts map[string]string, field string) string {
+	if key, known := texts[field]; known {
 		return p.T(key)
 	}
 	return field

@@ -280,6 +280,8 @@ type UserData struct {
 	// Invited tells that the user was invited and has not chosen a password yet,
 	// and CanInvite that the service can send an invitation.
 	Invited, CanInvite bool
+	// AuditHref is the address of the audit log with only the records of the user.
+	AuditHref string
 	// BlockReason and BlockUntil are what the form of a block was sent with, kept
 	// to be shown again when the block was refused.
 	BlockReason, BlockUntil string
@@ -309,6 +311,31 @@ type NewUserData struct {
 	CanInvite bool
 	// Languages are the languages of the invitation.
 	Languages []Option
+}
+
+// AuditForm is the form that filters the audit log, filled in with what was
+// asked for.
+type AuditForm struct {
+	// User is the ID of the user that was asked for.
+	User string
+	// Admins, Actions and Limit are the lists to choose from.
+	Admins, Actions, Limit []Option
+	// From and To are the days of the period, as the form sends them.
+	From, To string
+}
+
+// AuditData is what the page of the audit log needs.
+type AuditData struct {
+	// Form is the form with what was asked for.
+	Form AuditForm
+	// Rows are the records of the page.
+	Rows []AuditRow
+	// Next is the address of the page that follows, empty on the last page, and
+	// First the address of the first page, empty on the first.
+	Next, First string
+	// Filtered tells that something was asked for, so that an empty list can say
+	// that no record matches.
+	Filtered bool
 }
 
 // TemporaryData is what the page that shows a temporary password needs.

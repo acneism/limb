@@ -59,12 +59,23 @@ This file is made from the texts of the library by a test. After a text changes,
 | `audit.actor.maintenance` | maintenance | обслуживание |
 | `audit.actor.unknown` | unknown | неизвестно |
 | `audit.actor.user` | the user | сам пользователь |
+| `audit.caption` | The records of the audit log | Записи журнала аудита |
 | `audit.col.address` | Address | Адрес |
 | `audit.col.details` | Details | Подробности |
 | `audit.col.time` | Time | Время |
 | `audit.col.user` | User | Пользователь |
 | `audit.col.what` | What | Что |
 | `audit.col.who` | Who | Кто |
+| `audit.empty` | The audit log is empty. | Журнал аудита пуст. |
+| `audit.f.action` | Action | Действие |
+| `audit.f.action.any` | Any action | Любое действие |
+| `audit.f.admin` | Administrator | Администратор |
+| `audit.f.admin.any` | Any administrator | Любой администратор |
+| `audit.f.from` | From (a day, UTC) | С (день, UTC) |
+| `audit.f.to` | Until (a day, UTC) | По (день, UTC) |
+| `audit.f.user` | User (ID) | Пользователь (ID) |
+| `audit.none` | No record matches. | Ни одна запись не подошла. |
+| `audit.title` | Audit log | Журнал аудита |
 | `back.to.login` | Back to the sign-in | Назад ко входу |
 | `brand` | %s administration | Администрирование: %s |
 | `code.failed` | The code is wrong, or it was used already. Wait for the next one and try again. | Код неверный или уже использован. Дождитесь следующего и попробуйте ещё раз. |
@@ -113,6 +124,8 @@ This file is made from the texts of the library by a test. After a text changes,
 | `factor.title` | Authenticator and recovery codes | Аутентификатор и резервные коды |
 | `home.account` | Your account | Ваша учётная запись |
 | `home.account.text` | Change your password, bind another authenticator, make new recovery codes and see where you are signed in. | Смените пароль, привяжите другой аутентификатор, создайте новые резервные коды и посмотрите, где вы вошли. |
+| `home.audit` | Audit log | Журнал аудита |
+| `home.audit.text` | See what administrators did and what happened to users: who, what, when and from where. | Что делали администраторы и что происходило с пользователями: кто, что, когда и откуда. |
 | `home.recovery` | You have %d recovery codes left. Make new ones on the page of your account. | Резервных кодов осталось: %d. Создайте новые на странице учётной записи. |
 | `home.recovery.0` | You have no recovery codes left. Make new ones on the page of your account. | Резервных кодов не осталось. Создайте новые на странице учётной записи. |
 | `home.signed.in` | You signed in at %s. | Вы вошли: %s. |
@@ -130,6 +143,7 @@ This file is made from the texts of the library by a test. After a text changes,
 | `login.submit` | Continue | Продолжить |
 | `login.title` | Sign in | Вход |
 | `nav.account` | My account | Моя учётная запись |
+| `nav.audit` | Audit log | Журнал |
 | `nav.home` | Home | Главная |
 | `nav.label` | Main menu | Главное меню |
 | `nav.logout` | Sign out | Выйти |
@@ -193,6 +207,7 @@ This file is made from the texts of the library by a test. After a text changes,
 | `temporary.title` | Temporary password | Временный пароль |
 | `time.utc` | %s UTC | %s UTC |
 | `user.account` | Account | Учётная запись |
+| `user.audit` | All the records of this user | Все записи об этом пользователе |
 | `user.back` | ← All users | ← Все пользователи |
 | `user.block.change` | Change the block | Изменить блокировку |
 | `user.block.change.submit` | Change the block | Изменить блокировку |
