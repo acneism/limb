@@ -7,6 +7,10 @@
 {{if eq .Data.RecoveryCodes 0}}<p role="status" class="alert alert-notice">{{.T "home.recovery.0"}}</p>
 {{else if lt .Data.RecoveryCodes 4}}<p role="status" class="alert alert-notice">{{.T "home.recovery" .Data.RecoveryCodes}}</p>{{end}}
 <div class="card">
+<h2 class="h2"><a href="{{.Base}}/users">{{.T "home.users"}}</a></h2>
+<p class="muted">{{.T "home.users.text"}}</p>
+</div>
+<div class="card">
 <h2 class="h2"><a href="{{.Base}}/account">{{.T "home.account"}}</a></h2>
 <p class="muted">{{.T "home.account.text"}}</p>
 </div>

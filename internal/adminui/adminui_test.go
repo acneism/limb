@@ -43,6 +43,24 @@ func samplePage(t *testing.T, c *Catalog, language string) map[string]*Page {
 			{ID: "first-session", SignedAt: signedAt, LastSeenAt: signedAt, IP: "203.0.113.7", UserAgent: `Mozilla/5.0 "<script>alert(1)</script>"`, Current: true},
 			{ID: "second-session", SignedAt: signedAt, LastSeenAt: signedAt, IP: "2001:db8::7"},
 		}},
+		"users": UsersData{
+			Form: UsersForm{
+				Search: `al"<b>`, Statuses: []Choice{{Name: "status", Value: "active", Label: "Active", Checked: true}, {Name: "status", Value: "blocked", Label: "Blocked"}},
+				Confirmed: []Option{{Value: "", Label: "Any", Selected: true}, {Value: "yes", Label: "Yes"}},
+				Via:       []Option{{Value: "", Label: "Any", Selected: true}}, Order: []Option{{Value: "created", Label: "Created", Selected: true}},
+				Direction: []Option{{Value: "desc", Label: "Descending", Selected: true}}, Limit: []Option{{Value: "50", Label: "50", Selected: true}},
+				CreatedFrom: "2026-01-02", Never: true,
+			},
+			Rows: []UserRow{
+				{
+					Href: "/admin/users/one", Title: "alice@example.com", Status: "active", StatusLabel: "Active", CreatedAt: signedAt, LastLoginAt: signedAt, Via: "By an invitation",
+					Identifiers: []IdentifierView{{Type: "email", Value: "alice@example.com", Verified: true}, {Type: "username", Value: "<alice>"}},
+				},
+				{Href: "/admin/users/two", Title: "two", Status: "blocked", StatusLabel: "Blocked", BlockedUntil: signedAt, CreatedAt: signedAt, MustChangePassword: true},
+			},
+			ByCreated: SortLink{Href: "/admin/users?order=created&dir=asc", State: "descending"}, ByLastLogin: SortLink{Href: "/admin/users?order=last_login", State: "none"},
+			ByStatus: SortLink{Href: "/admin/users?order=status", State: "none"}, Next: "/admin/users?cursor=x", First: "/admin/users", Filtered: true,
+		},
 		"rebind": RebindData{Login: "root", QR: qr, Secret: key, URI: template.URL(uri), Token: "token-of-the-binding"}, //nolint:gosec
 		"error":  ErrorData{Title: "Page not found", Text: "There is nothing at this address."},
 	}
@@ -71,7 +89,7 @@ func TestEveryPageIsRenderedInEveryLanguageAsWellFormedHTMLThatHasNoScriptAndNoS
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := len(templates.Pages()); got != 8 {
+	if got := len(templates.Pages()); got != 9 {
 		t.Fatalf("there are %d pages: %v", got, templates.Pages())
 	}
 	key := regexp.MustCompile(`\b(?:[a-z]+\.){1,3}[a-z]+\b`)
@@ -118,6 +136,7 @@ func checkDocument(t *testing.T, label string, page []byte) {
 	z := html.NewTokenizer(bytes.NewReader(page))
 	labels, ids, controls := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	depth := map[string]int{}
+	readOnlyForm := false
 	for {
 		tt := z.Next()
 		if tt == html.ErrorToken {
@@ -159,17 +178,28 @@ func checkDocument(t *testing.T, label string, page []byte) {
 			if tag == "label" {
 				labels[attrs["for"]] = true
 			}
-			if tag == "input" && attrs["type"] != "hidden" && attrs["type"] != "submit" {
+			inLabel := depth["label"] > 0 && tag != "label"
+			field := tag == "input" && attrs["type"] != "hidden" && attrs["type"] != "submit" || tag == "select" || tag == "textarea"
+			if field && !inLabel {
 				controls[attrs["id"]] = true
 				if attrs["id"] == "" {
-					t.Errorf("%s: an input has no id to be labelled by", label)
+					t.Errorf("%s: a field has no id to be labelled by", label)
 				}
 			}
-			if tag == "form" && attrs["method"] != "post" {
-				t.Errorf("%s: a form that is not sent with POST", label)
+			if tag == "input" && attrs["type"] == "password" && readOnlyForm {
+				t.Errorf("%s: a password is sent by a form that is sent with GET", label)
+			}
+			if tag == "form" {
+				readOnlyForm = attrs["method"] == "get"
+				if attrs["method"] != "post" && !readOnlyForm {
+					t.Errorf("%s: a form that is sent with neither POST nor GET", label)
+				}
 			}
 		case html.EndTagToken:
 			name, _ := z.TagName()
+			if string(name) == "form" {
+				readOnlyForm = false
+			}
 			depth[string(name)]--
 			if depth[string(name)] < 0 {
 				t.Errorf("%s: </%s> closes nothing", label, name)
@@ -341,8 +371,18 @@ func TestTheStylesheetHasEveryClassThatATemplateUses(t *testing.T) {
 		}
 		for _, match := range attribute.FindAllStringSubmatch(string(text), -1) {
 			values := []string{match[1]}
-			if strings.Contains(match[1], "{{.FlashKind}}") {
-				values = []string{strings.ReplaceAll(match[1], "{{.FlashKind}}", "error"), strings.ReplaceAll(match[1], "{{.FlashKind}}", "notice")}
+			for placeholder, expansions := range map[string][]string{"{{.FlashKind}}": {"error", "notice"}, "{{.Status}}": {"active", "blocked", "deleted"}} {
+				var expanded []string
+				for _, value := range values {
+					if !strings.Contains(value, placeholder) {
+						expanded = append(expanded, value)
+						continue
+					}
+					for _, expansion := range expansions {
+						expanded = append(expanded, strings.ReplaceAll(value, placeholder, expansion))
+					}
+				}
+				values = expanded
 			}
 			for _, value := range values {
 				if strings.Contains(value, "{{") {

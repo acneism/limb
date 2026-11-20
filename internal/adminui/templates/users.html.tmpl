@@ -1,0 +1,96 @@
+{{define "title"}}{{.T "users.title"}}{{end}}
+{{define "content"}}
+<section class="stack">
+<h1 class="h1">{{.T "users.title"}}</h1>
+{{template "flash" .}}
+<form method="get" action="{{.Base}}/users" class="card stack">
+<h2 class="h2">{{.T "users.filters"}}</h2>
+<div>
+<label for="users-search" class="label">{{.T "users.search"}}</label>
+<input id="users-search" name="q" type="search" class="input" value="{{.Data.Form.Search}}" maxlength="128" aria-describedby="users-search-hint">
+<p id="users-search-hint" class="muted">{{.T "users.search.hint"}}</p>
+</div>
+<div class="filters">
+<fieldset class="fieldset">
+<legend class="label">{{.T "users.status"}}</legend>
+<div class="checks">{{range .Data.Form.Statuses}}<label class="check"><input type="checkbox" name="{{.Name}}" value="{{.Value}}"{{if .Checked}} checked{{end}}> {{.Label}}</label>
+{{end}}</div>
+</fieldset>
+<div>
+<label for="users-confirmed" class="label">{{.T "users.confirmed"}}</label>
+<select id="users-confirmed" name="confirmed" class="select">{{range .Data.Form.Confirmed}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+</div>
+<div>
+<label for="users-via" class="label">{{.T "users.via"}}</label>
+<select id="users-via" name="via" class="select">{{range .Data.Form.Via}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+</div>
+<div>
+<label for="users-created-from" class="label">{{.T "users.created.from"}}</label>
+<input id="users-created-from" name="created_from" type="date" class="input" value="{{.Data.Form.CreatedFrom}}">
+</div>
+<div>
+<label for="users-created-to" class="label">{{.T "users.created.to"}}</label>
+<input id="users-created-to" name="created_to" type="date" class="input" value="{{.Data.Form.CreatedTo}}">
+</div>
+<div>
+<label for="users-login-from" class="label">{{.T "users.login.from"}}</label>
+<input id="users-login-from" name="login_from" type="date" class="input" value="{{.Data.Form.LoginFrom}}">
+</div>
+<div>
+<label for="users-login-to" class="label">{{.T "users.login.to"}}</label>
+<input id="users-login-to" name="login_to" type="date" class="input" value="{{.Data.Form.LoginTo}}">
+</div>
+<div class="checks"><label class="check"><input type="checkbox" name="never" value="1"{{if .Data.Form.Never}} checked{{end}}> {{.T "users.never"}}</label></div>
+<div>
+<label for="users-order" class="label">{{.T "users.order"}}</label>
+<select id="users-order" name="order" class="select">{{range .Data.Form.Order}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+</div>
+<div>
+<label for="users-dir" class="label">{{.T "users.dir"}}</label>
+<select id="users-dir" name="dir" class="select">{{range .Data.Form.Direction}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+</div>
+<div>
+<label for="users-limit" class="label">{{.T "users.limit"}}</label>
+<select id="users-limit" name="limit" class="select">{{range .Data.Form.Limit}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+</div>
+</div>
+<div class="actions">
+<button type="submit" class="btn btn-primary">{{.T "users.apply"}}</button>
+<a class="btn btn-secondary" href="{{.Base}}/users">{{.T "users.reset"}}</a>
+</div>
+</form>
+{{if .Data.Rows}}<div class="card stack">
+<div class="scroll">
+<table class="table">
+<caption class="sr-only">{{.T "users.caption"}}</caption>
+<thead>
+<tr>
+<th scope="col">{{.T "users.col.login"}}</th>
+<th scope="col" aria-sort="{{.Data.ByStatus.State}}"><a href="{{.Data.ByStatus.Href}}">{{.T "users.col.status"}}</a></th>
+<th scope="col" aria-sort="{{.Data.ByCreated.State}}"><a href="{{.Data.ByCreated.Href}}">{{.T "users.col.created"}}</a></th>
+<th scope="col" aria-sort="{{.Data.ByLastLogin.State}}"><a href="{{.Data.ByLastLogin.Href}}">{{.T "users.col.last"}}</a></th>
+<th scope="col">{{.T "users.col.via"}}</th>
+<th scope="col"><span class="sr-only">{{.T "users.col.open"}}</span></th>
+</tr>
+</thead>
+<tbody>
+{{range .Data.Rows}}<tr>
+<td class="break">{{range .Identifiers}}<span class="ident"><span class="muted">{{.Type}}</span> {{.Value}}{{if .Verified}} <span class="ok" aria-hidden="true">&#10003;</span><span class="sr-only">{{$.T "users.confirmed.mark"}}</span>{{end}}</span>{{end}}</td>
+<td><span class="badge badge-{{.Status}}">{{.StatusLabel}}</span>{{if not .BlockedUntil.IsZero}}<br><span class="muted">{{$.T "users.until"}} {{$.Time .BlockedUntil}}</span>{{end}}{{if .MustChangePassword}}<br><span class="muted">{{$.T "users.change"}}</span>{{end}}</td>
+<td>{{$.Time .CreatedAt}}</td>
+<td>{{if .LastLoginAt.IsZero}}<span class="muted">{{$.T "users.never.signed"}}</span>{{else}}{{$.Time .LastLoginAt}}{{end}}</td>
+<td>{{.Via}}</td>
+<td><a href="{{.Href}}" aria-label="{{$.T "users.open.user" .Title}}">{{$.T "users.open"}}</a></td>
+</tr>
+{{end}}</tbody>
+</table>
+</div>
+<nav class="pager" aria-label="{{.T "users.pages"}}">
+{{if .Data.First}}<a href="{{.Data.First}}">{{.T "users.first"}}</a>{{else}}<span></span>{{end}}
+{{if .Data.Next}}<a href="{{.Data.Next}}">{{.T "users.next"}}</a>{{else}}<span></span>{{end}}
+</nav>
+</div>
+{{else if .Data.Filtered}}<p class="muted">{{.T "users.none"}}</p>
+{{else}}<p class="muted">{{.T "users.empty"}}</p>{{end}}
+</section>
+{{end}}

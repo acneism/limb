@@ -93,6 +93,94 @@ type RebindData struct {
 	Token string
 }
 
+// Option is an entry of a list to choose from.
+type Option struct {
+	// Value is what the form sends, and Label what the administrator reads.
+	Value, Label string
+	// Selected tells that the entry is the one that is chosen.
+	Selected bool
+}
+
+// Choice is a box to tick.
+type Choice struct {
+	// Name is the name of the field and Value what it sends when it is ticked.
+	Name, Value string
+	// Label is what the administrator reads.
+	Label string
+	// Checked tells that the box is ticked.
+	Checked bool
+}
+
+// IdentifierView is a value that a user signs in with, as a list shows it.
+type IdentifierView struct {
+	// Type is the name of the type of the value and Value the value.
+	Type, Value string
+	// Verified tells that the owner proved to own it.
+	Verified bool
+}
+
+// UserRow is a user as the list of users shows them.
+type UserRow struct {
+	// Href is the address of the card of the user and Title what the link says.
+	Href, Title string
+	// Identifiers are the values that the user signs in with.
+	Identifiers []IdentifierView
+	// Status is "active", "blocked" or "deleted", and StatusLabel says it in the
+	// language of the page.
+	Status, StatusLabel string
+	// BlockedUntil is when a block ends, the zero time if it has no end or there
+	// is none.
+	BlockedUntil time.Time
+	// CreatedAt and LastLoginAt are when the account was made and when the user
+	// signed in last, the zero time if never.
+	CreatedAt, LastLoginAt time.Time
+	// Via says how the account came to be, in the language of the page.
+	Via string
+	// MustChangePassword tells that the user has to choose another password.
+	MustChangePassword bool
+}
+
+// SortLink is the link in the head of a column that orders the list by it.
+type SortLink struct {
+	// Href is where the link goes.
+	Href string
+	// State is "none", "ascending" or "descending", as aria-sort has it.
+	State string
+}
+
+// UsersForm is the form that searches and filters the list of users, filled in
+// with what was asked for.
+type UsersForm struct {
+	// Search is the text that was searched for.
+	Search string
+	// Statuses are the boxes of the statuses.
+	Statuses []Choice
+	// Confirmed, Via, Order, Direction and Limit are the lists to choose from.
+	Confirmed, Via, Order, Direction, Limit []Option
+	// CreatedFrom, CreatedTo, LoginFrom and LoginTo are the dates of the periods,
+	// as the form sends them.
+	CreatedFrom, CreatedTo, LoginFrom, LoginTo string
+	// Never tells that only the users who never signed in are asked for.
+	Never bool
+}
+
+// UsersData is what the page of the list of users needs.
+type UsersData struct {
+	// Form is the form with what was asked for.
+	Form UsersForm
+	// Rows are the users of the page.
+	Rows []UserRow
+	// ByCreated, ByLastLogin and ByStatus are the links of the heads of the
+	// columns that can order the list.
+	ByCreated, ByLastLogin, ByStatus SortLink
+	// Next is the address of the page that follows, empty on the last page, and
+	// First the address of the first page, empty on the first.
+	Next, First string
+	// Filtered tells that something was asked for, so that an empty list can say
+	// that nobody matches.
+	Filtered bool
+}
+
 // ErrorData is what the page of an error needs.
 type ErrorData struct {
 	// Title and Text say what happened, in the language of the page.

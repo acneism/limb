@@ -63,6 +63,8 @@ This file is made from the texts of the library by a test. After a text changes,
 | `home.recovery.0` | You have no recovery codes left. Make new ones on the page of your account. | Резервных кодов не осталось. Создайте новые на странице учётной записи. |
 | `home.signed.in` | You signed in at %s. | Вы вошли: %s. |
 | `home.title` | Administration | Администрирование |
+| `home.users` | Users | Пользователи |
+| `home.users.text` | Find users, see their sessions and sign-ins, block and delete them, reset their passwords. | Найти пользователей, посмотреть их сеансы и входы, заблокировать и удалить, сбросить пароль. |
 | `home.welcome` | Welcome, %s. | Добро пожаловать, %s. |
 | `lang.label` | Language | Язык |
 | `login.already` | You are signed in already. | Вы уже вошли. |
@@ -77,6 +79,7 @@ This file is made from the texts of the library by a test. After a text changes,
 | `nav.home` | Home | Главная |
 | `nav.label` | Main menu | Главное меню |
 | `nav.logout` | Sign out | Выйти |
+| `nav.users` | Users | Пользователи |
 | `password.again` | New password again | Новый пароль ещё раз |
 | `password.current` | Current password | Текущий пароль |
 | `password.differ` | The two new passwords are not the same. | Новые пароли не совпадают. |
@@ -114,4 +117,58 @@ This file is made from the texts of the library by a test. After a text changes,
 | `sessions.title` | Where you are signed in | Где вы вошли |
 | `signed.in.as` | Signed in as %s | Вы вошли как %s |
 | `skip` | Skip to the content | Перейти к содержимому |
+| `status.active` | Active | Активен |
+| `status.blocked` | Blocked | Заблокирован |
+| `status.deleted` | Deleted | Удалён |
 | `time.utc` | %s UTC | %s UTC |
+| `users.apply` | Apply | Применить |
+| `users.caption` | The users of the service | Пользователи сервиса |
+| `users.change` | has to change the password | должен сменить пароль |
+| `users.col.created` | Created | Создан |
+| `users.col.last` | Last sign-in | Последний вход |
+| `users.col.login` | Signs in with | Вход по |
+| `users.col.open` | Open | Открыть |
+| `users.col.status` | Status | Статус |
+| `users.col.via` | Origin | Происхождение |
+| `users.confirmed` | Confirmed address or phone number | Подтверждённый адрес или телефон |
+| `users.confirmed.any` | Does not matter | Не важно |
+| `users.confirmed.mark` | confirmed | подтверждено |
+| `users.confirmed.no` | Has none | Нет |
+| `users.confirmed.yes` | Has one | Есть |
+| `users.created.from` | Created from | Создан с |
+| `users.created.to` | Created until | Создан по |
+| `users.dir` | Direction | Порядок |
+| `users.dir.asc` | Ascending | По возрастанию |
+| `users.dir.desc` | Descending | По убыванию |
+| `users.empty` | There are no users yet. | Пользователей пока нет. |
+| `users.field.cursor` | the page | страница |
+| `users.field.search` | the text to search for | текст для поиска |
+| `users.filters` | Search and filters | Поиск и фильтры |
+| `users.first` | First page | Первая страница |
+| `users.invalid` | A value in the search is not valid: %s. | Значение в поиске не подходит: %s. |
+| `users.limit` | On a page | На странице |
+| `users.login.from` | Signed in from | Входил с |
+| `users.login.to` | Signed in until | Входил по |
+| `users.never` | Never signed in | Ни разу не входили |
+| `users.never.signed` | never | никогда |
+| `users.next` | Next page | Следующая страница |
+| `users.none` | Nobody matches. | Никто не подошёл. |
+| `users.open` | Open | Открыть |
+| `users.open.user` | Open the user %s | Открыть пользователя %s |
+| `users.order` | Order by | Сортировать по |
+| `users.order.created` | The time of creation | времени создания |
+| `users.order.last` | The last sign-in | последнему входу |
+| `users.order.status` | The status | статусу |
+| `users.pages` | Pages of the list | Страницы списка |
+| `users.reset` | Reset | Сбросить |
+| `users.search` | Search by what they sign in with | Поиск по тому, чем входят |
+| `users.search.hint` | Three characters or more find the values that start with them, fewer find exactly that value. | От трёх символов находятся значения, которые с них начинаются, короче — ровно такое значение. |
+| `users.status` | Status | Статус |
+| `users.title` | Users | Пользователи |
+| `users.until` | until | до |
+| `users.via` | Origin | Происхождение |
+| `users.via.any` | Any origin | Любое |
+| `via.admin` | Administrator | Администратор |
+| `via.api` | Application code | Код приложения |
+| `via.invite` | Invitation | Приглашение |
+| `via.signup` | Sign-up | Регистрация |

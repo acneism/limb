@@ -107,6 +107,7 @@ func (a *Auth) AdminHandler() http.Handler {
 		{http.MethodGet, "/login/totp", (*adminCall).showEnroll},
 		{http.MethodPost, "/login/totp", (*adminCall).submitEnroll},
 		{http.MethodPost, "/logout", (*adminCall).logout},
+		{http.MethodGet, "/users", (*adminCall).showUsers},
 		{http.MethodGet, "/account", (*adminCall).showAccount},
 		{http.MethodPost, "/account/password", (*adminCall).changePassword},
 		{http.MethodPost, "/account/recovery", (*adminCall).renewRecoveryCodes},
