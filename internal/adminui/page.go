@@ -71,12 +71,18 @@ func (p *Page) T(key string, args ...any) string {
 	return p.catalog.Text(p.Lang, key, args...)
 }
 
+// TimeText returns a time as text, to the minute in UTC, for a sentence that
+// holds it. Time is the element that carries the exact moment, for a time that
+// stands on its own.
+func (p *Page) TimeText(at time.Time) string {
+	return p.T("time.utc", at.UTC().Format("2006-01-02 15:04"))
+}
+
 // Time returns a time as an element that carries the exact moment and shows it to
 // the minute in UTC.
 func (p *Page) Time(at time.Time) template.HTML {
-	at = at.UTC()
-	shown := template.HTMLEscapeString(p.T("time.utc", at.Format("2006-01-02 15:04")))
-	return template.HTML(fmt.Sprintf(`<time datetime="%s">%s</time>`, at.Format(time.RFC3339), shown)) //nolint:gosec
+	shown := template.HTMLEscapeString(p.TimeText(at))
+	return template.HTML(fmt.Sprintf(`<time datetime="%s">%s</time>`, at.UTC().Format(time.RFC3339), shown)) //nolint:gosec
 }
 
 // AuditTable is what the table of the records of the audit log needs.

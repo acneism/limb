@@ -148,6 +148,9 @@ func TestEveryPageIsRenderedInEveryLanguageAsWellFormedHTMLThatHasNoScriptAndNoS
 			if strings.Contains(text, "ro<ot") {
 				t.Errorf("%s in %s: a login with a bracket is not escaped", name, language)
 			}
+			if strings.Contains(text, "&lt;time") {
+				t.Errorf("%s in %s: the element of a time is shown as words", name, language)
+			}
 		}
 	}
 }
@@ -447,6 +450,13 @@ func TestATimeIsShownInUTCWithItsExactMoment(t *testing.T) {
 	got := p.Time(time.Date(2026, 11, 18, 5, 4, 3, 0, time.FixedZone("x", 3*3600)))
 	if string(got) != `<time datetime="2026-11-18T02:04:03Z">2026-11-18 02:04 UTC</time>` {
 		t.Fatalf("the time is %s", got)
+	}
+	at := time.Date(2026, 11, 18, 5, 4, 3, 0, time.FixedZone("x", 3*3600))
+	if text := p.TimeText(at); text != "2026-11-18 02:04 UTC" {
+		t.Fatalf("the text of the time is %q", text)
+	}
+	if text := NewPage(c, "ru").TimeText(at); text != "2026-11-18 02:04 UTC" {
+		t.Fatalf("the text of the time in Russian is %q", text)
 	}
 	if NewPage(c, "zz").Lang != DefaultLanguage {
 		t.Fatal("a page in a language that is not spoken is not in English")

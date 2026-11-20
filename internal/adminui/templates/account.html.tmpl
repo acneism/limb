@@ -2,7 +2,7 @@
 {{define "content"}}
 <section class="stack">
 <h1 class="h1">{{.T "account.title"}}</h1>
-<p class="muted">{{.T "account.since" (.Time .Data.CreatedAt)}}</p>
+<p class="muted">{{.T "account.since" (.TimeText .Data.CreatedAt)}}</p>
 {{template "flash" .}}
 <div class="card stack">
 <h2 class="h2">{{.T "password.title"}}</h2>

@@ -22,6 +22,8 @@ import (
 
 var recoveryCodeShape = regexp.MustCompile(`^[A-Z2-7]{5}(-[A-Z2-7]{5}){4}$`)
 
+var signedInSentence = regexp.MustCompile(`<p class="muted">You signed in at \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\.</p>`)
+
 func newFaultyWebFixture(t *testing.T) (*webFixture, *faultSet, *logBuffer) {
 	t.Helper()
 	faults := newFaults()
@@ -102,10 +104,13 @@ func TestAnAdministratorBindsAnAuthenticatorAndSignsInAndOutThroughTheBrowser(t 
 	}
 
 	home := f.get("/")
-	for _, want := range []string{"Welcome, root.", "You signed in at", "Signed in as root", `action="/admin/logout"`} {
+	for _, want := range []string{"Welcome, root.", "Signed in as root", `action="/admin/logout"`} {
 		if home.StatusCode != http.StatusOK || !home.has(want) {
 			t.Errorf("the first page is %d and lacks %q", home.StatusCode, want)
 		}
+	}
+	if !signedInSentence.MatchString(home.body) || home.has("&lt;time") || home.has("<time") {
+		t.Errorf("the first page does not say when the administrator signed in, in words: %.600s", home.body)
 	}
 	if home.has("recovery codes left") {
 		t.Error("the first page warns about the recovery codes although there are ten")

@@ -20,6 +20,8 @@ import (
 
 const changedPassword = "a password with more words"
 
+var accountSentence = regexp.MustCompile(`<p class="muted">The account was made on \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\.</p>`)
+
 var (
 	sessionIDPattern = regexp.MustCompile(`name="session" value="([^"]+)"`)
 	secretPattern    = regexp.MustCompile(`<code class="secret">([^<]+)</code>`)
@@ -61,13 +63,16 @@ func TestTheAccountPageIsForASessionAndListsTheSessionsOfTheAdministrator(t *tes
 	f.signedInBrowsers(1)
 	page := f.get("/account")
 	for _, want := range []string{
-		"Your account", "The account was made on", `action="/admin/account/password"`, `name="current"`, `name="new"`, `name="again"`,
+		"Your account", `action="/admin/account/password"`, `name="current"`, `name="new"`, `name="again"`,
 		`autocomplete="new-password"`, `action="/admin/account/recovery"`, `action="/admin/account/authenticator"`, "Recovery codes left: 10.",
 		"Where you are signed in", "<strong>This session</strong>", `action="/admin/account/sessions/end"`, "End every other session", "127.0.0.1", "Go-http-client",
 	} {
 		if page.StatusCode != http.StatusOK || !page.has(want) {
 			t.Errorf("the account page is %d and lacks %q", page.StatusCode, want)
 		}
+	}
+	if !accountSentence.MatchString(page.body) || page.has("&lt;time") {
+		t.Errorf("the account page does not say when the account was made, in words: %.600s", page.body)
 	}
 	if got := strings.Count(page.body, "<strong>This session</strong>"); got != 1 {
 		t.Errorf("%d sessions are marked as the current one", got)
