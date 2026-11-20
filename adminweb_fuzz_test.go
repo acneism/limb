@@ -24,9 +24,10 @@ type fuzzedAdmin struct {
 	calls   int
 }
 
-func newFuzzedAdmin(f *testing.F) *fuzzedAdmin {
+func newFuzzedAdmin(f *testing.F, opts ...Option) *fuzzedAdmin {
 	f.Helper()
-	a, err := NewWithStore(newTestMemory(), []byte(testKey), WithAutoMigrate(), WithLogger(discardingLogger()), WithAdminMountPath(adminMount), WithDevelopmentMode())
+	all := append([]Option{WithAutoMigrate(), WithLogger(discardingLogger()), WithAdminMountPath(adminMount), WithDevelopmentMode()}, opts...)
+	a, err := NewWithStore(newTestMemory(), []byte(testKey), all...)
 	if err != nil {
 		f.Fatal(err)
 	}
