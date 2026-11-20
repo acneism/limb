@@ -190,6 +190,10 @@ type IdentifierRow struct {
 	// Verified tells that the owner proved to own it, and VerifiedAt is when.
 	Verified   bool
 	VerifiedAt time.Time
+	// Editable tells that the type of the value is one that the service knows, so
+	// that the value can be changed. CanConfirm tells that an administrator can
+	// mark it as confirmed and CanRemove that it can be taken away.
+	Editable, CanConfirm, CanRemove bool
 }
 
 // UserSessionRow is a session of a user as the card of the user shows it.
@@ -270,6 +274,9 @@ type UserData struct {
 	CanSend bool
 	// MessageLanguages are the languages that a message to the user can be in.
 	MessageLanguages []Option
+	// MissingTypes are the types of values that the user has none of, which can be
+	// added.
+	MissingTypes []Option
 	// BlockReason and BlockUntil are what the form of a block was sent with, kept
 	// to be shown again when the block was refused.
 	BlockReason, BlockUntil string

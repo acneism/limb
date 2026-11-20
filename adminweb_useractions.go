@@ -56,8 +56,10 @@ func validationAnswer(v *ValidationError) (int, func(p *adminui.Page) string) {
 		return http.StatusUnprocessableEntity, textOf("user.error.until.invalid")
 	case v.Field == "user" && v.Reason == "is not deleted":
 		return http.StatusConflict, textOf("user.error.notdeleted")
+	case v.Field == "identifiers" && v.Reason == "at least one value to sign in with is required":
+		return http.StatusUnprocessableEntity, textOf("user.error.lastlogin")
 	}
-	return http.StatusUnprocessableEntity, textOf("user.error.invalid")
+	return http.StatusUnprocessableEntity, func(p *adminui.Page) string { return p.T("user.error.identifier", v.Field, v.Reason) }
 }
 
 func (c *adminCall) userFailure(ses admin.Session, form url.Values, err error) {
@@ -79,6 +81,8 @@ func (c *adminCall) userFailure(ses admin.Session, form url.Values, err error) {
 		flash = textOf("user.error.refused")
 	case errors.Is(err, ErrRetentionOver):
 		flash = textOf("user.error.retention")
+	case errors.Is(err, ErrIdentifierTaken):
+		flash = textOf("user.error.taken")
 	case errors.Is(err, ErrRecoveryDisabled):
 		flash = textOf("user.error.nosender")
 	case errors.Is(err, ErrNoConfirmedChannel):

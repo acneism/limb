@@ -21,6 +21,9 @@ var userNotices = map[string]string{
 	"deleted":   "user.notice.deleted",
 	"restored":  "user.notice.restored",
 	"link":      "user.notice.link",
+	"value":     "user.notice.identifier",
+	"removed":   "user.notice.removed",
+	"confirmed": "user.notice.confirmed",
 }
 
 func shownValue(i UserIdentifier) string {
@@ -49,10 +52,37 @@ func (c *adminCall) userData(p *adminui.Page, u ManagedUser) adminui.UserData {
 	if u.Status == store.StatusBlocked {
 		data.BlockedUntil = u.BlockedUntil
 	}
-	for _, i := range u.Identifiers {
-		data.Identifiers = append(data.Identifiers, adminui.IdentifierRow{Type: i.Type, Value: shownValue(i), Verified: !i.VerifiedAt.IsZero(), VerifiedAt: i.VerifiedAt})
-	}
+	data.Identifiers, data.MissingTypes = c.identifierRows(u)
 	return data
+}
+
+func (c *adminCall) identifierRows(u ManagedUser) ([]adminui.IdentifierRow, []adminui.Option) {
+	a := c.auth()
+	signIn := 0
+	held := make(map[string]bool, len(u.Identifiers))
+	for _, i := range u.Identifiers {
+		held[i.Type] = true
+		if kind, declared := a.known[i.Type]; declared && kind.IsLogin() {
+			signIn++
+		}
+	}
+	rows := make([]adminui.IdentifierRow, 0, len(u.Identifiers))
+	for _, i := range u.Identifiers {
+		kind, declared := a.known[i.Type]
+		verified := !i.VerifiedAt.IsZero()
+		editable := declared && u.Status != store.StatusDeleted
+		rows = append(rows, adminui.IdentifierRow{
+			Type: i.Type, Value: shownValue(i), Verified: verified, VerifiedAt: i.VerifiedAt, Editable: editable,
+			CanConfirm: editable && kind.IsDelivery() && !verified, CanRemove: editable && !kind.IsRequired() && (!kind.IsLogin() || signIn > 1),
+		})
+	}
+	var missing []adminui.Option
+	for _, kind := range a.types {
+		if !held[kind.Name()] && u.Status != store.StatusDeleted {
+			missing = append(missing, adminui.Option{Value: kind.Name(), Label: kind.Name()})
+		}
+	}
+	return rows, missing
 }
 
 func sessionRows(p *adminui.Page, sessions []Session) []adminui.UserSessionRow {

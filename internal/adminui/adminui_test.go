@@ -67,11 +67,13 @@ func samplePage(t *testing.T, c *Catalog, language string) map[string]*Page {
 			HasPassword: true, CanSend: true, ReasonLimit: 512, BlockReason: `<reason>`, BlockUntil: "2030-01-01",
 			MessageLanguages: []Option{{Value: "en", Label: "English", Selected: true}, {Value: "ru", Label: "Русский"}},
 			Identifiers: []IdentifierRow{
-				{Type: "email", Value: "Alice@Example.com", Verified: true, VerifiedAt: signedAt},
-				{Type: "username", Value: "<alice>"},
+				{Type: "email", Value: "Alice@Example.com", Verified: true, VerifiedAt: signedAt, Editable: true},
+				{Type: "username", Value: "<alice>", Editable: true, CanRemove: true},
+				{Type: "phone", Value: "+1 202 555 0100", Editable: true, CanConfirm: true, CanRemove: true},
 			},
-			Sessions: []UserSessionRow{{ID: "s1", Kind: "cookie", IP: "203.0.113.7", UserAgent: "<agent>", CreatedAt: signedAt, LastSeenAt: signedAt, ExpiresAt: signedAt}},
-			SignIns:  []AuditRow{{At: signedAt, Actor: "the user", Action: "auth.login", Label: "Signed in", IP: "203.0.113.7", Details: []DetailPair{{Key: "kind", Value: "cookie"}}}},
+			MissingTypes: []Option{{Value: "nick", Label: "nick"}},
+			Sessions:     []UserSessionRow{{ID: "s1", Kind: "cookie", IP: "203.0.113.7", UserAgent: "<agent>", CreatedAt: signedAt, LastSeenAt: signedAt, ExpiresAt: signedAt}},
+			SignIns:      []AuditRow{{At: signedAt, Actor: "the user", Action: "auth.login", Label: "Signed in", IP: "203.0.113.7", Details: []DetailPair{{Key: "kind", Value: "cookie"}}}},
 			Journal: []AuditRow{
 				{At: signedAt, Actor: "root", Action: "user.blocked", Label: "User blocked", UserID: "one", UserHref: "/admin/users/one", IP: "203.0.113.8", Details: []DetailPair{{Key: "reason", Value: "<spam>"}}},
 			},

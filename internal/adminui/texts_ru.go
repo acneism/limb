@@ -251,7 +251,6 @@ var russian = map[string]string{ //nolint:gosec
 	"user.error.refused":         "Приложение не позволяет удалить этого пользователя.",
 	"user.error.retention":       "Время для восстановления пользователя истекло.",
 	"user.error.notdeleted":      "Пользователь не удалён.",
-	"user.error.invalid":         "Значение не подходит.",
 
 	"user.password.none":     "ещё нет, пользователя пригласили, и он не выбрал пароль",
 	"user.password.set":      "задан",
@@ -272,6 +271,20 @@ var russian = map[string]string{ //nolint:gosec
 	"user.error.nochannel": "У пользователя нет подтверждённого адреса или телефона, куда можно отправить ссылку. Подтвердите значение или задайте временный пароль.",
 	"user.error.busy":      "Очередь сообщений заполнена. Повторите через минуту.",
 	"user.error.temporary": "Проверки приложения не приняли созданный пароль. Попробуйте ещё раз.",
+
+	"user.ident.new":        "Новое значение типа %s",
+	"user.ident.save":       "Сохранить",
+	"user.ident.confirm":    "Отметить подтверждённым",
+	"user.ident.remove":     "Удалить",
+	"user.ident.add":        "Добавить значение",
+	"user.ident.add.submit": "Добавить",
+
+	"user.notice.identifier": "Значение сохранено.",
+	"user.notice.removed":    "Значение удалено.",
+	"user.notice.confirmed":  "Значение отмечено подтверждённым.",
+	"user.error.taken":       "Это значение уже есть у другого пользователя.",
+	"user.error.lastlogin":   "У пользователя должно остаться хотя бы одно значение для входа.",
+	"user.error.identifier":  "Значение «%s» не принято: %s.",
 
 	"audit.col.time":          "Время",
 	"audit.col.what":          "Что",

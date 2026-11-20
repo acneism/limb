@@ -405,6 +405,7 @@ func TestTheActionsOnTheCardNeedASessionTheTokenOfItAndTheOriginOfTheSite(t *tes
 	actions := map[string]url.Values{
 		"block": {"reason": {"why"}}, "unblock": {}, "sessions/end": {"session": {session.Principal.SessionID}}, "sessions/end-all": {},
 		"delete": {"confirm": {"ann@example.com"}}, "restore": {}, "password/link": {"language": {"en"}}, "password/temporary": {},
+		"identifiers/set": {"type": {"email"}, "value": {"other@example.com"}}, "identifiers/remove": {"type": {"username"}}, "identifiers/verify": {"type": {"email"}},
 	}
 	for action, fields := range actions {
 		path := "/users/" + id + "/" + action
@@ -440,7 +441,8 @@ func TestTheActionsOnTheCardNeedASessionTheTokenOfItAndTheOriginOfTheSite(t *tes
 	if f.status("ann") != StatusActive || !f.authenticated(session) {
 		t.Fatal("a request that was refused changed the user")
 	}
-	f.noRecords(audit.UserBlocked, audit.UserUnblocked, audit.UserSessionEnded, audit.UserSessionsEnded, audit.UserDeleted, audit.UserRestored, audit.UserPasswordResetSent, audit.UserPasswordTemporary)
+	f.noRecords(audit.UserBlocked, audit.UserUnblocked, audit.UserSessionEnded, audit.UserSessionsEnded, audit.UserDeleted, audit.UserRestored, audit.UserPasswordResetSent, audit.UserPasswordTemporary,
+		audit.UserIdentifierAdded, audit.UserIdentifierChanged, audit.UserIdentifierRemoved, audit.UserIdentifierVerified)
 	for action, fields := range actions {
 		values := url.Values{"csrf": {own}}
 		for key, list := range fields {
@@ -475,7 +477,10 @@ func TestAnAnswerToAnActionOnAUserIsTheOneThatTheFailureCallsFor(t *testing.T) {
 		{"a reason that is wrong", &ValidationError{Field: "reason", Reason: "too long"}, http.StatusUnprocessableEntity, "at most 512 bytes."},
 		{"a day in the past", &ValidationError{Field: "until", Reason: "must be in the future"}, http.StatusUnprocessableEntity, "has to be in the future."},
 		{"a day that is wrong", &ValidationError{Field: "until", Reason: "must be before the year 10000"}, http.StatusUnprocessableEntity, "is not valid."},
-		{"another value", &ValidationError{Field: "other", Reason: "is wrong"}, http.StatusUnprocessableEntity, "A value is not valid."},
+		{"another value", &ValidationError{Field: "other", Reason: "is wrong <b>"}, http.StatusUnprocessableEntity, "The value of other is not accepted: is wrong &lt;b&gt;."},
+		{"a value that a type refuses", &ValidationError{Field: "email", Reason: "must be an address"}, http.StatusUnprocessableEntity, "The value of email is not accepted: must be an address."},
+		{"the last value to sign in with", &ValidationError{Field: "identifiers", Reason: "at least one value to sign in with is required"}, http.StatusUnprocessableEntity, "keep at least one value to sign in with."},
+		{"a value that another user has", fmt.Errorf("%w: email", ErrIdentifierTaken), http.StatusConflict, "Another user has this value."},
 		{"a service that cannot send", ErrRecoveryDisabled, http.StatusConflict, "The service has no way to send messages."},
 		{"a user without a confirmed value", ErrNoConfirmedChannel, http.StatusConflict, "no confirmed address or phone number"},
 		{"a queue of messages that is full", ErrBusy, http.StatusServiceUnavailable, "The queue of messages is full."},

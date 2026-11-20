@@ -81,6 +81,7 @@
 <th scope="col">{{.T "user.ident.type"}}</th>
 <th scope="col">{{.T "user.ident.value"}}</th>
 <th scope="col">{{.T "user.ident.confirmed"}}</th>
+<th scope="col"><span class="sr-only">{{.T "sessions.action"}}</span></th>
 </tr>
 </thead>
 <tbody>
@@ -88,11 +89,43 @@
 <td>{{.Type}}</td>
 <td class="break">{{.Value}}</td>
 <td>{{if .Verified}}{{$.Time .VerifiedAt}}{{else}}<span class="muted">{{$.T "user.ident.no"}}</span>{{end}}</td>
+<td>{{if .Editable}}<div class="stack">
+<form method="post" action="{{$.Base}}/users/{{$.Data.ID}}/identifiers/set" class="actions">
+<input type="hidden" name="csrf" value="{{$.CSRF}}">
+<input type="hidden" name="type" value="{{.Type}}">
+<label for="value-{{.Type}}" class="sr-only">{{$.T "user.ident.new" .Type}}</label>
+<input id="value-{{.Type}}" name="value" type="text" class="input" value="{{.Value}}" required maxlength="1024">
+<button type="submit" class="btn btn-secondary btn-small">{{$.T "user.ident.save"}}</button>
+</form>
+{{if .CanConfirm}}<form method="post" action="{{$.Base}}/users/{{$.Data.ID}}/identifiers/verify">
+<input type="hidden" name="csrf" value="{{$.CSRF}}">
+<input type="hidden" name="type" value="{{.Type}}">
+<button type="submit" class="btn btn-secondary btn-small">{{$.T "user.ident.confirm"}}</button>
+</form>
+{{end}}{{if .CanRemove}}<form method="post" action="{{$.Base}}/users/{{$.Data.ID}}/identifiers/remove">
+<input type="hidden" name="csrf" value="{{$.CSRF}}">
+<input type="hidden" name="type" value="{{.Type}}">
+<button type="submit" class="btn btn-danger btn-small">{{$.T "user.ident.remove"}}</button>
+</form>
+{{end}}</div>{{end}}</td>
 </tr>
 {{end}}</tbody>
 </table>
 </div>{{else}}<p class="muted">{{.T "user.identifiers.none"}}</p>{{end}}
+{{if .Data.MissingTypes}}<form method="post" action="{{.Base}}/users/{{.Data.ID}}/identifiers/set" class="stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<h3 class="label">{{.T "user.ident.add"}}</h3>
+<div>
+<label for="add-type" class="label">{{.T "user.ident.type"}}</label>
+<select id="add-type" name="type" class="select">{{range .Data.MissingTypes}}<option value="{{.Value}}">{{.Label}}</option>{{end}}</select>
 </div>
+<div>
+<label for="add-value" class="label">{{.T "user.ident.value"}}</label>
+<input id="add-value" name="value" type="text" class="input" required maxlength="1024">
+</div>
+<div class="actions"><button type="submit" class="btn btn-primary">{{.T "user.ident.add.submit"}}</button></div>
+</form>
+{{end}}</div>
 <div class="card stack">
 <h2 class="h2">{{.T "user.sessions"}}</h2>
 {{if .Data.Sessions}}<div class="scroll">

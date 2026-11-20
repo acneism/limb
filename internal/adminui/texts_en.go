@@ -251,7 +251,6 @@ var english = map[string]string{ //nolint:gosec
 	"user.error.refused":         "The application does not allow this user to be deleted.",
 	"user.error.retention":       "The time to restore the user has run out.",
 	"user.error.notdeleted":      "The user is not deleted.",
-	"user.error.invalid":         "A value is not valid.",
 
 	"user.password.none":     "none yet, the user was invited and has not chosen one",
 	"user.password.set":      "set",
@@ -272,6 +271,20 @@ var english = map[string]string{ //nolint:gosec
 	"user.error.nochannel": "The user has no confirmed address or phone number to send the link to. Confirm a value, or set a temporary password.",
 	"user.error.busy":      "The queue of messages is full. Try again in a moment.",
 	"user.error.temporary": "The checks of the application refused the password that was made. Try again.",
+
+	"user.ident.new":        "New value of the type %s",
+	"user.ident.save":       "Save",
+	"user.ident.confirm":    "Mark as confirmed",
+	"user.ident.remove":     "Remove",
+	"user.ident.add":        "Add a value",
+	"user.ident.add.submit": "Add",
+
+	"user.notice.identifier": "The value is saved.",
+	"user.notice.removed":    "The value is removed.",
+	"user.notice.confirmed":  "The value is marked as confirmed.",
+	"user.error.taken":       "Another user has this value.",
+	"user.error.lastlogin":   "A user has to keep at least one value to sign in with.",
+	"user.error.identifier":  "The value of %s is not accepted: %s.",
 
 	"audit.col.time":          "Time",
 	"audit.col.what":          "What",

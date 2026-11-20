@@ -208,7 +208,8 @@ This file is made from the texts of the library by a test. After a text changes,
 | `user.error.changed` | The user kept changing meanwhile. Check the card and try again. | Пользователь менялся в это же время. Проверьте карточку и повторите. |
 | `user.error.confirm` | What you typed is not a value that the user signs in with. | Введено не то значение, которым пользователь входит. |
 | `user.error.deleted` | The user is deleted. | Пользователь удалён. |
-| `user.error.invalid` | A value is not valid. | Значение не подходит. |
+| `user.error.identifier` | The value of %s is not accepted: %s. | Значение «%s» не принято: %s. |
+| `user.error.lastlogin` | A user has to keep at least one value to sign in with. | У пользователя должно остаться хотя бы одно значение для входа. |
 | `user.error.nochannel` | The user has no confirmed address or phone number to send the link to. Confirm a value, or set a temporary password. | У пользователя нет подтверждённого адреса или телефона, куда можно отправить ссылку. Подтвердите значение или задайте временный пароль. |
 | `user.error.nosender` | The service has no way to send messages. | У сервиса нет способа отправлять сообщения. |
 | `user.error.notdeleted` | The user is not deleted. | Пользователь не удалён. |
@@ -216,12 +217,19 @@ This file is made from the texts of the library by a test. After a text changes,
 | `user.error.reason.required` | Give the reason of the block. | Укажите причину блокировки. |
 | `user.error.refused` | The application does not allow this user to be deleted. | Приложение не позволяет удалить этого пользователя. |
 | `user.error.retention` | The time to restore the user has run out. | Время для восстановления пользователя истекло. |
+| `user.error.taken` | Another user has this value. | Это значение уже есть у другого пользователя. |
 | `user.error.temporary` | The checks of the application refused the password that was made. Try again. | Проверки приложения не приняли созданный пароль. Попробуйте ещё раз. |
 | `user.error.until.invalid` | The day of the end of the block is not valid. | День окончания блокировки не подходит. |
 | `user.error.until.past` | The day of the end of the block has to be in the future. | День окончания блокировки должен быть в будущем. |
 | `user.id` | ID | ID |
+| `user.ident.add` | Add a value | Добавить значение |
+| `user.ident.add.submit` | Add | Добавить |
+| `user.ident.confirm` | Mark as confirmed | Отметить подтверждённым |
 | `user.ident.confirmed` | Confirmed | Подтверждено |
+| `user.ident.new` | New value of the type %s | Новое значение типа %s |
 | `user.ident.no` | not confirmed | не подтверждено |
+| `user.ident.remove` | Remove | Удалить |
+| `user.ident.save` | Save | Сохранить |
 | `user.ident.type` | Type | Тип |
 | `user.ident.value` | Value | Значение |
 | `user.identifiers` | What the user signs in with | Чем пользователь входит |
@@ -233,8 +241,11 @@ This file is made from the texts of the library by a test. After a text changes,
 | `user.last` | Last sign-in | Последний вход |
 | `user.must.change` | has to be changed at the next sign-in | нужно сменить при следующем входе |
 | `user.notice.blocked` | The user is blocked and their sessions ended. | Пользователь заблокирован, его сессии завершены. |
+| `user.notice.confirmed` | The value is marked as confirmed. | Значение отмечено подтверждённым. |
 | `user.notice.deleted` | The user is deleted. | Пользователь удалён. |
+| `user.notice.identifier` | The value is saved. | Значение сохранено. |
 | `user.notice.link` | The link to choose a new password is being sent to the user. | Ссылка для выбора нового пароля отправляется пользователю. |
+| `user.notice.removed` | The value is removed. | Значение удалено. |
 | `user.notice.restored` | The user is restored. | Пользователь восстановлен. |
 | `user.notice.session` | The session ended. | Сессия завершена. |
 | `user.notice.sessions` | The sessions ended. | Сессии завершены. |
