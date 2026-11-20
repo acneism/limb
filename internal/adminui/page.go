@@ -79,6 +79,24 @@ func (p *Page) Time(at time.Time) template.HTML {
 	return template.HTML(fmt.Sprintf(`<time datetime="%s">%s</time>`, at.Format(time.RFC3339), shown)) //nolint:gosec
 }
 
+// AuditTable is what the table of the records of the audit log needs.
+type AuditTable struct {
+	// Page is the page that the table is part of, for its texts and its times.
+	Page *Page
+	// Caption is the key of the text that names the table, and Empty the key of
+	// the text that stands for a table that has no records.
+	Caption, Empty string
+	// WithUser adds the column of the user that a record was done to.
+	WithUser bool
+	// Rows are the records.
+	Rows []AuditRow
+}
+
+// AuditTable returns the table of records that the template "auditrows" draws.
+func (p *Page) AuditTable(caption, empty string, withUser bool, rows []AuditRow) AuditTable {
+	return AuditTable{Page: p, Caption: caption, Empty: empty, WithUser: withUser, Rows: rows}
+}
+
 // Templates are the templates of the pages, parsed.
 type Templates struct {
 	pages map[string]*template.Template

@@ -61,6 +61,19 @@ func samplePage(t *testing.T, c *Catalog, language string) map[string]*Page {
 			ByCreated: SortLink{Href: "/admin/users?order=created&dir=asc", State: "descending"}, ByLastLogin: SortLink{Href: "/admin/users?order=last_login", State: "none"},
 			ByStatus: SortLink{Href: "/admin/users?order=status", State: "none"}, Next: "/admin/users?cursor=x", First: "/admin/users", Filtered: true,
 		},
+		"user": UserData{
+			ID: "0198f2a4-7c11-7d44-9b0e-3c6c2f1d9a55", Title: "alice@example.com", Status: "blocked", StatusLabel: "Blocked", BlockedReason: `spam "<b>"`,
+			BlockedUntil: signedAt, DeletedAt: signedAt, PurgeAfter: signedAt, CreatedAt: signedAt, LastLoginAt: signedAt, Via: "Invitation", MustChangePassword: true,
+			Identifiers: []IdentifierRow{
+				{Type: "email", Value: "Alice@Example.com", Verified: true, VerifiedAt: signedAt},
+				{Type: "username", Value: "<alice>"},
+			},
+			Sessions: []UserSessionRow{{ID: "s1", Kind: "cookie", IP: "203.0.113.7", UserAgent: "<agent>", CreatedAt: signedAt, LastSeenAt: signedAt, ExpiresAt: signedAt}},
+			SignIns:  []AuditRow{{At: signedAt, Actor: "the user", Action: "auth.login", Label: "Signed in", IP: "203.0.113.7", Details: []DetailPair{{Key: "kind", Value: "cookie"}}}},
+			Journal: []AuditRow{
+				{At: signedAt, Actor: "root", Action: "user.blocked", Label: "User blocked", UserID: "one", UserHref: "/admin/users/one", IP: "203.0.113.8", Details: []DetailPair{{Key: "reason", Value: "<spam>"}}},
+			},
+		},
 		"rebind": RebindData{Login: "root", QR: qr, Secret: key, URI: template.URL(uri), Token: "token-of-the-binding"}, //nolint:gosec
 		"error":  ErrorData{Title: "Page not found", Text: "There is nothing at this address."},
 	}
@@ -89,7 +102,7 @@ func TestEveryPageIsRenderedInEveryLanguageAsWellFormedHTMLThatHasNoScriptAndNoS
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := len(templates.Pages()); got != 9 {
+	if got := len(templates.Pages()); got != 10 {
 		t.Fatalf("there are %d pages: %v", got, templates.Pages())
 	}
 	key := regexp.MustCompile(`\b(?:[a-z]+\.){1,3}[a-z]+\b`)
@@ -371,7 +384,7 @@ func TestTheStylesheetHasEveryClassThatATemplateUses(t *testing.T) {
 		}
 		for _, match := range attribute.FindAllStringSubmatch(string(text), -1) {
 			values := []string{match[1]}
-			for placeholder, expansions := range map[string][]string{"{{.FlashKind}}": {"error", "notice"}, "{{.Status}}": {"active", "blocked", "deleted"}} {
+			for placeholder, expansions := range map[string][]string{"{{.FlashKind}}": {"error", "notice"}, "{{.Status}}": {"active", "blocked", "deleted"}, "{{.Data.Status}}": {"active", "blocked", "deleted"}} {
 				var expanded []string
 				for _, value := range values {
 					if !strings.Contains(value, placeholder) {

@@ -1,7 +1,6 @@
 package limb
 
 import (
-	"cmp"
 	"errors"
 	"net/http"
 	"net/url"
@@ -247,22 +246,19 @@ func viaText(p *adminui.Page, via string) string {
 func identifierViews(user ManagedUser) []adminui.IdentifierView {
 	views := make([]adminui.IdentifierView, 0, len(user.Identifiers))
 	for _, i := range user.Identifiers {
-		views = append(views, adminui.IdentifierView{Type: i.Type, Value: cmp.Or(i.DisplayValue, i.Value), Verified: !i.VerifiedAt.IsZero()})
+		views = append(views, adminui.IdentifierView{Type: i.Type, Value: shownValue(i), Verified: !i.VerifiedAt.IsZero()})
 	}
 	return views
 }
 
 func (c *adminCall) userRow(p *adminui.Page, u ManagedUser) adminui.UserRow {
 	row := adminui.UserRow{
-		Href: c.s.base + "/users/" + string(u.ID), Title: string(u.ID), Identifiers: identifierViews(u), Status: string(u.Status),
+		Href: c.s.base + "/users/" + string(u.ID), Title: titleOf(u), Identifiers: identifierViews(u), Status: string(u.Status),
 		StatusLabel: p.T("status." + string(u.Status)), CreatedAt: u.CreatedAt, LastLoginAt: u.LastLoginAt, Via: viaText(p, u.CreatedVia),
 		MustChangePassword: u.MustChangePassword,
 	}
 	if u.Status == store.StatusBlocked {
 		row.BlockedUntil = u.BlockedUntil
-	}
-	if len(row.Identifiers) > 0 {
-		row.Title = row.Identifiers[0].Value
 	}
 	return row
 }

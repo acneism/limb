@@ -1,0 +1,91 @@
+{{define "title"}}{{.Data.Title}}{{end}}
+{{define "content"}}
+<section class="stack">
+<p class="aside"><a href="{{.Base}}/users">{{.T "user.back"}}</a></p>
+<h1 class="h1 break">{{.Data.Title}}</h1>
+{{template "flash" .}}
+<div class="card stack">
+<h2 class="h2">{{.T "user.account"}}</h2>
+<dl class="facts">
+<dt>{{.T "user.id"}}</dt>
+<dd><code class="break">{{.Data.ID}}</code></dd>
+<dt>{{.T "user.status"}}</dt>
+<dd><span class="badge badge-{{.Data.Status}}">{{.Data.StatusLabel}}</span></dd>
+{{if eq .Data.Status "blocked"}}<dt>{{.T "user.blocked.reason"}}</dt>
+<dd class="break">{{if .Data.BlockedReason}}{{.Data.BlockedReason}}{{else}}<span class="muted">{{.T "user.blocked.noreason"}}</span>{{end}}</dd>
+<dt>{{.T "user.blocked.until"}}</dt>
+<dd>{{if .Data.BlockedUntil.IsZero}}{{.T "user.blocked.forever"}}{{else}}{{.Time .Data.BlockedUntil}}{{end}}</dd>
+{{end}}{{if not .Data.DeletedAt.IsZero}}<dt>{{.T "user.deleted.at"}}</dt>
+<dd>{{.Time .Data.DeletedAt}}</dd>
+{{end}}{{if not .Data.PurgeAfter.IsZero}}<dt>{{.T "user.deleted.until"}}</dt>
+<dd>{{.Time .Data.PurgeAfter}}</dd>
+{{end}}<dt>{{.T "user.created"}}</dt>
+<dd>{{.Time .Data.CreatedAt}}</dd>
+<dt>{{.T "users.via"}}</dt>
+<dd>{{.Data.Via}}</dd>
+<dt>{{.T "user.last"}}</dt>
+<dd>{{if .Data.LastLoginAt.IsZero}}<span class="muted">{{.T "users.never.signed"}}</span>{{else}}{{.Time .Data.LastLoginAt}}{{end}}</dd>
+{{if .Data.MustChangePassword}}<dt>{{.T "user.password"}}</dt>
+<dd>{{.T "user.must.change"}}</dd>
+{{end}}</dl>
+</div>
+<div class="card stack">
+<h2 class="h2">{{.T "user.identifiers"}}</h2>
+{{if .Data.Identifiers}}<div class="scroll">
+<table class="table">
+<caption class="sr-only">{{.T "user.identifiers.caption"}}</caption>
+<thead>
+<tr>
+<th scope="col">{{.T "user.ident.type"}}</th>
+<th scope="col">{{.T "user.ident.value"}}</th>
+<th scope="col">{{.T "user.ident.confirmed"}}</th>
+</tr>
+</thead>
+<tbody>
+{{range .Data.Identifiers}}<tr>
+<td>{{.Type}}</td>
+<td class="break">{{.Value}}</td>
+<td>{{if .Verified}}{{$.Time .VerifiedAt}}{{else}}<span class="muted">{{$.T "user.ident.no"}}</span>{{end}}</td>
+</tr>
+{{end}}</tbody>
+</table>
+</div>{{else}}<p class="muted">{{.T "user.identifiers.none"}}</p>{{end}}
+</div>
+<div class="card stack">
+<h2 class="h2">{{.T "user.sessions"}}</h2>
+{{if .Data.Sessions}}<div class="scroll">
+<table class="table">
+<caption class="sr-only">{{.T "user.sessions.caption"}}</caption>
+<thead>
+<tr>
+<th scope="col">{{.T "sessions.started"}}</th>
+<th scope="col">{{.T "sessions.seen"}}</th>
+<th scope="col">{{.T "user.sessions.ends"}}</th>
+<th scope="col">{{.T "user.sessions.kind"}}</th>
+<th scope="col">{{.T "sessions.address"}}</th>
+<th scope="col">{{.T "sessions.browser"}}</th>
+</tr>
+</thead>
+<tbody>
+{{range .Data.Sessions}}<tr>
+<td>{{$.Time .CreatedAt}}</td>
+<td>{{$.Time .LastSeenAt}}</td>
+<td>{{$.Time .ExpiresAt}}</td>
+<td>{{.Kind}}</td>
+<td>{{.IP}}</td>
+<td class="break">{{.UserAgent}}</td>
+</tr>
+{{end}}</tbody>
+</table>
+</div>{{else}}<p class="muted">{{.T "user.sessions.none"}}</p>{{end}}
+</div>
+<div class="card stack">
+<h2 class="h2">{{.T "user.signins"}}</h2>
+{{template "auditrows" (.AuditTable "user.signins.caption" "user.signins.none" false .Data.SignIns)}}
+</div>
+<div class="card stack">
+<h2 class="h2">{{.T "user.journal"}}</h2>
+{{template "auditrows" (.AuditTable "user.journal.caption" "user.journal.none" false .Data.Journal)}}
+</div>
+</section>
+{{end}}

@@ -11,6 +11,60 @@ This file is made from the texts of the library by a test. After a text changes,
 | `account.notice.sessions` | Every other session was ended. | Все остальные сеансы завершены. |
 | `account.since` | The account was made on %s. | Учётная запись создана: %s. |
 | `account.title` | Your account | Ваша учётная запись |
+| `audit.action.admin.created` | Administrator created | Создан администратор |
+| `audit.action.admin.deleted` | Administrator deleted | Удалён администратор |
+| `audit.action.admin.disabled` | Administrator disabled | Администратор отключён |
+| `audit.action.admin.enabled` | Administrator enabled | Администратор включён |
+| `audit.action.admin.login` | Administrator signed in | Вход администратора |
+| `audit.action.admin.login_failed` | Failed sign-in of an administrator | Неудачный вход администратора |
+| `audit.action.admin.logout` | Administrator signed out | Выход администратора |
+| `audit.action.admin.password_changed` | Administrator changed their password | Администратор сменил пароль |
+| `audit.action.admin.password_reset` | Password of an administrator reset | Сброшен пароль администратора |
+| `audit.action.admin.recovery_code_used` | Recovery code used | Использован резервный код |
+| `audit.action.admin.recovery_codes_renewed` | Recovery codes renewed | Резервные коды выпущены заново |
+| `audit.action.admin.session_ended` | Session of an administrator ended | Завершена сессия администратора |
+| `audit.action.admin.sessions_ended` | Sessions of an administrator ended | Завершены сессии администратора |
+| `audit.action.admin.totp_enrolled` | Authenticator bound | Привязан аутентификатор |
+| `audit.action.admin.totp_rebound` | Authenticator replaced | Заменён аутентификатор |
+| `audit.action.admin.totp_reset` | Authenticator of an administrator reset | Сброшен аутентификатор администратора |
+| `audit.action.auth.channel_verified` | Address or phone number confirmed | Адрес или телефон подтверждён |
+| `audit.action.auth.login` | Signed in | Вход |
+| `audit.action.auth.login_failed` | Failed sign-in | Неудачный вход |
+| `audit.action.auth.logout` | Signed out | Выход |
+| `audit.action.auth.password_changed` | Password changed | Пароль изменён |
+| `audit.action.auth.password_reset` | Password reset | Пароль сброшен |
+| `audit.action.auth.refresh_token_reused` | Refresh token used again | Повторное использование refresh-токена |
+| `audit.action.auth.session_ended` | Session ended | Сессия завершена |
+| `audit.action.auth.user_created` | Account created | Учётная запись создана |
+| `audit.action.setting.changed` | Setting changed | Изменена настройка |
+| `audit.action.user.blocked` | User blocked | Пользователь заблокирован |
+| `audit.action.user.created` | User created by an administrator | Пользователь создан администратором |
+| `audit.action.user.deleted` | User deleted | Пользователь удалён |
+| `audit.action.user.identifier_added` | Value to sign in with added | Добавлено значение для входа |
+| `audit.action.user.identifier_changed` | Value to sign in with changed | Изменено значение для входа |
+| `audit.action.user.identifier_removed` | Value to sign in with removed | Удалено значение для входа |
+| `audit.action.user.identifier_verified` | Value marked as confirmed | Значение отмечено подтверждённым |
+| `audit.action.user.invitation_resent` | Invitation sent again | Приглашение отправлено снова |
+| `audit.action.user.invited` | User invited | Пользователь приглашён |
+| `audit.action.user.password_reset_sent` | Link to reset the password sent | Отправлена ссылка для сброса пароля |
+| `audit.action.user.password_temporary` | Temporary password set | Задан временный пароль |
+| `audit.action.user.purged` | User removed for good | Пользователь удалён окончательно |
+| `audit.action.user.restored` | User restored | Пользователь восстановлен |
+| `audit.action.user.session_ended` | Session of the user ended | Завершена сессия пользователя |
+| `audit.action.user.sessions_ended` | Sessions of the user ended | Завершены сессии пользователя |
+| `audit.action.user.unblocked` | User unblocked | Пользователь разблокирован |
+| `audit.actor.admin.gone` | deleted administrator %s | удалённый администратор %s |
+| `audit.actor.api` | code of the application | код приложения |
+| `audit.actor.cli` | command line | командная строка |
+| `audit.actor.maintenance` | maintenance | обслуживание |
+| `audit.actor.unknown` | unknown | неизвестно |
+| `audit.actor.user` | the user | сам пользователь |
+| `audit.col.address` | Address | Адрес |
+| `audit.col.details` | Details | Подробности |
+| `audit.col.time` | Time | Время |
+| `audit.col.user` | User | Пользователь |
+| `audit.col.what` | What | Что |
+| `audit.col.who` | Who | Кто |
 | `back.to.login` | Back to the sign-in | Назад ко входу |
 | `brand` | %s administration | Администрирование: %s |
 | `code.failed` | The code is wrong, or it was used already. Wait for the next one and try again. | Код неверный или уже использован. Дождитесь следующего и попробуйте ещё раз. |
@@ -104,6 +158,8 @@ This file is made from the texts of the library by a test. After a text changes,
 | `recovery.intro` | Keep these codes in a safe place, apart from your phone. If you lose the authenticator, each of them lets you sign in once. They are shown only now. | Сохраните эти коды в надёжном месте, отдельно от телефона. Если вы потеряете аутентификатор, каждый из них позволит войти один раз. Они показываются только сейчас. |
 | `recovery.list` | Recovery codes | Резервные коды |
 | `recovery.title` | Your recovery codes | Ваши резервные коды |
+| `session.kind.cookie` | cookie | cookie |
+| `session.kind.token` | tokens | токены |
 | `sessions.action` | Action | Действие |
 | `sessions.address` | Address | Адрес |
 | `sessions.browser` | Browser | Браузер |
@@ -121,6 +177,38 @@ This file is made from the texts of the library by a test. After a text changes,
 | `status.blocked` | Blocked | Заблокирован |
 | `status.deleted` | Deleted | Удалён |
 | `time.utc` | %s UTC | %s UTC |
+| `user.account` | Account | Учётная запись |
+| `user.back` | ← All users | ← Все пользователи |
+| `user.blocked.forever` | never, until an administrator lifts it | никогда, пока её не снимет администратор |
+| `user.blocked.noreason` | none given | не указана |
+| `user.blocked.reason` | Reason of the block | Причина блокировки |
+| `user.blocked.until` | The block ends | Блокировка закончится |
+| `user.created` | Created | Создан |
+| `user.deleted.at` | Deleted | Удалён |
+| `user.deleted.until` | Removed for good after | Будет удалён окончательно после |
+| `user.id` | ID | ID |
+| `user.ident.confirmed` | Confirmed | Подтверждено |
+| `user.ident.no` | not confirmed | не подтверждено |
+| `user.ident.type` | Type | Тип |
+| `user.ident.value` | Value | Значение |
+| `user.identifiers` | What the user signs in with | Чем пользователь входит |
+| `user.identifiers.caption` | The values that the user signs in with | Значения, которыми пользователь входит |
+| `user.identifiers.none` | The user has no value to sign in with. | У пользователя нет значений для входа. |
+| `user.journal` | Changes | Изменения |
+| `user.journal.caption` | What was changed about the user, and by whom | Что менялось у пользователя и кто это делал |
+| `user.journal.none` | Nothing was changed yet. | Изменений пока не было. |
+| `user.last` | Last sign-in | Последний вход |
+| `user.must.change` | has to be changed at the next sign-in | нужно сменить при следующем входе |
+| `user.password` | Password | Пароль |
+| `user.sessions` | Sessions in use | Сессии в работе |
+| `user.sessions.caption` | The sessions of the user that are in use | Сессии пользователя, которые в работе |
+| `user.sessions.ends` | Ends | Закончится |
+| `user.sessions.kind` | Kept by | Чем держится |
+| `user.sessions.none` | The user has no session in use. | У пользователя нет сессий в работе. |
+| `user.signins` | Sign-ins | Входы |
+| `user.signins.caption` | The last sign-ins, failed attempts and sign-outs of the user | Последние входы, неудачные попытки и выходы пользователя |
+| `user.signins.none` | Nobody signed in as this user yet. | Входов этого пользователя пока не было. |
+| `user.status` | Status | Статус |
 | `users.apply` | Apply | Применить |
 | `users.caption` | The users of the service | Пользователи сервиса |
 | `users.change` | has to change the password | должен сменить пароль |

@@ -1,4 +1,29 @@
 {{define "flash"}}{{if .Flash}}<div role="alert" class="alert alert-{{.FlashKind}}">{{.Flash}}</div>{{end}}{{end}}
+{{define "auditrows"}}{{if .Rows}}<div class="scroll">
+<table class="table">
+<caption class="sr-only">{{.Page.T .Caption}}</caption>
+<thead>
+<tr>
+<th scope="col">{{.Page.T "audit.col.time"}}</th>
+<th scope="col">{{.Page.T "audit.col.what"}}</th>
+<th scope="col">{{.Page.T "audit.col.who"}}</th>
+{{if .WithUser}}<th scope="col">{{.Page.T "audit.col.user"}}</th>
+{{end}}<th scope="col">{{.Page.T "audit.col.address"}}</th>
+<th scope="col">{{.Page.T "audit.col.details"}}</th>
+</tr>
+</thead>
+<tbody>
+{{range .Rows}}<tr>
+<td>{{$.Page.Time .At}}</td>
+<td>{{.Label}}</td>
+<td class="break">{{.Actor}}</td>
+{{if $.WithUser}}<td class="break">{{if .UserHref}}<a href="{{.UserHref}}">{{.UserID}}</a>{{end}}</td>
+{{end}}<td>{{.IP}}</td>
+<td class="break">{{range .Details}}<span class="ident"><span class="muted">{{.Key}}</span> {{.Value}}</span>{{end}}</td>
+</tr>
+{{end}}</tbody>
+</table>
+</div>{{else}}<p class="muted">{{.Page.T .Empty}}</p>{{end}}{{end}}
 {{define "layout"}}<!doctype html>
 <html lang="{{.Lang}}">
 <head>

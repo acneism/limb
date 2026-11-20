@@ -14,6 +14,7 @@ import (
 
 	"github.com/acneism/limb/internal/admin"
 	"github.com/acneism/limb/internal/adminui"
+	"github.com/acneism/limb/store"
 )
 
 const (
@@ -108,6 +109,7 @@ func (a *Auth) AdminHandler() http.Handler {
 		{http.MethodPost, "/login/totp", (*adminCall).submitEnroll},
 		{http.MethodPost, "/logout", (*adminCall).logout},
 		{http.MethodGet, "/users", (*adminCall).showUsers},
+		{http.MethodGet, "/users/{id}", (*adminCall).showUser},
 		{http.MethodGet, "/account", (*adminCall).showAccount},
 		{http.MethodPost, "/account/password", (*adminCall).changePassword},
 		{http.MethodPost, "/account/recovery", (*adminCall).renewRecoveryCodes},
@@ -127,6 +129,7 @@ type adminCall struct {
 	lang   string
 	ip     netip.Addr
 	client admin.Client
+	userID string
 }
 
 func (c *adminCall) auth() *Auth {
@@ -160,10 +163,12 @@ func (c *adminCall) serve() {
 	}
 	var allowed []string
 	for _, route := range c.s.routes {
-		if route.path != path {
+		id, matched := matchRoute(route.path, path)
+		if !matched {
 			continue
 		}
 		if route.method == c.r.Method || (c.r.Method == http.MethodHead && route.method == http.MethodGet) {
+			c.userID = id
 			route.run(c)
 			return
 		}
@@ -175,6 +180,34 @@ func (c *adminCall) serve() {
 	}
 	c.w.Header().Set("Allow", allowHeader(allowed))
 	c.fail(http.StatusMethodNotAllowed)
+}
+
+func matchRoute(pattern, path string) (string, bool) {
+	before, after, hasID := strings.Cut(pattern, "{id}")
+	if !hasID {
+		return "", pattern == path
+	}
+	if len(path) <= len(before)+len(after) || !strings.HasPrefix(path, before) || !strings.HasSuffix(path, after) {
+		return "", false
+	}
+	id := path[len(before) : len(path)-len(after)]
+	if !validPathID(id) {
+		return "", false
+	}
+	return id, true
+}
+
+func validPathID(id string) bool {
+	if id == "" || len(id) > store.MaxIDLength {
+		return false
+	}
+	for i := range len(id) {
+		c := id[i]
+		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '-' && c != '_' {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *adminCall) recoverPanic() {

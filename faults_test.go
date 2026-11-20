@@ -64,6 +64,10 @@ func (s faultStore) Settings() store.Settings {
 	return faultSettings{Settings: s.Store.Settings(), faults: s.faults}
 }
 
+func (s faultStore) Admins() store.Admins {
+	return faultAdmins{Admins: s.Store.Admins(), faults: s.faults}
+}
+
 func (s faultStore) InTx(ctx context.Context, fn func(ctx context.Context, tx store.Repositories) error) error {
 	return s.Store.InTx(ctx, func(ctx context.Context, tx store.Repositories) error {
 		return fn(ctx, faultRepositories{Repositories: tx, faults: s.faults})
@@ -227,11 +231,30 @@ func (s faultSessions) Revoke(ctx context.Context, tenantID, userID, id string, 
 	return s.Sessions.Revoke(ctx, tenantID, userID, id, at)
 }
 
+func (s faultSessions) ListByUser(ctx context.Context, tenantID, userID string, now time.Time) ([]store.Session, error) {
+	if err := s.faults.check("sessions.list"); err != nil {
+		return nil, err
+	}
+	return s.Sessions.ListByUser(ctx, tenantID, userID, now)
+}
+
 func (s faultSessions) RevokeAllForUser(ctx context.Context, tenantID, userID, exceptID string, at time.Time) (int, error) {
 	if err := s.faults.check("sessions.revoke"); err != nil {
 		return 0, err
 	}
 	return s.Sessions.RevokeAllForUser(ctx, tenantID, userID, exceptID, at)
+}
+
+type faultAdmins struct {
+	store.Admins
+	faults *faultSet
+}
+
+func (a faultAdmins) Get(ctx context.Context, tenantID, id string) (store.Admin, error) {
+	if err := a.faults.check("admins.get:" + id); err != nil {
+		return store.Admin{}, err
+	}
+	return a.Admins.Get(ctx, tenantID, id)
 }
 
 type failingHasher struct {

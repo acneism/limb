@@ -181,6 +181,85 @@ type UsersData struct {
 	Filtered bool
 }
 
+// IdentifierRow is a value that a user signs in with, as the card of the user
+// shows it.
+type IdentifierRow struct {
+	// Type is the name of the type of the value and Value the value as the user
+	// wrote it.
+	Type, Value string
+	// Verified tells that the owner proved to own it, and VerifiedAt is when.
+	Verified   bool
+	VerifiedAt time.Time
+}
+
+// UserSessionRow is a session of a user as the card of the user shows it.
+type UserSessionRow struct {
+	// ID identifies the session.
+	ID string
+	// Kind says in the language of the page whether a cookie or tokens carry the
+	// session.
+	Kind string
+	// IP and UserAgent are where the user signed in from.
+	IP, UserAgent string
+	// CreatedAt is when the user signed in, LastSeenAt when the session was used
+	// last and ExpiresAt when it ends whatever it does.
+	CreatedAt, LastSeenAt, ExpiresAt time.Time
+}
+
+// DetailPair is one thing that a record of the audit log says, a name and what
+// it is.
+type DetailPair struct {
+	Key, Value string
+}
+
+// AuditRow is a record of the audit log as a page shows it.
+type AuditRow struct {
+	// At is when it happened.
+	At time.Time
+	// Actor says who did it, in the language of the page.
+	Actor string
+	// Action is the name of the action and Label says it in the language of the
+	// page.
+	Action, Label string
+	// UserID is the user it was done to, empty if it was done to none, and
+	// UserHref is the address of their card.
+	UserID, UserHref string
+	// IP is where the actor came from.
+	IP string
+	// Details are what the record says changed.
+	Details []DetailPair
+}
+
+// UserData is what the card of a user needs.
+type UserData struct {
+	// ID identifies the user and Title is what the page calls them.
+	ID, Title string
+	// Status is "active", "blocked" or "deleted", and StatusLabel says it in the
+	// language of the page.
+	Status, StatusLabel string
+	// BlockedReason is why the account was blocked, and BlockedUntil when the block
+	// ends, the zero time if it has no end.
+	BlockedReason string
+	BlockedUntil  time.Time
+	// DeletedAt is when the account was deleted and PurgeAfter when it is removed
+	// for good, the zero time for an account that is not deleted.
+	DeletedAt, PurgeAfter time.Time
+	// CreatedAt is when the account was made and LastLoginAt when the user signed
+	// in last, the zero time if never.
+	CreatedAt, LastLoginAt time.Time
+	// Via says how the account came to be, in the language of the page.
+	Via string
+	// MustChangePassword tells that the user has to choose another password.
+	MustChangePassword bool
+	// Identifiers are the values that the user signs in with.
+	Identifiers []IdentifierRow
+	// Sessions are the sessions that are in use.
+	Sessions []UserSessionRow
+	// SignIns are the last records of signing in and out, and Journal the last
+	// records of what was changed.
+	SignIns, Journal []AuditRow
+}
+
 // ErrorData is what the page of an error needs.
 type ErrorData struct {
 	// Title and Text say what happened, in the language of the page.
