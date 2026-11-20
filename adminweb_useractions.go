@@ -62,6 +62,7 @@ func validationAnswer(v *ValidationError) (int, func(p *adminui.Page) string) {
 
 func (c *adminCall) userFailure(ses admin.Session, form url.Values, err error) {
 	var invalid *ValidationError
+	var policy *PolicyError
 	var flash func(p *adminui.Page) string
 	status := http.StatusConflict
 	switch {
@@ -78,6 +79,15 @@ func (c *adminCall) userFailure(ses admin.Session, form url.Values, err error) {
 		flash = textOf("user.error.refused")
 	case errors.Is(err, ErrRetentionOver):
 		flash = textOf("user.error.retention")
+	case errors.Is(err, ErrRecoveryDisabled):
+		flash = textOf("user.error.nosender")
+	case errors.Is(err, ErrNoConfirmedChannel):
+		flash = textOf("user.error.nochannel")
+	case errors.Is(err, ErrBusy):
+		status, flash = http.StatusServiceUnavailable, textOf("user.error.busy")
+		c.w.Header().Set("Retry-After", busyRetryAfter)
+	case errors.As(err, &policy):
+		status, flash = http.StatusUnprocessableEntity, textOf("user.error.temporary")
 	default:
 		c.internal(err)
 		return

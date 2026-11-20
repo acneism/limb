@@ -25,9 +25,9 @@
 <dd>{{.Data.Via}}</dd>
 <dt>{{.T "user.last"}}</dt>
 <dd>{{if .Data.LastLoginAt.IsZero}}<span class="muted">{{.T "users.never.signed"}}</span>{{else}}{{.Time .Data.LastLoginAt}}{{end}}</dd>
-{{if .Data.MustChangePassword}}<dt>{{.T "user.password"}}</dt>
-<dd>{{.T "user.must.change"}}</dd>
-{{end}}</dl>
+<dt>{{.T "user.password"}}</dt>
+<dd>{{if not .Data.HasPassword}}{{.T "user.password.none"}}{{else if .Data.MustChangePassword}}{{.T "user.must.change"}}{{else}}{{.T "user.password.set"}}{{end}}</dd>
+</dl>
 </div>
 {{if ne .Data.Status "deleted"}}<div class="card stack">
 <h2 class="h2">{{if eq .Data.Status "blocked"}}{{.T "user.block.change"}}{{else}}{{.T "user.block.title"}}{{end}}</h2>
@@ -50,6 +50,27 @@
 <div class="actions"><button type="submit" class="btn btn-secondary">{{.T "user.unblock"}}</button></div>
 </form>
 {{end}}</div>
+{{end}}{{if ne .Data.Status "deleted"}}<div class="card stack">
+<h2 class="h2">{{.T "user.reset.title"}}</h2>
+{{if .Data.CanSend}}<form method="post" action="{{.Base}}/users/{{.Data.ID}}/password/link" class="stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<p class="muted">{{.T "user.reset.link.hint"}}</p>
+<div>
+<label for="link-language" class="label">{{.T "user.reset.language"}}</label>
+<select id="link-language" name="language" class="select">{{range .Data.MessageLanguages}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+</div>
+<div class="actions"><button type="submit" class="btn btn-secondary">{{.T "user.reset.link.submit"}}</button></div>
+</form>{{else}}<p class="muted">{{.T "user.reset.nosender"}}</p>{{end}}
+<form method="post" action="{{.Base}}/users/{{.Data.ID}}/password/temporary" class="stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<p class="muted">{{.T "user.reset.temp.hint"}}</p>
+{{if .Data.CanSend}}<div>
+<label for="temp-language" class="label">{{.T "user.reset.language"}}</label>
+<select id="temp-language" name="language" class="select">{{range .Data.MessageLanguages}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+</div>
+{{end}}<div class="actions"><button type="submit" class="btn btn-danger">{{.T "user.reset.temp.submit"}}</button></div>
+</form>
+</div>
 {{end}}<div class="card stack">
 <h2 class="h2">{{.T "user.identifiers"}}</h2>
 {{if .Data.Identifiers}}<div class="scroll">

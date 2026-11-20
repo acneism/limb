@@ -1,0 +1,12 @@
+{{define "title"}}{{.T "temporary.title"}}{{end}}
+{{define "content"}}
+<section class="narrow">
+<h1 class="h1">{{.T "temporary.title"}}</h1>
+<div class="card stack">
+<p>{{.T "temporary.for" .Data.Title}}</p>
+<p><code class="secret">{{.Data.Password}}</code></p>
+<p class="muted">{{.T "temporary.text"}}</p>
+<a class="btn btn-primary" href="{{.Data.UserHref}}">{{.T "temporary.back"}}</a>
+</div>
+</section>
+{{end}}

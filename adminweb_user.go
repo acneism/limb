@@ -20,6 +20,7 @@ var userNotices = map[string]string{
 	"sessions":  "user.notice.sessions",
 	"deleted":   "user.notice.deleted",
 	"restored":  "user.notice.restored",
+	"link":      "user.notice.link",
 }
 
 func shownValue(i UserIdentifier) string {
@@ -43,6 +44,7 @@ func (c *adminCall) userData(p *adminui.Page, u ManagedUser) adminui.UserData {
 		ID: string(u.ID), Title: titleOf(u), Status: string(u.Status), StatusLabel: p.T("status." + string(u.Status)),
 		BlockedReason: u.BlockedReason, DeletedAt: u.DeletedAt, PurgeAfter: u.PurgeAfter, CreatedAt: u.CreatedAt, LastLoginAt: u.LastLoginAt,
 		Via: viaText(p, u.CreatedVia), MustChangePassword: u.MustChangePassword, Immediate: c.auth().immediate, ReasonLimit: store.MaxBlockedReasonLength,
+		HasPassword: u.HasPassword, CanSend: c.auth().recoveryReady(), MessageLanguages: messageLanguages(p),
 	}
 	if u.Status == store.StatusBlocked {
 		data.BlockedUntil = u.BlockedUntil
@@ -123,4 +125,13 @@ func (c *adminCall) showUser() {
 		flash = textOf(key)
 	}
 	c.userPage(ses, http.StatusOK, flash, nil)
+}
+
+func messageLanguages(p *adminui.Page) []adminui.Option {
+	chosen := normalizeLanguage(p.Lang)
+	options := make([]adminui.Option, 0, len(supportedLanguages))
+	for _, language := range supportedLanguages {
+		options = append(options, adminui.Option{Value: language, Label: adminui.LanguageName(language), Selected: language == chosen})
+	}
+	return options
 }

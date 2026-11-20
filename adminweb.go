@@ -116,6 +116,8 @@ func (a *Auth) AdminHandler() http.Handler {
 		{http.MethodPost, "/users/{id}/sessions/end-all", (*adminCall).submitEndSessions},
 		{http.MethodPost, "/users/{id}/delete", (*adminCall).submitDelete},
 		{http.MethodPost, "/users/{id}/restore", (*adminCall).submitRestore},
+		{http.MethodPost, "/users/{id}/password/link", (*adminCall).submitResetLink},
+		{http.MethodPost, "/users/{id}/password/temporary", (*adminCall).submitTemporaryPassword},
 		{http.MethodGet, "/account", (*adminCall).showAccount},
 		{http.MethodPost, "/account/password", (*adminCall).changePassword},
 		{http.MethodPost, "/account/recovery", (*adminCall).renewRecoveryCodes},

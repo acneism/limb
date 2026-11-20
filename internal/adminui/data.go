@@ -263,9 +263,25 @@ type UserData struct {
 	Immediate bool
 	// ReasonLimit is the longest reason of a block, in bytes.
 	ReasonLimit int
+	// HasPassword tells that the user has a password.
+	HasPassword bool
+	// CanSend tells that the service can send a message to the user, so that a link
+	// to choose a password can be sent.
+	CanSend bool
+	// MessageLanguages are the languages that a message to the user can be in.
+	MessageLanguages []Option
 	// BlockReason and BlockUntil are what the form of a block was sent with, kept
 	// to be shown again when the block was refused.
 	BlockReason, BlockUntil string
+}
+
+// TemporaryData is what the page that shows a temporary password needs.
+type TemporaryData struct {
+	// UserHref is the address of the card of the user and Title what the page
+	// calls them.
+	UserHref, Title string
+	// Password is the temporary password, which is shown this once.
+	Password string
 }
 
 // ErrorData is what the page of an error needs.

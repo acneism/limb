@@ -176,6 +176,10 @@ This file is made from the texts of the library by a test. After a text changes,
 | `status.active` | Active | Активен |
 | `status.blocked` | Blocked | Заблокирован |
 | `status.deleted` | Deleted | Удалён |
+| `temporary.back` | Back to the user | Назад к пользователю |
+| `temporary.for` | The temporary password of %s: | Временный пароль пользователя %s: |
+| `temporary.text` | Give it to the user. It is shown only now and cannot be found again. All the sessions of the user ended, and they have to choose another password when they sign in. | Передайте его пользователю. Он показан только сейчас, потом его не найти. Все сессии пользователя завершены, а при входе ему придётся выбрать другой пароль. |
+| `temporary.title` | Temporary password | Временный пароль |
 | `time.utc` | %s UTC | %s UTC |
 | `user.account` | Account | Учётная запись |
 | `user.back` | ← All users | ← Все пользователи |
@@ -200,15 +204,19 @@ This file is made from the texts of the library by a test. After a text changes,
 | `user.delete.title` | Delete the user | Удалить пользователя |
 | `user.deleted.at` | Deleted | Удалён |
 | `user.deleted.until` | Removed for good after | Будет удалён окончательно после |
+| `user.error.busy` | The queue of messages is full. Try again in a moment. | Очередь сообщений заполнена. Повторите через минуту. |
 | `user.error.changed` | The user kept changing meanwhile. Check the card and try again. | Пользователь менялся в это же время. Проверьте карточку и повторите. |
 | `user.error.confirm` | What you typed is not a value that the user signs in with. | Введено не то значение, которым пользователь входит. |
 | `user.error.deleted` | The user is deleted. | Пользователь удалён. |
 | `user.error.invalid` | A value is not valid. | Значение не подходит. |
+| `user.error.nochannel` | The user has no confirmed address or phone number to send the link to. Confirm a value, or set a temporary password. | У пользователя нет подтверждённого адреса или телефона, куда можно отправить ссылку. Подтвердите значение или задайте временный пароль. |
+| `user.error.nosender` | The service has no way to send messages. | У сервиса нет способа отправлять сообщения. |
 | `user.error.notdeleted` | The user is not deleted. | Пользователь не удалён. |
 | `user.error.reason.invalid` | The reason has to be text without control characters, at most %d bytes. | Причина должна быть текстом без управляющих символов, не длиннее %d байт. |
 | `user.error.reason.required` | Give the reason of the block. | Укажите причину блокировки. |
 | `user.error.refused` | The application does not allow this user to be deleted. | Приложение не позволяет удалить этого пользователя. |
 | `user.error.retention` | The time to restore the user has run out. | Время для восстановления пользователя истекло. |
+| `user.error.temporary` | The checks of the application refused the password that was made. Try again. | Проверки приложения не приняли созданный пароль. Попробуйте ещё раз. |
 | `user.error.until.invalid` | The day of the end of the block is not valid. | День окончания блокировки не подходит. |
 | `user.error.until.past` | The day of the end of the block has to be in the future. | День окончания блокировки должен быть в будущем. |
 | `user.id` | ID | ID |
@@ -226,11 +234,21 @@ This file is made from the texts of the library by a test. After a text changes,
 | `user.must.change` | has to be changed at the next sign-in | нужно сменить при следующем входе |
 | `user.notice.blocked` | The user is blocked and their sessions ended. | Пользователь заблокирован, его сессии завершены. |
 | `user.notice.deleted` | The user is deleted. | Пользователь удалён. |
+| `user.notice.link` | The link to choose a new password is being sent to the user. | Ссылка для выбора нового пароля отправляется пользователю. |
 | `user.notice.restored` | The user is restored. | Пользователь восстановлен. |
 | `user.notice.session` | The session ended. | Сессия завершена. |
 | `user.notice.sessions` | The sessions ended. | Сессии завершены. |
 | `user.notice.unblocked` | The block is lifted. | Блокировка снята. |
 | `user.password` | Password | Пароль |
+| `user.password.none` | none yet, the user was invited and has not chosen one | ещё нет, пользователя пригласили, и он не выбрал пароль |
+| `user.password.set` | set | задан |
+| `user.reset.language` | Language of the message | Язык сообщения |
+| `user.reset.link.hint` | Sends a link to the confirmed address or phone number of the user, where they choose a new password. | Отправляет на подтверждённый адрес или телефон пользователя ссылку, по которой он выберет новый пароль. |
+| `user.reset.link.submit` | Send the link | Отправить ссылку |
+| `user.reset.nosender` | The service has no way to send messages, so a link cannot be sent. | У сервиса нет способа отправлять сообщения, поэтому ссылку отправить нельзя. |
+| `user.reset.temp.hint` | Makes a password that you give to the user yourself. All the sessions of the user end, and they have to choose another password when they sign in. | Создаёт пароль, который вы сами передаёте пользователю. Все сессии пользователя завершатся, а при входе ему придётся выбрать другой пароль. |
+| `user.reset.temp.submit` | Set a temporary password | Задать временный пароль |
+| `user.reset.title` | Reset the password | Сброс пароля |
 | `user.restore.hint` | The user can sign in again. The sessions that ended are not restored. | Пользователь снова сможет войти. Завершённые сессии не восстанавливаются. |
 | `user.restore.submit` | Restore | Восстановить |
 | `user.restore.title` | Restore the user | Восстановить пользователя |

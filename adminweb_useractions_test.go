@@ -404,7 +404,7 @@ func TestTheActionsOnTheCardNeedASessionTheTokenOfItAndTheOriginOfTheSite(t *tes
 	own := f.csrfOf(f.card("ann"))
 	actions := map[string]url.Values{
 		"block": {"reason": {"why"}}, "unblock": {}, "sessions/end": {"session": {session.Principal.SessionID}}, "sessions/end-all": {},
-		"delete": {"confirm": {"ann@example.com"}}, "restore": {},
+		"delete": {"confirm": {"ann@example.com"}}, "restore": {}, "password/link": {"language": {"en"}}, "password/temporary": {},
 	}
 	for action, fields := range actions {
 		path := "/users/" + id + "/" + action
@@ -440,7 +440,7 @@ func TestTheActionsOnTheCardNeedASessionTheTokenOfItAndTheOriginOfTheSite(t *tes
 	if f.status("ann") != StatusActive || !f.authenticated(session) {
 		t.Fatal("a request that was refused changed the user")
 	}
-	f.noRecords(audit.UserBlocked, audit.UserUnblocked, audit.UserSessionEnded, audit.UserSessionsEnded, audit.UserDeleted, audit.UserRestored)
+	f.noRecords(audit.UserBlocked, audit.UserUnblocked, audit.UserSessionEnded, audit.UserSessionsEnded, audit.UserDeleted, audit.UserRestored, audit.UserPasswordResetSent, audit.UserPasswordTemporary)
 	for action, fields := range actions {
 		values := url.Values{"csrf": {own}}
 		for key, list := range fields {
@@ -476,6 +476,10 @@ func TestAnAnswerToAnActionOnAUserIsTheOneThatTheFailureCallsFor(t *testing.T) {
 		{"a day in the past", &ValidationError{Field: "until", Reason: "must be in the future"}, http.StatusUnprocessableEntity, "has to be in the future."},
 		{"a day that is wrong", &ValidationError{Field: "until", Reason: "must be before the year 10000"}, http.StatusUnprocessableEntity, "is not valid."},
 		{"another value", &ValidationError{Field: "other", Reason: "is wrong"}, http.StatusUnprocessableEntity, "A value is not valid."},
+		{"a service that cannot send", ErrRecoveryDisabled, http.StatusConflict, "The service has no way to send messages."},
+		{"a user without a confirmed value", ErrNoConfirmedChannel, http.StatusConflict, "no confirmed address or phone number"},
+		{"a queue of messages that is full", ErrBusy, http.StatusServiceUnavailable, "The queue of messages is full."},
+		{"a password that the checks refuse", &PolicyError{Rules: []string{"min_length"}}, http.StatusUnprocessableEntity, "refused the password that was made"},
 		{"a failure of the store", errors.New("the store failed"), http.StatusInternalServerError, "Something went wrong"},
 	}
 	for _, c := range cases {
@@ -486,6 +490,9 @@ func TestAnAnswerToAnActionOnAUserIsTheOneThatTheFailureCallsFor(t *testing.T) {
 		}
 		call.userFailure(admin.Session{ID: "session", AdminID: "admin", Login: "root"}, url.Values{"reason": {"typed"}}, c.err)
 		body := recorder.Body.String()
+		if c.status == http.StatusServiceUnavailable && recorder.Header().Get("Retry-After") != busyRetryAfter {
+			t.Errorf("%s: Retry-After is %q", c.name, recorder.Header().Get("Retry-After"))
+		}
 		if recorder.Code != c.status || !strings.Contains(body, c.text) || strings.Contains(body, "the secret reason") || strings.Contains(body, "the store failed") {
 			t.Errorf("%s: the answer is %d with %.200s", c.name, recorder.Code, body)
 		}
