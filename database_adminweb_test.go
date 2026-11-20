@@ -18,9 +18,9 @@ type webInstances struct {
 	a, b *webFixture
 }
 
-func newWebInstances(t *testing.T, d *database) *webInstances {
+func newWebInstances(t *testing.T, d *database, opts ...Option) *webInstances {
 	t.Helper()
-	in := newInstancesWith(t, d, WithAdminMountPath(adminMount), WithDevelopmentMode())
+	in := newInstancesWith(t, d, append([]Option{WithAdminMountPath(adminMount), WithDevelopmentMode()}, opts...)...)
 	if _, err := in.a.Admin().CreateAdmin(t.Context(), adminLoginName, adminPassword); err != nil {
 		t.Fatalf("CreateAdmin failed: %v", err)
 	}
