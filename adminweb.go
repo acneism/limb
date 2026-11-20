@@ -126,6 +126,8 @@ func (a *Auth) AdminHandler() http.Handler {
 		{http.MethodPost, "/users/{id}/identifiers/remove", (*adminCall).submitIdentifierRemove},
 		{http.MethodPost, "/users/{id}/identifiers/verify", (*adminCall).submitIdentifierVerify},
 		{http.MethodGet, "/audit", (*adminCall).showAudit},
+		{http.MethodGet, "/settings", (*adminCall).showSettings},
+		{http.MethodPost, "/settings", (*adminCall).submitSettings},
 		{http.MethodGet, "/account", (*adminCall).showAccount},
 		{http.MethodPost, "/account/password", (*adminCall).changePassword},
 		{http.MethodPost, "/account/recovery", (*adminCall).renewRecoveryCodes},

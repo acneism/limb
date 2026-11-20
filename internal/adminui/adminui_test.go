@@ -96,6 +96,7 @@ func samplePage(t *testing.T, c *Catalog, language string) map[string]*Page {
 			},
 			Next: "/admin/audit?cursor=x", First: "/admin/audit", Filtered: true,
 		},
+		"settings":  SettingsData{PasswordToEndSessions: true, AuditHref: "/admin/audit?action=setting.changed&limit=50"},
 		"temporary": TemporaryData{UserHref: "/admin/users/one", Title: "<alice>", Password: "ABCDE-FGHIJ-KLMNO-PQRST-UVWXY"},
 		"rebind":    RebindData{Login: "root", QR: qr, Secret: key, URI: template.URL(uri), Token: "token-of-the-binding"}, //nolint:gosec
 		"error":     ErrorData{Title: "Page not found", Text: "There is nothing at this address."},
@@ -125,7 +126,7 @@ func TestEveryPageIsRenderedInEveryLanguageAsWellFormedHTMLThatHasNoScriptAndNoS
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := len(templates.Pages()); got != 13 {
+	if got := len(templates.Pages()); got != 14 {
 		t.Fatalf("there are %d pages: %v", got, templates.Pages())
 	}
 	key := regexp.MustCompile(`\b(?:[a-z]+\.){1,3}[a-z]+\b`)

@@ -104,8 +104,24 @@ func (fz *fuzzedPeople) fingerprint(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Fprintf(&out, "audit=%d", len(records))
+	required, err := fz.auth.currentPasswordToEndSessions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Fprintf(&out, "audit=%d|password to end sessions=%v", len(records), required)
 	return out.String()
+}
+
+func (fz *fuzzedPeople) checkSetting(t *testing.T) {
+	t.Helper()
+	stored, err := fz.auth.store.Settings().Get(context.Background(), fz.auth.tenant, settingPasswordToEndSessions)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+	case err != nil:
+		t.Fatal(err)
+	case !isBoolean(stored.Value):
+		t.Fatalf("the setting holds %q, which is no value of it", stored.Value)
+	}
 }
 
 func (fz *fuzzedPeople) checkState(t *testing.T) {
@@ -147,6 +163,8 @@ func FuzzAdminUserActions(f *testing.F) {
 		{"GET", "/users/{id}", "", "", "", 0, false},
 		{"GET", "/users/{id}?done=blocked&lang=ru", "", "", "", 1, false},
 		{"GET", "/audit?user={id}&limit=10", "", "", "", 0, false},
+		{"GET", "/settings", "", "", "", 0, false},
+		{"GET", "/settings?done=saved&lang=ru", "", "", "", 0, false},
 		{"POST", "/users/{id}/block", form, "reason=spam&until=2031-01-02", fuzzOrigin, 0, true},
 		{"POST", "/users/{id}/block", form, "reason=&until=nope", fuzzOrigin, 0, true},
 		{"POST", "/users/{id}/unblock", form, "", fuzzOrigin, 1, true},
@@ -166,6 +184,12 @@ func FuzzAdminUserActions(f *testing.F) {
 		{"POST", "/users/new", form, "value.email=new%40example.com&value.username=new_one&password=a+long+enough+password&verified.email=1", fuzzOrigin, 0, true},
 		{"POST", "/users/new", form, "mode=invite&value.email=invited%40example.com&language=ru", fuzzOrigin, 0, true},
 		{"POST", "/users/new", form, "value.email=first%40example.com&password=short", fuzzOrigin, 0, true},
+		{"POST", "/settings", form, "password_to_end_sessions=1", fuzzOrigin, 0, true},
+		{"POST", "/settings", form, "", fuzzOrigin, 0, true},
+		{"POST", "/settings", form, "password_to_end_sessions=yes", fuzzOrigin, 0, true},
+		{"POST", "/settings", form, "password_to_end_sessions=1&password_to_end_sessions=0", fuzzOrigin, 0, true},
+		{"POST", "/settings", form, "password_to_end_sessions=1", fuzzOrigin, 0, false},
+		{"POST", "/settings", "application/json", `{"password_to_end_sessions":"1"}`, fuzzOrigin, 0, true},
 		{"POST", "/users/{id}/block", form, "reason=spam", "https://evil.example", 0, true},
 		{"POST", "/users/{id}/block", "application/json", `{"reason":"spam"}`, fuzzOrigin, 0, true},
 		{"DELETE", "/users/{id}", "", "", "", 0, false},
@@ -202,6 +226,7 @@ func FuzzAdminUserActions(f *testing.F) {
 		fz.handler.ServeHTTP(recorder, request)
 		checkFuzzedAdminAnswer(t, recorder, method, target, sessionSecret)
 		fz.checkState(t)
+		fz.checkSetting(t)
 		safe := method == http.MethodGet || method == http.MethodHead
 		if after := fz.fingerprint(t); (safe || recorder.Code >= http.StatusBadRequest) && after != before {
 			t.Fatalf("%s %q answered %d and changed what it should not:\nbefore:\n%s\nafter:\n%s", method, target, recorder.Code, before, after)

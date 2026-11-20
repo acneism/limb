@@ -64,6 +64,11 @@ func (a *Auth) setting(ctx context.Context, name string) (string, bool, error) {
 	return value, found, nil
 }
 
+func (a *Auth) currentPasswordToEndSessions(ctx context.Context) (bool, error) {
+	a.settings.forget()
+	return a.passwordToEndSessions(ctx)
+}
+
 func (a *Auth) setSetting(ctx context.Context, by actorRef, name, value string) error {
 	valid, known := knownSettings[name]
 	switch {

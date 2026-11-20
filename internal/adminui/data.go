@@ -338,6 +338,16 @@ type AuditData struct {
 	Filtered bool
 }
 
+// SettingsData is what the page of the settings needs.
+type SettingsData struct {
+	// PasswordToEndSessions tells that a user has to give their password to end
+	// their other sessions.
+	PasswordToEndSessions bool
+	// AuditHref is the address of the audit log filtered to the changes of the
+	// settings.
+	AuditHref string
+}
+
 // TemporaryData is what the page that shows a temporary password needs.
 type TemporaryData struct {
 	// UserHref is the address of the card of the user and Title what the page

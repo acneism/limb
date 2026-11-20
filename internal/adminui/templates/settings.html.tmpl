@@ -1,0 +1,17 @@
+{{define "title"}}{{.T "settings.title"}}{{end}}
+{{define "content"}}
+<section class="stack">
+<h1 class="h1">{{.T "settings.title"}}</h1>
+{{template "flash" .}}
+<form method="post" action="{{.Base}}/settings" class="card stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<fieldset class="fieldset stack">
+<legend class="h2">{{.T "settings.sessions"}}</legend>
+<div class="checks"><label class="check"><input type="checkbox" name="password_to_end_sessions" value="1" aria-describedby="password-to-end-hint"{{if .Data.PasswordToEndSessions}} checked{{end}}> {{.T "settings.password.label"}}</label></div>
+<p id="password-to-end-hint" class="muted">{{.T "settings.password.hint"}}</p>
+</fieldset>
+<div class="actions"><button type="submit" class="btn btn-primary">{{.T "settings.submit"}}</button></div>
+</form>
+<p class="aside"><a href="{{.Data.AuditHref}}">{{.T "settings.audit"}}</a></p>
+</section>
+{{end}}

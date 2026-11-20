@@ -128,6 +128,8 @@ This file is made from the texts of the library by a test. After a text changes,
 | `home.audit.text` | See what administrators did and what happened to users: who, what, when and from where. | Что делали администраторы и что происходило с пользователями: кто, что, когда и откуда. |
 | `home.recovery` | You have %d recovery codes left. Make new ones on the page of your account. | Резервных кодов осталось: %d. Создайте новые на странице учётной записи. |
 | `home.recovery.0` | You have no recovery codes left. Make new ones on the page of your account. | Резервных кодов не осталось. Создайте новые на странице учётной записи. |
+| `home.settings` | Settings | Настройки |
+| `home.settings.text` | Decide whether a user has to give their password to end their other sessions. | Решите, должен ли пользователь вводить пароль, чтобы завершить свои другие сессии. |
 | `home.signed.in` | You signed in at %s. | Вы вошли: %s. |
 | `home.title` | Administration | Администрирование |
 | `home.users` | Users | Пользователи |
@@ -147,6 +149,7 @@ This file is made from the texts of the library by a test. After a text changes,
 | `nav.home` | Home | Главная |
 | `nav.label` | Main menu | Главное меню |
 | `nav.logout` | Sign out | Выйти |
+| `nav.settings` | Settings | Настройки |
 | `nav.users` | Users | Пользователи |
 | `newuser.how` | How the user gets in | Как пользователь получит доступ |
 | `newuser.invite.none` | Invitations need a sender of messages and the address of the page where the user chooses a password, which this service has not been given. | Для приглашений нужны отправка сообщений и адрес страницы, где пользователь выбирает пароль. У этого сервиса их нет. |
@@ -197,6 +200,14 @@ This file is made from the texts of the library by a test. After a text changes,
 | `sessions.seen` | Last used | Последнее обращение |
 | `sessions.started` | Signed in | Вход |
 | `sessions.title` | Where you are signed in | Где вы вошли |
+| `settings.audit` | Who changed the settings and when: the audit log | Кто и когда менял настройки: журнал аудита |
+| `settings.error.invalid` | The form is not valid. Nothing was changed. | Форма заполнена неверно. Ничего не изменено. |
+| `settings.notice.saved` | The settings are saved. This instance of the service uses them at once, the others within %d seconds. | Настройки сохранены. Этот экземпляр сервиса применяет их сразу, остальные в течение %d с. |
+| `settings.password.hint` | When it is on, a user who ends one of their other sessions, or all of them, has to give their password again, so that someone who stole a session cannot end the sessions of its owner. Ending the session in use never asks for the password. | Когда настройка включена, пользователь, который завершает одну из своих других сессий или все сразу, должен ещё раз ввести пароль. Так тот, кто украл сессию, не сможет завершить сессии её владельца. Завершить текущую сессию можно без пароля. |
+| `settings.password.label` | Ask for the password to end sessions | Спрашивать пароль, чтобы завершить сессии |
+| `settings.sessions` | Sessions of the users | Сессии пользователей |
+| `settings.submit` | Save | Сохранить |
+| `settings.title` | Settings | Настройки |
 | `signed.in.as` | Signed in as %s | Вы вошли как %s |
 | `skip` | Skip to the content | Перейти к содержимому |
 | `status.active` | Active | Активен |

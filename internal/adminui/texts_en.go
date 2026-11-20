@@ -382,4 +382,16 @@ var english = map[string]string{ //nolint:gosec
 	"audit.action.auth.session_ended":           "Session ended",
 	"audit.action.auth.refresh_token_reused":    "Refresh token used again",
 	"audit.action.auth.channel_verified":        "Address or phone number confirmed",
+
+	"nav.settings":            "Settings",
+	"home.settings":           "Settings",
+	"home.settings.text":      "Decide whether a user has to give their password to end their other sessions.",
+	"settings.title":          "Settings",
+	"settings.sessions":       "Sessions of the users",
+	"settings.password.label": "Ask for the password to end sessions",
+	"settings.password.hint":  "When it is on, a user who ends one of their other sessions, or all of them, has to give their password again, so that someone who stole a session cannot end the sessions of its owner. Ending the session in use never asks for the password.",
+	"settings.submit":         "Save",
+	"settings.audit":          "Who changed the settings and when: the audit log",
+	"settings.notice.saved":   "The settings are saved. This instance of the service uses them at once, the others within %d seconds.",
+	"settings.error.invalid":  "The form is not valid. Nothing was changed.",
 }

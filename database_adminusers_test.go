@@ -423,3 +423,61 @@ func TestTheImmediateDeletionOfAUserThroughTheBrowserErasesThemOnEveryDatabase(t
 		}
 	})
 }
+
+func TestTheSettingOfTheWebAdministrationReachesTheOtherInstanceAndTheAuditLogOnEveryDatabase(t *testing.T) {
+	eachDatabase(t, func(t *testing.T, d *database) {
+		a, b := newPeopleInstances(t, d)
+		a.add("ann")
+		enrollBoth(a, b)
+		first := a.userLogin("ann", SessionCookie)
+		probe := func(instance *peopleFixture) bool {
+			return instance.canEndOtherSessionsWithoutPassword(first, instance.userLogin("ann", SessionToken))
+		}
+		if a.needsPassword() || b.needsPassword() || !probe(a) || !probe(b) {
+			t.Fatal("the password is needed before anyone asked for it")
+		}
+
+		a.clock.advance(time.Second)
+		if r := b.saveSettings(url.Values{"password_to_end_sessions": {"1"}}); r.StatusCode != http.StatusSeeOther || r.location() != adminMount+"/settings?done=saved" {
+			t.Fatalf("turning it on gave %d %q", r.StatusCode, r.location())
+		}
+		if !b.needsPassword() || probe(b) {
+			t.Error("the setting does not hold at once on the instance that took it")
+		}
+		if a.needsPassword() || !probe(a) {
+			t.Error("the other instance does not keep the value of its cache until it runs out")
+		}
+		if page := a.get("/settings"); !page.has(`aria-describedby="password-to-end-hint" checked>`) {
+			t.Error("the page of the other instance does not show what is stored")
+		}
+
+		a.clock.advance(time.Second)
+		if r := a.saveSettings(url.Values{}); r.StatusCode != http.StatusSeeOther {
+			t.Fatalf("turning it off gave %d", r.StatusCode)
+		}
+		if a.needsPassword() || !probe(a) {
+			t.Error("turning it off does not hold at once")
+		}
+		if !b.needsPassword() || probe(b) {
+			t.Error("the first instance does not keep the value of its cache until it runs out")
+		}
+		b.clock.advance(settingsTTL)
+		if b.needsPassword() || !probe(b) {
+			t.Error("turning it off does not reach the other instance after the cache ran out")
+		}
+
+		records := a.records(audit.SettingChanged)
+		if len(records) != 2 {
+			t.Fatalf("%d records of the setting, want 2", len(records))
+		}
+		for _, record := range records {
+			details := detailsOf(t, record)
+			if record.ActorKind != store.ActorAdmin || record.ActorID != a.adminID() || details["name"] != "password_to_end_sessions" || (details["new"] == "false") != (details["old"] == "true") {
+				t.Errorf("the record %+v with %v is not a change made by the administrator", record, details)
+			}
+		}
+		if list := b.get("/audit?action=setting.changed"); strings.Count(list.body, "<td>Setting changed</td>") != 2 {
+			t.Errorf("the audit log shows %d changes of the setting, want 2", strings.Count(list.body, "<td>Setting changed</td>"))
+		}
+	})
+}

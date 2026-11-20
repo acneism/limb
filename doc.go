@@ -144,7 +144,8 @@
 // authenticator, the account page where an administrator changes their password
 // and recovery codes and ends their sessions, the list and the cards of the users
 // with the forms of what an administrator does to them, the form of a new user,
-// and the audit log. What an administrator does there is the operation of Admin
+// the audit log, and the setting that makes users give their password to end
+// their other sessions. What an administrator does there is the operation of Admin
 // of the same name, written to the audit log in their name. The application
 // mounts it under the path that it gives to WithAdminMountPath. The pages run no
 // script, ask nothing of another site and carry a Content-Security-Policy, and a
