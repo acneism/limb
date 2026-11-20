@@ -14,16 +14,20 @@ import (
 const historyRows = 20
 
 var userNotices = map[string]string{
-	"blocked":   "user.notice.blocked",
-	"unblocked": "user.notice.unblocked",
-	"session":   "user.notice.session",
-	"sessions":  "user.notice.sessions",
-	"deleted":   "user.notice.deleted",
-	"restored":  "user.notice.restored",
-	"link":      "user.notice.link",
-	"value":     "user.notice.identifier",
-	"removed":   "user.notice.removed",
-	"confirmed": "user.notice.confirmed",
+	"blocked":    "user.notice.blocked",
+	"unblocked":  "user.notice.unblocked",
+	"session":    "user.notice.session",
+	"sessions":   "user.notice.sessions",
+	"deleted":    "user.notice.deleted",
+	"restored":   "user.notice.restored",
+	"link":       "user.notice.link",
+	"created":    "user.notice.created",
+	"invited":    "user.notice.invited",
+	"invitebusy": "user.notice.invitebusy",
+	"invitation": "user.notice.invitation",
+	"value":      "user.notice.identifier",
+	"removed":    "user.notice.removed",
+	"confirmed":  "user.notice.confirmed",
 }
 
 func shownValue(i UserIdentifier) string {
@@ -48,6 +52,7 @@ func (c *adminCall) userData(p *adminui.Page, u ManagedUser) adminui.UserData {
 		BlockedReason: u.BlockedReason, DeletedAt: u.DeletedAt, PurgeAfter: u.PurgeAfter, CreatedAt: u.CreatedAt, LastLoginAt: u.LastLoginAt,
 		Via: viaText(p, u.CreatedVia), MustChangePassword: u.MustChangePassword, Immediate: c.auth().immediate, ReasonLimit: store.MaxBlockedReasonLength,
 		HasPassword: u.HasPassword, CanSend: c.auth().recoveryReady(), MessageLanguages: messageLanguages(p),
+		Invited: u.CreatedVia == string(store.CreatedViaInvite) && !u.HasPassword, CanInvite: c.auth().invitationsReady(),
 	}
 	if u.Status == store.StatusBlocked {
 		data.BlockedUntil = u.BlockedUntil

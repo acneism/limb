@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -109,6 +110,8 @@ func (a *Auth) AdminHandler() http.Handler {
 		{http.MethodPost, "/login/totp", (*adminCall).submitEnroll},
 		{http.MethodPost, "/logout", (*adminCall).logout},
 		{http.MethodGet, "/users", (*adminCall).showUsers},
+		{http.MethodGet, "/users/new", (*adminCall).showNewUser},
+		{http.MethodPost, "/users/new", (*adminCall).submitNewUser},
 		{http.MethodGet, "/users/{id}", (*adminCall).showUser},
 		{http.MethodPost, "/users/{id}/block", (*adminCall).submitBlock},
 		{http.MethodPost, "/users/{id}/unblock", (*adminCall).submitUnblock},
@@ -116,6 +119,7 @@ func (a *Auth) AdminHandler() http.Handler {
 		{http.MethodPost, "/users/{id}/sessions/end-all", (*adminCall).submitEndSessions},
 		{http.MethodPost, "/users/{id}/delete", (*adminCall).submitDelete},
 		{http.MethodPost, "/users/{id}/restore", (*adminCall).submitRestore},
+		{http.MethodPost, "/users/{id}/invitation", (*adminCall).submitInvitation},
 		{http.MethodPost, "/users/{id}/password/link", (*adminCall).submitResetLink},
 		{http.MethodPost, "/users/{id}/password/temporary", (*adminCall).submitTemporaryPassword},
 		{http.MethodPost, "/users/{id}/identifiers/set", (*adminCall).submitIdentifierSet},
@@ -183,7 +187,9 @@ func (c *adminCall) serve() {
 			route.run(c)
 			return
 		}
-		allowed = append(allowed, route.method)
+		if !slices.Contains(allowed, route.method) {
+			allowed = append(allowed, route.method)
+		}
 	}
 	if len(allowed) == 0 {
 		c.fail(http.StatusNotFound)

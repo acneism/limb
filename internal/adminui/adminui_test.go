@@ -64,7 +64,7 @@ func samplePage(t *testing.T, c *Catalog, language string) map[string]*Page {
 		"user": UserData{
 			ID: "0198f2a4-7c11-7d44-9b0e-3c6c2f1d9a55", Title: "alice@example.com", Status: "blocked", StatusLabel: "Blocked", BlockedReason: `spam "<b>"`,
 			BlockedUntil: signedAt, DeletedAt: signedAt, PurgeAfter: signedAt, CreatedAt: signedAt, LastLoginAt: signedAt, Via: "Invitation", MustChangePassword: true,
-			HasPassword: true, CanSend: true, ReasonLimit: 512, BlockReason: `<reason>`, BlockUntil: "2030-01-01",
+			HasPassword: true, CanSend: true, Invited: true, CanInvite: true, ReasonLimit: 512, BlockReason: `<reason>`, BlockUntil: "2030-01-01",
 			MessageLanguages: []Option{{Value: "en", Label: "English", Selected: true}, {Value: "ru", Label: "Русский"}},
 			Identifiers: []IdentifierRow{
 				{Type: "email", Value: "Alice@Example.com", Verified: true, VerifiedAt: signedAt, Editable: true},
@@ -77,6 +77,12 @@ func samplePage(t *testing.T, c *Catalog, language string) map[string]*Page {
 			Journal: []AuditRow{
 				{At: signedAt, Actor: "root", Action: "user.blocked", Label: "User blocked", UserID: "one", UserHref: "/admin/users/one", IP: "203.0.113.8", Details: []DetailPair{{Key: "reason", Value: "<spam>"}}},
 			},
+		},
+		"newuser": NewUserData{
+			Fields: []NewUserField{
+				{Type: "email", Value: `a"<b>@example.com`, Required: true, Delivery: true, Verified: true}, {Type: "username", Value: "<alice>"},
+			},
+			Mode: "invite", Keep: true, CanInvite: true, Languages: []Option{{Value: "en", Label: "English", Selected: true}, {Value: "ru", Label: "Русский"}},
 		},
 		"temporary": TemporaryData{UserHref: "/admin/users/one", Title: "<alice>", Password: "ABCDE-FGHIJ-KLMNO-PQRST-UVWXY"},
 		"rebind":    RebindData{Login: "root", QR: qr, Secret: key, URI: template.URL(uri), Token: "token-of-the-binding"}, //nolint:gosec
@@ -107,7 +113,7 @@ func TestEveryPageIsRenderedInEveryLanguageAsWellFormedHTMLThatHasNoScriptAndNoS
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := len(templates.Pages()); got != 11 {
+	if got := len(templates.Pages()); got != 12 {
 		t.Fatalf("there are %d pages: %v", got, templates.Pages())
 	}
 	key := regexp.MustCompile(`\b(?:[a-z]+\.){1,3}[a-z]+\b`)

@@ -50,6 +50,18 @@
 <div class="actions"><button type="submit" class="btn btn-secondary">{{.T "user.unblock"}}</button></div>
 </form>
 {{end}}</div>
+{{end}}{{if and .Data.Invited (ne .Data.Status "deleted")}}<div class="card stack">
+<h2 class="h2">{{.T "user.invite.title"}}</h2>
+<p class="muted">{{.T "user.invite.hint"}}</p>
+{{if .Data.CanInvite}}<form method="post" action="{{.Base}}/users/{{.Data.ID}}/invitation" class="stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div>
+<label for="invite-language" class="label">{{.T "user.reset.language"}}</label>
+<select id="invite-language" name="language" class="select">{{range .Data.MessageLanguages}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+</div>
+<div class="actions"><button type="submit" class="btn btn-secondary">{{.T "user.invite.submit"}}</button></div>
+</form>{{else}}<p class="muted">{{.T "newuser.invite.none"}}</p>{{end}}
+</div>
 {{end}}{{if ne .Data.Status "deleted"}}<div class="card stack">
 <h2 class="h2">{{.T "user.reset.title"}}</h2>
 {{if .Data.CanSend}}<form method="post" action="{{.Base}}/users/{{.Data.ID}}/password/link" class="stack">

@@ -2,6 +2,7 @@
 {{define "content"}}
 <section class="stack">
 <h1 class="h1">{{.T "users.title"}}</h1>
+<p><a class="btn btn-primary" href="{{.Base}}/users/new">{{.T "users.new"}}</a></p>
 {{template "flash" .}}
 <form method="get" action="{{.Base}}/users" class="card stack">
 <h2 class="h2">{{.T "users.filters"}}</h2>

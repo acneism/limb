@@ -68,6 +68,9 @@ func (f *peopleFixture) namesIn(r webResponse) []string {
 	f.t.Helper()
 	var names []string
 	for _, m := range userLinkPattern.FindAllStringSubmatch(r.body, -1) {
+		if m[1] == "new" {
+			continue
+		}
 		name, known := f.names[UserID(m[1])]
 		if !known {
 			f.t.Fatalf("the page links the user %q that nobody made", m[1])

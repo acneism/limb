@@ -56,6 +56,10 @@ func validationAnswer(v *ValidationError) (int, func(p *adminui.Page) string) {
 		return http.StatusUnprocessableEntity, textOf("user.error.until.invalid")
 	case v.Field == "user" && v.Reason == "is not deleted":
 		return http.StatusConflict, textOf("user.error.notdeleted")
+	case v.Field == "user" && v.Reason == "has a password already, there is nothing to invite them to":
+		return http.StatusConflict, textOf("user.error.haspassword")
+	case v.Field == "user" && v.Reason == "has no address or phone number to invite":
+		return http.StatusConflict, textOf("user.error.noaddress")
 	case v.Field == "identifiers" && v.Reason == "at least one value to sign in with is required":
 		return http.StatusUnprocessableEntity, textOf("user.error.lastlogin")
 	}
@@ -83,6 +87,8 @@ func (c *adminCall) userFailure(ses admin.Session, form url.Values, err error) {
 		flash = textOf("user.error.retention")
 	case errors.Is(err, ErrIdentifierTaken):
 		flash = textOf("user.error.taken")
+	case errors.Is(err, ErrInvitationsDisabled):
+		flash = textOf("user.error.invitations")
 	case errors.Is(err, ErrRecoveryDisabled):
 		flash = textOf("user.error.nosender")
 	case errors.Is(err, ErrNoConfirmedChannel):

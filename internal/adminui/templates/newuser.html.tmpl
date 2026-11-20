@@ -1,0 +1,36 @@
+{{define "title"}}{{.T "newuser.title"}}{{end}}
+{{define "content"}}
+<section class="stack">
+<p class="aside"><a href="{{.Base}}/users">{{.T "user.back"}}</a></p>
+<h1 class="h1">{{.T "newuser.title"}}</h1>
+{{template "flash" .}}
+<form method="post" action="{{.Base}}/users/new" class="card stack">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<fieldset class="fieldset stack">
+<legend class="h2">{{.T "newuser.values"}}</legend>
+<p class="muted">{{.T "newuser.values.hint"}}</p>
+{{range .Data.Fields}}<div>
+<label for="new-{{.Type}}" class="label">{{.Type}}</label>
+<input id="new-{{.Type}}" name="value.{{.Type}}" type="text" class="input" value="{{.Value}}" maxlength="1024" autocomplete="off"{{if .Required}} required{{end}}>
+{{if .Delivery}}<div class="checks"><label class="check"><input type="checkbox" name="verified.{{.Type}}" value="1"{{if .Verified}} checked{{end}}> {{$.T "newuser.verified"}}</label></div>
+{{end}}</div>
+{{end}}</fieldset>
+<fieldset class="fieldset stack">
+<legend class="h2">{{.T "newuser.how"}}</legend>
+<div class="checks"><label class="check"><input type="radio" name="mode" value="password"{{if eq .Data.Mode "password"}} checked{{end}}> {{.T "newuser.mode.password"}}</label></div>
+<div>
+<label for="new-password" class="label">{{.T "newuser.password"}}</label>
+<input id="new-password" name="password" type="password" class="input" autocomplete="new-password" maxlength="1024">
+</div>
+<div class="checks"><label class="check"><input type="checkbox" name="keep" value="1"{{if .Data.Keep}} checked{{end}}> {{.T "newuser.keep"}}</label></div>
+{{if .Data.CanInvite}}<div class="checks"><label class="check"><input type="radio" name="mode" value="invite"{{if eq .Data.Mode "invite"}} checked{{end}}> {{.T "newuser.mode.invite"}}</label></div>
+<div>
+<label for="new-language" class="label">{{.T "user.reset.language"}}</label>
+<select id="new-language" name="language" class="select">{{range .Data.Languages}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+</div>
+{{else}}<p class="muted">{{.T "newuser.invite.none"}}</p>{{end}}
+</fieldset>
+<div class="actions"><button type="submit" class="btn btn-primary">{{.T "newuser.submit"}}</button></div>
+</form>
+</section>
+{{end}}

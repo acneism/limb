@@ -404,7 +404,7 @@ func TestTheActionsOnTheCardNeedASessionTheTokenOfItAndTheOriginOfTheSite(t *tes
 	own := f.csrfOf(f.card("ann"))
 	actions := map[string]url.Values{
 		"block": {"reason": {"why"}}, "unblock": {}, "sessions/end": {"session": {session.Principal.SessionID}}, "sessions/end-all": {},
-		"delete": {"confirm": {"ann@example.com"}}, "restore": {}, "password/link": {"language": {"en"}}, "password/temporary": {},
+		"delete": {"confirm": {"ann@example.com"}}, "restore": {}, "password/link": {"language": {"en"}}, "password/temporary": {}, "invitation": {"language": {"en"}},
 		"identifiers/set": {"type": {"email"}, "value": {"other@example.com"}}, "identifiers/remove": {"type": {"username"}}, "identifiers/verify": {"type": {"email"}},
 	}
 	for action, fields := range actions {

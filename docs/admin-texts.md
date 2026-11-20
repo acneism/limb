@@ -134,6 +134,17 @@ This file is made from the texts of the library by a test. After a text changes,
 | `nav.label` | Main menu | Главное меню |
 | `nav.logout` | Sign out | Выйти |
 | `nav.users` | Users | Пользователи |
+| `newuser.how` | How the user gets in | Как пользователь получит доступ |
+| `newuser.invite.none` | Invitations need a sender of messages and the address of the page where the user chooses a password, which this service has not been given. | Для приглашений нужны отправка сообщений и адрес страницы, где пользователь выбирает пароль. У этого сервиса их нет. |
+| `newuser.keep` | The user does not have to choose another password when they first sign in | Пользователю не нужно выбирать другой пароль при первом входе |
+| `newuser.mode.invite` | By an invitation: they choose the password with a link that is sent to them | По приглашению: пароль он выберет по ссылке, которую ему отправят |
+| `newuser.mode.password` | With a password that I give them | С паролем, который я ему дам |
+| `newuser.password` | Password | Пароль |
+| `newuser.submit` | Create the user | Создать пользователя |
+| `newuser.title` | New user | Новый пользователь |
+| `newuser.values` | What the user signs in with | Чем пользователь входит |
+| `newuser.values.hint` | The same checks apply as when a user signs up. An address or a phone number can be marked as confirmed if you vouch for it, and the log says that you did. | Действуют те же проверки, что и при регистрации. Адрес или телефон можно отметить подтверждённым, если вы ручаетесь за него, и журнал это запишет. |
+| `newuser.verified` | I vouch that it is theirs: mark it as confirmed | Ручаюсь, что это его значение: отметить подтверждённым |
 | `password.again` | New password again | Новый пароль ещё раз |
 | `password.current` | Current password | Текущий пароль |
 | `password.differ` | The two new passwords are not the same. | Новые пароли не совпадают. |
@@ -208,8 +219,11 @@ This file is made from the texts of the library by a test. After a text changes,
 | `user.error.changed` | The user kept changing meanwhile. Check the card and try again. | Пользователь менялся в это же время. Проверьте карточку и повторите. |
 | `user.error.confirm` | What you typed is not a value that the user signs in with. | Введено не то значение, которым пользователь входит. |
 | `user.error.deleted` | The user is deleted. | Пользователь удалён. |
+| `user.error.haspassword` | The user has a password already, there is nothing to invite them to. | У пользователя уже есть пароль, приглашать его не к чему. |
 | `user.error.identifier` | The value of %s is not accepted: %s. | Значение «%s» не принято: %s. |
+| `user.error.invitations` | The service cannot send invitations. | Сервис не может отправлять приглашения. |
 | `user.error.lastlogin` | A user has to keep at least one value to sign in with. | У пользователя должно остаться хотя бы одно значение для входа. |
+| `user.error.noaddress` | The user has no address or phone number to send the invitation to. | У пользователя нет адреса или телефона, куда можно отправить приглашение. |
 | `user.error.nochannel` | The user has no confirmed address or phone number to send the link to. Confirm a value, or set a temporary password. | У пользователя нет подтверждённого адреса или телефона, куда можно отправить ссылку. Подтвердите значение или задайте временный пароль. |
 | `user.error.nosender` | The service has no way to send messages. | У сервиса нет способа отправлять сообщения. |
 | `user.error.notdeleted` | The user is not deleted. | Пользователь не удалён. |
@@ -235,6 +249,9 @@ This file is made from the texts of the library by a test. After a text changes,
 | `user.identifiers` | What the user signs in with | Чем пользователь входит |
 | `user.identifiers.caption` | The values that the user signs in with | Значения, которыми пользователь входит |
 | `user.identifiers.none` | The user has no value to sign in with. | У пользователя нет значений для входа. |
+| `user.invite.hint` | The user was invited and has not chosen a password yet. Sending the invitation again ends the links that were sent before. | Пользователя пригласили, и он ещё не выбрал пароль. Повторная отправка прекращает действие ссылок, отправленных раньше. |
+| `user.invite.submit` | Send the invitation again | Отправить приглашение ещё раз |
+| `user.invite.title` | Invitation | Приглашение |
 | `user.journal` | Changes | Изменения |
 | `user.journal.caption` | What was changed about the user, and by whom | Что менялось у пользователя и кто это делал |
 | `user.journal.none` | Nothing was changed yet. | Изменений пока не было. |
@@ -242,8 +259,12 @@ This file is made from the texts of the library by a test. After a text changes,
 | `user.must.change` | has to be changed at the next sign-in | нужно сменить при следующем входе |
 | `user.notice.blocked` | The user is blocked and their sessions ended. | Пользователь заблокирован, его сессии завершены. |
 | `user.notice.confirmed` | The value is marked as confirmed. | Значение отмечено подтверждённым. |
+| `user.notice.created` | The user is created. | Пользователь создан. |
 | `user.notice.deleted` | The user is deleted. | Пользователь удалён. |
 | `user.notice.identifier` | The value is saved. | Значение сохранено. |
+| `user.notice.invitation` | The invitation is being sent again. | Приглашение отправляется ещё раз. |
+| `user.notice.invitebusy` | The user is created, but the invitation could not be queued now. Send it again from this card. | Пользователь создан, но приглашение сейчас не удалось поставить в очередь. Отправьте его ещё раз из этой карточки. |
+| `user.notice.invited` | The user is created and the invitation is being sent. | Пользователь создан, приглашение отправляется. |
 | `user.notice.link` | The link to choose a new password is being sent to the user. | Ссылка для выбора нового пароля отправляется пользователю. |
 | `user.notice.removed` | The value is removed. | Значение удалено. |
 | `user.notice.restored` | The user is restored. | Пользователь восстановлен. |
@@ -304,6 +325,7 @@ This file is made from the texts of the library by a test. After a text changes,
 | `users.login.to` | Signed in until | Входил по |
 | `users.never` | Never signed in | Ни разу не входили |
 | `users.never.signed` | never | никогда |
+| `users.new` | New user | Новый пользователь |
 | `users.next` | Next page | Следующая страница |
 | `users.none` | Nobody matches. | Никто не подошёл. |
 | `users.notice.erased` | The user is erased. | Пользователь стёрт. |

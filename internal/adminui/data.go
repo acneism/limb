@@ -277,9 +277,38 @@ type UserData struct {
 	// MissingTypes are the types of values that the user has none of, which can be
 	// added.
 	MissingTypes []Option
+	// Invited tells that the user was invited and has not chosen a password yet,
+	// and CanInvite that the service can send an invitation.
+	Invited, CanInvite bool
 	// BlockReason and BlockUntil are what the form of a block was sent with, kept
 	// to be shown again when the block was refused.
 	BlockReason, BlockUntil string
+}
+
+// NewUserField is a value that the form of a new user asks for.
+type NewUserField struct {
+	// Type is the name of the type of the value and Value what was typed.
+	Type, Value string
+	// Required tells that the user cannot be made without it, and Delivery that it
+	// is an address or a phone number, which an administrator can vouch for.
+	Required, Delivery bool
+	// Verified tells that the box that vouches for the value is ticked.
+	Verified bool
+}
+
+// NewUserData is what the form of a new user needs.
+type NewUserData struct {
+	// Fields are the values to ask for.
+	Fields []NewUserField
+	// Mode is "password" for a user who is given a password and "invite" for one
+	// who is invited.
+	Mode string
+	// Keep tells that the user does not have to choose another password.
+	Keep bool
+	// CanInvite tells that the service can send an invitation.
+	CanInvite bool
+	// Languages are the languages of the invitation.
+	Languages []Option
 }
 
 // TemporaryData is what the page that shows a temporary password needs.
