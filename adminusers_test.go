@@ -114,7 +114,7 @@ func TestUsersAreListedOldestFirstWithWhatTheySignInWith(t *testing.T) {
 		eve.Identifiers[0].DisplayValue != "Eve@Example.com" || eve.Identifiers[0].VerifiedAt.IsZero() || !eve.Identifiers[1].VerifiedAt.IsZero() {
 		t.Fatalf("the identifiers of Eve are %+v", eve.Identifiers)
 	}
-	if eve.CreatedVia != "api" || eve.Status != StatusActive || !eve.CreatedAt.Equal(f.start.Add(4*time.Hour)) || !eve.LastLoginAt.Equal(f.start.Add(20*time.Hour)) {
+	if !eve.HasPassword || eve.CreatedVia != "api" || eve.Status != StatusActive || !eve.CreatedAt.Equal(f.start.Add(4*time.Hour)) || !eve.LastLoginAt.Equal(f.start.Add(20*time.Hour)) {
 		t.Fatalf("Eve is %+v", eve)
 	}
 	cara, dan := page.Users[2], page.Users[3]

@@ -49,6 +49,9 @@ func TestAnInvitedUserChoosesThePasswordWithTheLink(t *testing.T) {
 	if invited.CreatedVia != "invite" || stored.CreatedVia != store.CreatedViaInvite || stored.PasswordHash != "" || stored.MustChangePassword || invited.Status != StatusActive {
 		t.Fatalf("the invited user is %+v, stored %+v", invited, stored)
 	}
+	if listed, userErr := f.a.Admin().User(t.Context(), invited.ID); userErr != nil || listed.HasPassword || invited.HasPassword {
+		t.Fatalf("an invited user who has no password has one: %+v, %v", listed, userErr)
+	}
 	m := f.messages(t, sender, 1)[0]
 	if m.Kind != MessageInvitation || m.To != invitedAddress || m.UserID != string(invited.ID) || m.Code != "" ||
 		!strings.HasPrefix(m.Link, "https://app.example.com/reset#token=") || !m.LinkExpiresAt.Equal(f.clock.now().Add(7*24*time.Hour).Truncate(time.Microsecond)) {
@@ -76,6 +79,9 @@ func TestAnInvitedUserChoosesThePasswordWithTheLink(t *testing.T) {
 	identifier := f.identifiers(t, invited.ID)["email"]
 	if identifier.VerifiedAt.IsZero() || f.storedUser(t, invited.ID).PasswordHash == "" {
 		t.Fatalf("the invitation did not confirm the address and set the password: %+v", identifier)
+	}
+	if listed, userErr := f.a.Admin().User(t.Context(), invited.ID); userErr != nil || !listed.HasPassword {
+		t.Fatalf("an invited user who chose a password has none: %+v, %v", listed, userErr)
 	}
 	login, err := f.a.Login(t.Context(), Credentials{Login: invitedAddress, Password: chosen, IP: testIP, UserAgent: testAgent, Kind: SessionCookie})
 	if err != nil || login.Principal.MustChangePassword {

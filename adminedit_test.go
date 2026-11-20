@@ -19,7 +19,7 @@ func TestAUserIsCreatedWithAPasswordThatMustBeChanged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
-	if created.CreatedVia != "admin" || !created.MustChangePassword || created.Status != StatusActive || !created.CreatedAt.Equal(f.clock.now().Truncate(time.Microsecond)) {
+	if created.CreatedVia != "admin" || !created.HasPassword || !created.MustChangePassword || created.Status != StatusActive || !created.CreatedAt.Equal(f.clock.now().Truncate(time.Microsecond)) {
 		t.Fatalf("the user is %+v", created)
 	}
 	if len(created.Identifiers) != 2 || created.Identifiers[0].Value != "olga@example.com" || created.Identifiers[0].DisplayValue != "Olga@Example.com" || !created.Identifiers[0].VerifiedAt.IsZero() {

@@ -49,6 +49,11 @@ type ManagedUser struct {
 	// for one who invited the holder to a channel.
 	CreatedVia string
 
+	// HasPassword tells that the user has a password. A user who was invited and
+	// has not chosen one yet has none, and nobody can sign in to the account until
+	// they do.
+	HasPassword bool
+
 	// BlockedReason is why an administrator blocked the account, empty if none did.
 	BlockedReason string
 
@@ -343,7 +348,7 @@ func managedUser(u store.User, identifiers []store.Identifier, now time.Time) Ma
 		user.Status = store.StatusActive
 	}
 	return ManagedUser{
-		User: user, CreatedVia: string(u.CreatedVia), BlockedReason: u.BlockedReason, BlockedUntil: u.BlockedUntil,
+		User: user, CreatedVia: string(u.CreatedVia), HasPassword: u.PasswordHash != "", BlockedReason: u.BlockedReason, BlockedUntil: u.BlockedUntil,
 		DeletedAt: u.DeletedAt, PurgeAfter: u.PurgeAfter,
 	}
 }
