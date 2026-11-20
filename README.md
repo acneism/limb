@@ -1,5 +1,7 @@
 # limb
 
+![limb web administration: sign-in page](docs/images/admin-login.png)
+
 limb is an authentication library for Go with a built-in web admin panel.
 It works with PostgreSQL, MySQL/MariaDB and Oracle through `database/sql`.
 
