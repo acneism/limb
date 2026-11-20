@@ -17,7 +17,7 @@ func parseBlockDay(text string) (time.Time, bool) {
 		return time.Time{}, true
 	}
 	at, err := time.Parse(time.DateOnly, text)
-	if err != nil || at.IsZero() || at.Year() < firstYear || at.Year() > lastYear {
+	if err != nil || at.IsZero() || at.Year() < firstYear {
 		return time.Time{}, false
 	}
 	return at, true
@@ -25,14 +25,11 @@ func parseBlockDay(text string) (time.Time, bool) {
 
 func (a *Auth) deletionConfirmed(u ManagedUser, text string) bool {
 	text = strings.TrimSpace(text)
-	if text == "" {
-		return false
-	}
 	if len(u.Identifiers) == 0 {
 		return text == string(u.ID)
 	}
 	for _, i := range u.Identifiers {
-		if text == i.Value || text == i.DisplayValue {
+		if text == shownValue(i) {
 			return true
 		}
 		for _, kind := range a.types {

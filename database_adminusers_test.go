@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -258,6 +259,10 @@ func TestTheUsersAreManagedThroughTheBrowserOnEveryDatabase(t *testing.T) {
 		b.userLogin("ann", SessionToken)
 		if r := b.act("ann", "sessions/end", url.Values{"session": {sessionID}}); r.StatusCode != http.StatusSeeOther || a.authenticated(session) {
 			t.Fatalf("ending one session gave %d, or the session works", r.StatusCode)
+		}
+		step()
+		if r := b.act("ann", "sessions/end", url.Values{"session": {strings.Repeat("s", 500)}}); r.StatusCode != http.StatusSeeOther {
+			t.Fatalf("ending a session by an ID that is far too long gave %d", r.StatusCode)
 		}
 		step()
 		if r := a.act("ann", "sessions/end-all", url.Values{}); r.StatusCode != http.StatusSeeOther {

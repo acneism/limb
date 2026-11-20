@@ -210,6 +210,7 @@ func TestTheListIsFilteredAndSearchedByTheQuery(t *testing.T) {
 		{"signed in from a day on", "?login_from=2026-09-13", []string{"eve"}},
 		{"signed in until a day", "?login_to=2026-09-14", []string{"bob"}},
 		{"never signed in", "?never=1", []string{"gus", "fifty", "dan", "cara", "ann"}},
+		{"never signed in, as any value of the box", "?never=on", []string{"gus", "fifty", "dan", "cara", "ann"}},
 		{"a prefix of an address", "?q=eve@example", []string{"eve"}},
 		{"a prefix of a username", "?q=fif", []string{"fifty"}},
 		{"a text in capitals with spaces round it", "?q=%20EVE%20", []string{"eve"}},
@@ -292,7 +293,7 @@ func TestTheHeadsOfTheColumnsOrderTheListAndSayHowItIsOrdered(t *testing.T) {
 			t.Errorf("the head %q is %+v, want %+v with the default page size", label, got, want)
 		}
 	}
-	heads = headsOf(t, f.get("/users?order=last_login&dir=asc&status=active&status=blocked&q=gus&confirmed=no&via=api&created_from=2026-09-01&never=1&limit=25"))
+	heads = headsOf(t, f.get("/users?order=last_login&dir=asc&status=active&status=blocked&status=blocked&q=gus&confirmed=no&via=api&created_from=2026-09-01&never=1&limit=25"))
 	if len(heads) != 3 {
 		t.Fatalf("a list with a filter has %d heads that can order it, want 3", len(heads))
 	}
@@ -335,6 +336,7 @@ func TestTheListIsReadPageByPageWithTheCursor(t *testing.T) {
 		{"?limit=10&order=created&dir=asc", oldestFirst},
 		{"?limit=10", reversed(oldestFirst)},
 		{"?limit=10&status=active&q=user", reversed(oldestFirst)},
+		{"?limit=10&status=active&confirmed=no&via=api&created_from=2026-01-01&created_to=2030-01-01&q=user&order=created&dir=desc", reversed(oldestFirst)},
 	} {
 		var got []string
 		var sizes []int
@@ -356,7 +358,25 @@ func TestTheListIsReadPageByPageWithTheCursor(t *testing.T) {
 					}
 				}
 			}
+			original, parseErr := url.ParseQuery(strings.TrimPrefix(c.query, "?"))
+			if parseErr != nil {
+				t.Fatal(parseErr)
+			}
+			keys := make([]string, 0, len(original))
+			for key := range original {
+				keys = append(keys, key)
+			}
 			path = hrefTo(t, r, "Next page")
+			if path != "" {
+				if q := sameFilter(t, original, path, keys...); !q.Has("cursor") {
+					t.Errorf("%s page %d: the link to the next page has no cursor: %q", c.query, page, path)
+				}
+			}
+			if first := hrefTo(t, r, "First page"); first != "" {
+				if q := sameFilter(t, original, first, keys...); q.Has("cursor") {
+					t.Errorf("%s page %d: the link to the first page keeps the cursor: %q", c.query, page, first)
+				}
+			}
 			if page > 3 {
 				t.Fatalf("%s: more than three pages", c.query)
 			}
@@ -404,6 +424,21 @@ func TestWrongValuesInTheQueryAreRefusedAndTheFormKeepsTheRest(t *testing.T) {
 		if !r.has(`name="q"`) || !r.has(`name="limit"`) || !r.has("Search and filters") {
 			t.Errorf("GET /users%.60s does not show the form again", query)
 		}
+		values, parseErr := url.ParseQuery(strings.TrimPrefix(query, "?"))
+		if parseErr != nil {
+			t.Fatal(parseErr)
+		}
+		for _, name := range []string{"created_from", "created_to", "login_from", "login_to"} {
+			if bad := values.Get(name); bad != "" && r.has(`name="`+name+`" type="date" class="input" value="`+bad+`"`) {
+				t.Errorf("GET /users%.60s shows the day %q that was refused in the form", query, bad)
+			}
+		}
+		if values.Get("via") == "pigeon" && !r.has(`<option value="" selected>Any origin</option>`) {
+			t.Errorf("GET /users%.60s keeps the way that was refused in the form", query)
+		}
+		if values.Get("confirmed") == "maybe" && !r.has(`<option value="" selected>Does not matter</option>`) {
+			t.Errorf("GET /users%.60s keeps the confirmation that was refused in the form", query)
+		}
 	}
 	r := f.get("/users?q=eve&status=active&limit=7")
 	if !r.has(`value="eve"`) || !r.has(`name="status" value="active" checked`) {
@@ -435,6 +470,14 @@ func TestTheFormKeepsWhatWasAskedFor(t *testing.T) {
 	}
 	if page.has(`name="status" value="active" checked`) {
 		t.Errorf("the status that was not asked for is ticked")
+	}
+	for _, query := range []string{"?created_from=2030-01-01", "?created_to=2000-01-01", "?login_from=2030-01-01", "?login_to=2000-01-01"} {
+		if r := f.get("/users" + query); r.StatusCode != http.StatusOK || !r.has("Nobody matches.") || r.has("There are no users yet.") {
+			t.Errorf("GET /users%s does not say that nobody matches", query)
+		}
+	}
+	if r := f.get("/users?q=%20EVE%20"); !r.has(`value="EVE"`) || r.has(`value=" EVE "`) {
+		t.Errorf("the search is not shown trimmed: %.800s", r.body)
 	}
 	plain := f.get("/users")
 	for _, want := range []string{`<option value="" selected>`, `<option value="created" selected>`, `<option value="desc" selected>`, `<option value="50" selected>`} {
@@ -515,5 +558,18 @@ func TestTheDaysOfAPeriodAreTurnedIntoTheMomentsOfTheFilter(t *testing.T) {
 	}
 	if err := checkMoment("created_before", time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)); err == nil {
 		t.Errorf("the year 10000 is a moment that a database keeps")
+	}
+}
+
+func TestTheNameOfAFieldThatTheStoreRefusedIsItsTextOrItself(t *testing.T) {
+	catalog, err := adminui.NewCatalog(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := adminui.NewPage(catalog, "en")
+	for field, want := range map[string]string{"limit": "On a page", "search": "the text to search for", "cursor": "the page", "something": "something", "": ""} {
+		if got := fieldLabel(page, usersFieldTexts, field); got != want {
+			t.Errorf("fieldLabel(%q) = %q, want %q", field, got, want)
+		}
 	}
 }

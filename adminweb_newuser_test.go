@@ -2,12 +2,14 @@ package limb
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/acneism/limb/identifier"
 	"github.com/acneism/limb/internal/audit"
 	"github.com/acneism/limb/store"
 )
@@ -244,6 +246,9 @@ func TestAnAdministratorInvitesAUserAndSendsTheInvitationAgainUntilTheyChooseAPa
 	if done.has("Send the invitation again") || done.has("<h2 class=\"h2\">Invitation</h2>") || !done.has("<dd>set</dd>") {
 		t.Errorf("the card of a user who chose a password still waits for them: %.1500s", done.body)
 	}
+	if record := f.only(audit.UserInvitationResent); record.ActorKind != store.ActorAdmin || record.ActorID != f.adminID() || record.IP != "127.0.0.1" || record.TargetUserID != string(id) {
+		t.Errorf("the record of the invitation that was sent again is %+v", record)
+	}
 	if r = f.post("/users/"+string(id)+"/invitation", url.Values{"csrf": {f.csrfOf(done)}}); r.StatusCode != http.StatusConflict || !r.has("The user has a password already, there is nothing to invite them to.") {
 		t.Errorf("an invitation for a user who has a password gave %d", r.StatusCode)
 	}
@@ -259,7 +264,8 @@ func TestAnAdministratorInvitesAUserAndSendsTheInvitationAgainUntilTheyChooseAPa
 		if strings.Contains(name, "taken") {
 			want = http.StatusConflict
 		}
-		if r = f.create(fields); r.StatusCode != want || !r.has(`name="mode" value="invite" checked`) {
+		fields.Set("language", "ru")
+		if r = f.create(fields); r.StatusCode != want || !r.has(`name="mode" value="invite" checked`) || !r.has(`<option value="ru" selected>Русский</option>`) || r.has(`<option value="en" selected>`) {
 			t.Errorf("an invitation with %s gave %d", name, r.StatusCode)
 		}
 	}
@@ -309,5 +315,36 @@ func TestAnInvitationThatCannotBeQueuedLeavesTheUserCreatedAndSaysSo(t *testing.
 	}
 	if page := f.get("/users/" + string(id) + "?done=invitebusy"); !page.has("The user is created, but the invitation could not be queued now.") || !page.has("Send the invitation again") {
 		t.Errorf("the card does not say that the invitation has to be sent again: %.800s", page.body)
+	}
+}
+
+func TestAVouchForAValueThatWasNotGivenIsIgnored(t *testing.T) {
+	f := newPeopleFixture(t, WithIdentifiers(identifier.Email(), identifier.Username()))
+	f.enroll()
+	id := createdID(t, f.create(url.Values{"value.email": {"   "}, "value.username": {"only_name"}, "verified.email": {"1"}, "password": {goodPassword}}), "created")
+	user, err := f.a.Admin().User(t.Context(), id)
+	if err != nil || len(user.Identifiers) != 1 || user.Identifiers[0].Type != "username" {
+		t.Fatalf("the user is %+v, %v", user, err)
+	}
+	if r := f.create(url.Values{"value.email": {"other@example.com"}, "value.username": {"other_name"}, "verified.username": {"1"}, "password": {goodPassword}}); r.StatusCode != http.StatusUnprocessableEntity {
+		t.Errorf("a username that is vouched for, which cannot be confirmed, gave %d", r.StatusCode)
+	}
+}
+
+func TestAFailureOfTheStoreWhileAUserIsMadeIsAnErrorPageThatHidesWhyAndMakesNoUser(t *testing.T) {
+	f, faults, logs := newFaultyWebFixture(t)
+	f.enroll()
+	token := f.csrfOf(f.get("/users/new"))
+	faults.set("users.create", errors.New("down: users.create"))
+	r := f.post("/users/new", url.Values{"csrf": {token}, "value.email": {"new@example.com"}, "password": {goodPassword}})
+	if r.StatusCode != http.StatusInternalServerError || !r.has("Something went wrong") || r.has("down: users.create") || r.has("new@example.com") || !strings.Contains(logs.String(), "down: users.create") {
+		t.Errorf("a failure of the store gave %d: %.300s", r.StatusCode, r.body)
+	}
+	if page, err := f.a.Admin().ListUsers(t.Context(), UserFilter{}); err != nil || len(page.Users) != 0 {
+		t.Errorf("a user that could not be made is there: %+v, %v", page.Users, err)
+	}
+	faults.clear()
+	if r = f.post("/users/new", url.Values{"csrf": {token}, "value.email": {"new@example.com"}, "password": {goodPassword}}); r.StatusCode != http.StatusSeeOther {
+		t.Errorf("the user after the failure gave %d", r.StatusCode)
 	}
 }

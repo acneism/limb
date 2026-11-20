@@ -101,12 +101,7 @@ func (c *adminCall) submitNewUser() {
 		}
 		return
 	}
-	password := form.Get("password")
-	if len(password) > maxAdminPasswordInput {
-		c.newUserFailure(ses, form, &PolicyError{Rules: []string{"max_length"}})
-		return
-	}
-	created, err := a.createUser(c.ctx(), c.by(ses), NewUser{Identifiers: values, Password: password, KeepPassword: form.Get("keep") != "", Verified: verified})
+	created, err := a.createUser(c.ctx(), c.by(ses), NewUser{Identifiers: values, Password: form.Get("password"), KeepPassword: form.Get("keep") != "", Verified: verified})
 	if err != nil {
 		c.newUserFailure(ses, form, err)
 		return

@@ -11,10 +11,17 @@ import (
 type faultSet struct {
 	mu     sync.Mutex
 	failed map[string]error
+	hits   map[string]int
 }
 
 func newFaults() *faultSet {
-	return &faultSet{failed: map[string]error{}}
+	return &faultSet{failed: map[string]error{}, hits: map[string]int{}}
+}
+
+func (f *faultSet) count(name string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.hits[name]
 }
 
 func (f *faultSet) set(name string, err error) {
@@ -32,6 +39,7 @@ func (f *faultSet) clear() {
 func (f *faultSet) check(name string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.hits[name]++
 	return f.failed[name]
 }
 

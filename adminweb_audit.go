@@ -67,10 +67,7 @@ func parseAuditQuery(values url.Values) auditQuery {
 			q.reject("users.limit")
 		}
 	}
-	if q.cursor = values.Get("cursor"); len(q.cursor) > longestCursor {
-		q.cursor = ""
-		q.reject("users.field.cursor")
-	}
+	q.cursor = values.Get("cursor")
 	return q
 }
 

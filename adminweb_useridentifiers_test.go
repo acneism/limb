@@ -240,3 +240,48 @@ func TestAFailureOfTheStoreWhileAValueIsChangedLeavesTheOldValue(t *testing.T) {
 		t.Errorf("a change that failed is recorded: %+v", got)
 	}
 }
+
+func TestAValueThatDoesNotSignInIsNeitherTheLastToSignInWithNorOneThatMakesAnotherTheLast(t *testing.T) {
+	f := newPeopleFixture(t, WithIdentifiers(identifier.Email(), identifier.Custom("badge")))
+	user := mustRegister(t, f.a, map[string]string{"email": "solo@example.com", "badge": "B-1"}, goodPassword)
+	f.ids["solo"], f.names[user.ID] = user.ID, "solo"
+	f.enroll()
+	card := f.card("solo")
+	if got := strings.Count(card.body, `/identifiers/remove"`); got != 1 || !strings.Contains(card.body, `/identifiers/remove">`+"\n"+`<input type="hidden" name="csrf" value="`+f.csrfOf(card)+`">`+"\n"+`<input type="hidden" name="type" value="badge">`) {
+		t.Errorf("%d values can be removed, want only the badge, which does not sign in: the address is the last value to sign in with", got)
+	}
+	if r := f.act("solo", "identifiers/remove", url.Values{"type": {"email"}}); r.StatusCode != http.StatusUnprocessableEntity {
+		t.Errorf("removing the last value to sign in with gave %d", r.StatusCode)
+	}
+}
+
+func TestAUserWhoIsDeletedIsNotOfferedAValueToAdd(t *testing.T) {
+	f := seedPeople(t)
+	if err := f.a.Admin().RemoveUserIdentifier(t.Context(), f.ids["ann"], "username"); err != nil {
+		t.Fatal(err)
+	}
+	if card := f.card("ann"); !card.has(`id="add-type"`) {
+		t.Fatalf("a user who lacks a value is not offered to add it")
+	}
+	if err := f.a.Admin().DeleteUser(t.Context(), f.ids["ann"]); err != nil {
+		t.Fatal(err)
+	}
+	if card := f.card("ann"); card.has(`id="add-type"`) || card.has("Add a value") {
+		t.Errorf("a user who is deleted is offered to add a value")
+	}
+}
+
+func TestAValueOfATypeThatTheServiceNoLongerKnowsIsListedAndNotEdited(t *testing.T) {
+	f := seedPeople(t)
+	legacy := store.Identifier{TenantID: f.a.tenant, Type: "legacy", Value: "old-1", DisplayValue: "OLD-1", UserID: string(f.ids["ann"])}
+	if err := f.a.store.Identifiers().Add(t.Context(), legacy); err != nil {
+		t.Fatal(err)
+	}
+	card := f.card("ann")
+	if !card.has("<td>legacy</td>") || !card.has(`<td class="break">OLD-1</td>`) || card.has(`id="value-legacy"`) || card.has(`name="type" value="legacy"`) {
+		t.Errorf("a value of a type that is not declared is not listed as it is, or is offered for a change: %.2500s", card.body)
+	}
+	if r := f.act("ann", "identifiers/remove", url.Values{"type": {"legacy"}}); r.StatusCode != http.StatusUnprocessableEntity {
+		t.Errorf("removing a value of a type that is not declared gave %d", r.StatusCode)
+	}
+}

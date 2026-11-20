@@ -97,6 +97,7 @@ func TestEveryActionOfTheAuditLogIsKnownAndHasATextInEveryLanguage(t *testing.T)
 
 func TestTheDetailsOfARecordAreShownAsPlainText(t *testing.T) {
 	deep := map[string]any{"a": map[string]any{"b": map[string]any{"c": map[string]any{"d": map[string]any{"e": map[string]any{"f": map[string]any{"g": "end"}}}}}}}
+	deepList := []any{[]any{[]any{[]any{[]any{[]any{[]any{"end"}}}}}}}
 	for _, c := range []struct {
 		name  string
 		value any
@@ -117,15 +118,24 @@ func TestTheDetailsOfARecordAreShownAsPlainText(t *testing.T) {
 		{"a map is sorted by its keys", map[string]any{"b": "2", "a": "1"}, "a: 1, b: 2"},
 		{"a map within a list", []any{map[string]any{"x": "1"}, "y"}, "x: 1, y"},
 		{"a map that is too deep", deep, "a: b: c: d: e: f: …"},
+		{"a list that is too deep", deepList, "…"},
 	} {
 		if got := detailText(c.value, 0); got != c.want {
 			t.Errorf("%s: detailText(%v) = %q, want %q", c.name, c.value, got, c.want)
 		}
 	}
-	pairs := detailPairs(map[string]any{"z": "last", "a": float64(1), "m": []any{"x", "y"}})
-	want := []adminui.DetailPair{{Key: "a", Value: "1"}, {Key: "m", Value: "x, y"}, {Key: "z", Value: "last"}}
-	if !slices.Equal(pairs, want) {
+	many := map[string]any{}
+	var want []adminui.DetailPair
+	for _, key := range []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"} {
+		many[key] = strings.ToUpper(key)
+		want = append(want, adminui.DetailPair{Key: key, Value: strings.ToUpper(key)})
+	}
+	if pairs := detailPairs(many); !slices.Equal(pairs, want) {
 		t.Errorf("detailPairs = %v, want %v", pairs, want)
+	}
+	mixed := detailPairs(map[string]any{"z": "last", "a": float64(1), "m": []any{"x", "y"}})
+	if want := []adminui.DetailPair{{Key: "a", Value: "1"}, {Key: "m", Value: "x, y"}, {Key: "z", Value: "last"}}; !slices.Equal(mixed, want) {
+		t.Errorf("detailPairs = %v, want %v", mixed, want)
 	}
 	if got := detailPairs(nil); len(got) != 0 {
 		t.Errorf("detailPairs(nil) = %v", got)
@@ -136,6 +146,25 @@ func TestAnIdentifierOfAnAdministratorIsShortenedForTheListsOfRecords(t *testing
 	for id, want := range map[string]string{"": "", "abc": "abc", "12345678": "12345678", "123456789": "12345678", "0198f2a4-7c11-7d44-9b0e-aaaaaaaaaaaa": "0198f2a4"} {
 		if got := shorten(id); got != want {
 			t.Errorf("shorten(%q) = %q, want %q", id, got, want)
+		}
+	}
+}
+
+func TestAnActorIsNamedByItsKindItsIDOrAsUnknown(t *testing.T) {
+	catalog, err := adminui.NewCatalog(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := &actorNames{p: adminui.NewPage(catalog, "en"), admins: map[string]string{}}
+	for _, c := range []struct {
+		kind, id, want string
+	}{
+		{"user", "any", "the user"}, {"user", "", "the user"}, {"system", "cli", "command line"}, {"system", "api", "code of the application"}, {"system", "maintenance", "maintenance"},
+		{"system", "worker-7", "worker-7"}, {"system", "", "unknown"}, {"robot", "r2", "r2"}, {"robot", "", "unknown"}, {"", "", "unknown"}, {"", "x", "x"},
+	} {
+		got, nameErr := names.name(AuditEntry{ActorKind: c.kind, ActorID: c.id})
+		if nameErr != nil || got != c.want {
+			t.Errorf("the actor %q %q is named %q, %v, want %q", c.kind, c.id, got, nameErr, c.want)
 		}
 	}
 }

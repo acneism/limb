@@ -42,7 +42,7 @@ func (q *usersQuery) reject(key string) {
 
 func validDay(text string) bool {
 	at, err := time.Parse(time.DateOnly, text)
-	return err == nil && at.Year() >= firstYear && at.Year() <= lastYear
+	return err == nil && at.Year() >= firstYear
 }
 
 func (q *usersQuery) day(values url.Values, name, key string) string {
@@ -106,10 +106,7 @@ func parseUsersQuery(values url.Values) usersQuery {
 			q.reject("users.limit")
 		}
 	}
-	if q.cursor = values.Get("cursor"); len(q.cursor) > longestCursor {
-		q.cursor = ""
-		q.reject("users.field.cursor")
-	}
+	q.cursor = values.Get("cursor")
 	return q
 }
 
@@ -276,7 +273,7 @@ func (c *adminCall) showUsers() {
 	q := parseUsersQuery(c.r.URL.Query())
 	p := c.signedPage(ses)
 	p.Title = p.T("users.title")
-	if q.invalid == nil && c.r.URL.Query().Get("done") == "erased" {
+	if c.r.URL.Query().Get("done") == "erased" {
 		p.Flash, p.FlashKind = p.T("users.notice.erased"), "notice"
 	}
 	data := adminui.UsersData{Form: c.usersForm(p, q), Filtered: q.filtered()}

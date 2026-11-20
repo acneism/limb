@@ -220,6 +220,9 @@ func TestTheQueryOfAPageSurvivesASwitchOfTheLanguage(t *testing.T) {
 	if page := f.get("/login?next=1&a=%3Cb%3E"); !page.has(`<html lang="ru">`) || !page.has(`href="?a=%3Cb%3E&amp;lang=en&amp;next=1"`) || !page.has(`<span aria-current="true">Русский</span>`) {
 		t.Errorf("the link to another language of a page with a query is not the same page in that language: %.800s", page.body)
 	}
+	if page := f.get("/login?lang=xx"); !page.has(`href="?lang=en"`) || page.has("lang=xx") {
+		t.Errorf("the link to a language keeps a language that there is none of: %.800s", page.body)
+	}
 	if back := f.get("/login?lang=en&z=1&a=2"); back.location() != adminMount+"/login?a=2&z=1" {
 		t.Errorf("a switch back gave %q", back.location())
 	}

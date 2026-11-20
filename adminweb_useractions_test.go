@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/acneism/limb/identifier"
 	"github.com/acneism/limb/internal/admin"
 	"github.com/acneism/limb/internal/audit"
 	"github.com/acneism/limb/store"
@@ -91,6 +92,9 @@ func TestAnAdministratorBlocksAUserWhoLosesAccessAtOnceAndLiftsTheBlockThroughTh
 		t.Fatalf("a user that was blocked signs in: %v", err)
 	}
 	page := f.get("/users/" + id + "?done=blocked")
+	if !page.has(`role="alert" class="alert alert-notice"`) || page.has("alert-error") {
+		t.Errorf("a notice of a change is not a notice: %.1200s", page.body)
+	}
 	for _, want := range []string{
 		"The user is blocked and their sessions ended.", `<span class="badge badge-blocked">Blocked</span>`, `<dd class="break">spam wave</dd>`,
 		`<time datetime="2026-10-01T00:00:00Z">2026-10-01 00:00 UTC</time>`, "The user has no session in use.", "Change the block", "Lift the block",
@@ -473,6 +477,8 @@ func TestAnAnswerToAnActionOnAUserIsTheOneThatTheFailureCallsFor(t *testing.T) {
 		{"a refusal of the application", fmt.Errorf("%w: %w", ErrDeletionRefused, errors.New("the secret reason")), http.StatusConflict, "The application does not allow"},
 		{"the end of the time of keeping", ErrRetentionOver, http.StatusConflict, "The time to restore the user has run out."},
 		{"a user who is not deleted", &ValidationError{Field: "user", Reason: "is not deleted"}, http.StatusConflict, "The user is not deleted."},
+		{"a user who has a password", &ValidationError{Field: "user", Reason: "has a password already, there is nothing to invite them to"}, http.StatusConflict, "The user has a password already"},
+		{"a user who has nowhere to be invited", &ValidationError{Field: "user", Reason: "has no address or phone number to invite"}, http.StatusConflict, "no address or phone number to send the invitation to"},
 		{"a reason that is missing", &ValidationError{Field: "reason", Reason: "required"}, http.StatusUnprocessableEntity, "Give the reason of the block."},
 		{"a reason that is wrong", &ValidationError{Field: "reason", Reason: "too long"}, http.StatusUnprocessableEntity, "at most 512 bytes."},
 		{"a day in the past", &ValidationError{Field: "until", Reason: "must be in the future"}, http.StatusUnprocessableEntity, "has to be in the future."},
@@ -570,6 +576,21 @@ func TestTheTypedConfirmationOfADeletionIsAValueThatTheUserSignsInWith(t *testin
 	} {
 		if got := a.deletionConfirmed(c.who, c.text); got != c.want {
 			t.Errorf("deletionConfirmed(%s, %q) = %v, want %v", c.who.ID, c.text, got, c.want)
+		}
+	}
+}
+
+func TestTheTypedConfirmationIsNormalizedAsTheTypeOfTheValueDoes(t *testing.T) {
+	lower := identifier.Custom("lower", identifier.LoginAllowed(), identifier.Normalize(func(s string) (string, error) { return strings.ToLower(s), nil }))
+	plain := identifier.Custom("plain", identifier.LoginAllowed())
+	a := newTestAuth(t, WithIdentifiers(lower, plain))
+	user := ManagedUser{User: User{ID: "user-1", Identifiers: []UserIdentifier{{Type: "plain", Value: "foo", DisplayValue: "foo"}}}}
+	for _, c := range []struct {
+		text string
+		want bool
+	}{{"foo", true}, {" foo ", true}, {"FOO", false}, {"Foo", false}} {
+		if got := a.deletionConfirmed(user, c.text); got != c.want {
+			t.Errorf("deletionConfirmed(%q) = %v, want %v: another type that normalizes it the same way is not the type of the value", c.text, got, c.want)
 		}
 	}
 }

@@ -115,6 +115,10 @@ func TestTheAuditLogShowsWhoDidWhatToWhomWhenAndFromWhereNewestFirst(t *testing.
 	if strings.Contains(page.body, "<b>") {
 		t.Errorf("a text of a record is not escaped")
 	}
+	if page.has(`href="/admin/users/"`) {
+		t.Errorf("a record of nobody has a link to a user")
+	}
+
 	order := []string{"Signed in", "Setting changed", "User deleted", "User unblocked", "User blocked"}
 	last := -1
 	for _, label := range order {
@@ -160,50 +164,125 @@ func TestTheAuditLogIsFilteredByUserAdministratorActionAndPeriod(t *testing.T) {
 		!r.has(`name="to" type="date" class="input" value="2026-09-10"`) || !r.has(`<option value="25" selected>25</option>`) {
 		t.Errorf("the form does not keep what was asked for: %.2500s", r.body)
 	}
-	if r := f.get("/audit?user=no-such-user"); !r.has("No record matches.") || r.has("The audit log is empty.") {
-		t.Errorf("a search that finds nothing does not say so")
+	second, err := f.a.Admin().CreateAdmin(t.Context(), "second", adminPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := f.get("/audit?admin=" + admin); !r.has(`<option value="`+admin+`" selected>root</option>`) || !r.has(`<option value="`+second.ID+`">second</option>`) || !r.has(`<option value="">Any administrator</option>`) {
+		t.Errorf("the select of the administrators does not select only the one that was asked for")
+	}
+	for _, query := range []string{"?user=no-such-user", "?action=admin.deleted", "?from=2030-01-01", "?to=2000-01-01", "?admin=" + admin + "&action=user.restored"} {
+		if r := f.get("/audit" + query); !r.has("No record matches.") || r.has("The audit log is empty.") {
+			t.Errorf("a search that finds nothing, GET /audit%s, does not say so", query)
+		}
 	}
 	if r := f.get("/audit?admin=" + ghost()); !r.has(`<option value="` + ghost() + `" selected>deleted administrator 0198f2a4</option>`) {
 		t.Errorf("an administrator that was deleted is not in the list of those that can be asked for")
 	}
 }
 
-func TestTheAuditLogIsReadPageByPageWithTheCursor(t *testing.T) {
+func sameFilter(t *testing.T, original url.Values, link string, keys ...string) url.Values {
+	t.Helper()
+	parsed, err := url.Parse(link)
+	if err != nil {
+		t.Fatalf("the link %q is not an address: %v", link, err)
+	}
+	query := parsed.Query()
+	for _, key := range keys {
+		if !slices.Equal(query[key], original[key]) {
+			t.Errorf("the link %q has %s = %v, the page was asked for %v", link, key, query[key], original[key])
+		}
+	}
+	return query
+}
+
+func TestTheAuditLogIsReadPageByPageWithTheCursorAndKeepsItsFilterInEveryLink(t *testing.T) {
 	f := newPeopleFixture(t)
 	f.add("ann")
-	ann := string(f.ids["ann"])
+	f.add("bob")
+	ann, bob, admin := string(f.ids["ann"]), string(f.ids["bob"]), f.adminID()
+	second, err := f.a.Admin().CreateAdmin(t.Context(), "second", adminPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	note := func(actor audit.Actor, action, user string, n int) {
+		f.record(audit.Entry{Actor: actor, Action: action, TargetUserID: user, Details: map[string]any{"n": n}})
+	}
+	for i := range 5 {
+		note(adminActor(admin), audit.UserBlocked, ann, 1000+i)
+	}
+	f.clock.advance(24 * time.Hour)
+	for i := range 5 {
+		note(adminActor(admin), audit.UserBlocked, bob, 100+i)
+		note(adminActor(admin), audit.UserUnblocked, ann, 200+i)
+		note(adminActor(second.ID), audit.UserBlocked, ann, 300+i)
+	}
 	for i := range 25 {
-		f.record(audit.Entry{Actor: audit.API, Action: audit.UserBlocked, TargetUserID: ann, Details: map[string]any{"n": i}})
-		f.clock.advance(time.Second - time.Minute)
+		note(adminActor(admin), audit.UserBlocked, ann, i)
+	}
+	f.clock.advance(24 * time.Hour)
+	for i := range 5 {
+		note(adminActor(admin), audit.UserBlocked, ann, 2000+i)
 	}
 	f.enroll()
-	path := "/audit?limit=10&action=user.blocked"
+	want := make([]string, 0, 25)
+	for i := 24; i >= 0; i-- {
+		want = append(want, strconv.Itoa(i))
+	}
+	query := "?limit=10&action=user.blocked&user=" + ann + "&admin=" + admin + "&from=2026-09-13&to=2026-09-13"
+	original, err := url.ParseQuery(strings.TrimPrefix(query, "?"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	numbers := func(r webResponse) []string {
+		var found []string
+		for _, m := range detailNumberPattern.FindAllStringSubmatch(r.body, -1) {
+			found = append(found, m[1])
+		}
+		return found
+	}
+	filter := []string{"user", "admin", "action", "from", "to", "limit"}
+	path := "/audit" + query
 	var seen []string
-	sizes := []int{}
+	var sizes []int
+	var firstPage []string
 	for page := 1; path != ""; page++ {
 		r := f.get(path)
 		if r.StatusCode != http.StatusOK {
 			t.Fatalf("GET %s = %d: %.300s", path, r.StatusCode, r.body)
 		}
-		var numbers []string
-		for _, m := range detailNumberPattern.FindAllStringSubmatch(r.body, -1) {
-			numbers = append(numbers, m[1])
+		got := numbers(r)
+		seen, sizes = append(seen, got...), append(sizes, len(got))
+		if page == 1 {
+			firstPage = got
 		}
-		seen, sizes = append(seen, numbers...), append(sizes, len(numbers))
-		if first := hrefTo(t, r, "First page"); (page == 1) != (first == "") || strings.Contains(first, "cursor=") {
+		first := hrefTo(t, r, "First page")
+		if (page == 1) != (first == "") {
 			t.Errorf("page %d: the link to the first page is %q", page, first)
 		}
+		if first != "" {
+			if q := sameFilter(t, original, first, filter...); q.Has("cursor") {
+				t.Errorf("the link to the first page keeps the cursor: %q", first)
+			}
+			if again := f.get(first); !slices.Equal(numbers(again), firstPage) {
+				t.Errorf("the link to the first page shows %v, the first page was %v", numbers(again), firstPage)
+			}
+		}
 		path = hrefTo(t, r, "Next page")
+		if path != "" {
+			if q := sameFilter(t, original, path, filter...); !q.Has("cursor") {
+				t.Errorf("the link to the next page has no cursor: %q", path)
+			}
+		}
 		if page > 3 {
 			t.Fatal("more than three pages")
 		}
 	}
-	want := make([]string, 0, 25)
-	for i := 24; i >= 0; i-- {
-		want = append(want, strconv.Itoa(i))
-	}
 	if !slices.Equal(seen, want) || !slices.Equal(sizes, []int{10, 10, 5}) {
 		t.Errorf("the pages hold %v records, the records are %v, want every one once, the newest first: %v", sizes, seen, want)
+	}
+	if period := f.get("/audit?from=2030-01-01"); !period.has("No record matches.") || period.has("The audit log is empty.") {
+		t.Errorf("a period that has no record is not told as a search that found nothing")
 	}
 }
 
@@ -233,8 +312,14 @@ func TestWrongValuesInTheQueryOfTheAuditLogAreRefusedAndTheFormKeepsTheRest(t *t
 			t.Errorf("GET /audit%.60s does not show the form again", query)
 		}
 	}
-	if r := f.get("/audit?user=a%20b&action=user.blocked"); !r.has(`<option value="user.blocked" selected>`) {
-		t.Errorf("the form of a refused query lost what was valid")
+	if r := f.get("/audit?user=a%20b&action=user.blocked"); !r.has(`<option value="user.blocked" selected>`) || r.has(`name="user" type="text" class="input" value="a b"`) {
+		t.Errorf("the form of a refused query lost what was valid, or kept what was not")
+	}
+	if r := f.get("/audit?action=user.invented"); !r.has(`<option value="" selected>Any action</option>`) {
+		t.Errorf("the form of a query with an action that is not one selects it")
+	}
+	if r := f.get("/audit?admin=a/b"); !r.has(`<option value="" selected>Any administrator</option>`) || r.has(`value="a/b"`) {
+		t.Errorf("the form of a query with an administrator that is not one keeps it")
 	}
 	for _, query := range []string{"?user=", "?admin=", "?action=", "?from=&to=", "?limit=", "?cursor=", "?unknown=1", "?user=%20"} {
 		if got := f.auditLabels(query); len(got) == 0 {
@@ -296,8 +381,16 @@ func TestAFailureOfTheStoreOnTheAuditLogIsAnErrorPage(t *testing.T) {
 	if err := f.a.auditWriter().Add(t.Context(), f.a.store.Audit(), audit.Entry{Actor: adminActor(ghostID), Action: audit.SettingChanged}); err != nil {
 		t.Fatal(err)
 	}
+	for range 2 {
+		if err := f.a.auditWriter().Add(t.Context(), f.a.store.Audit(), audit.Entry{Actor: adminActor(ghostID), Action: audit.SettingChanged}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if r := f.get("/audit"); r.StatusCode != http.StatusOK || !r.has("deleted administrator 0198f2a4") {
 		t.Fatalf("the log without a failure is %d", r.StatusCode)
+	}
+	if got := faults.count("admins.get:" + ghostID); got != 1 {
+		t.Errorf("an administrator who appears in three records was looked up %d times, want once for a page", got)
 	}
 	for _, name := range []string{"audit.list", "admins.list", "admins.get:" + ghostID} {
 		faults.clear()

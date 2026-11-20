@@ -3,6 +3,7 @@ package limb
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -316,5 +317,52 @@ func TestRoutesWithAnIdentifierMatchOnlyAValidIdentifier(t *testing.T) {
 		if !validPathID(string(id)) {
 			t.Errorf("the identifier of %s, %q, would not be taken in a path", name, id)
 		}
+	}
+}
+
+func TestABlockThatRanOutIsShownAsActiveAndWithoutAnEnd(t *testing.T) {
+	f := seedPeople(t)
+	f.change("ann", func(u *store.User) {
+		u.Status, u.BlockedReason, u.BlockedUntil = store.StatusBlocked, "old", time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	})
+	card := f.card("ann")
+	if !card.has(`<span class="badge badge-active">Active</span>`) || card.has("<dt>The block ends</dt>") || card.has("<dt>Reason of the block</dt>") || card.has("2026-09-01") {
+		t.Errorf("the card of a user whose block ran out is wrong: %.1200s", card.body)
+	}
+	list := f.get("/users")
+	if got := strings.Count(list.body, `<span class="muted">until <time`); got != 1 || list.has("2026-09-01") {
+		t.Errorf("the list shows %d ends of blocks, want the one of a block that has not run out", got)
+	}
+}
+
+func TestAUserWhoHasNoValueToSignInWithIsNamedByTheirID(t *testing.T) {
+	f := seedPeople(t)
+	id := string(f.ids["ann"])
+	for _, c := range []struct{ typ, value string }{{"email", "ann@example.com"}, {"username", "ann"}} {
+		if err := f.a.store.Identifiers().Remove(t.Context(), f.a.tenant, c.typ, c.value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	card := f.card("ann")
+	for _, want := range []string{`<h1 class="h1 break">` + id + `</h1>`, `<title>` + id + ` · limb</title>`, "The user has no value to sign in with.", "For example: " + id} {
+		if !card.has(want) {
+			t.Errorf("the card of a user without values lacks %q", want)
+		}
+	}
+	if list := f.get("/users"); !list.has(`aria-label="Open the user ` + id + `"`) {
+		t.Errorf("the list does not name a user without values by their ID")
+	}
+	if r := f.act("ann", "delete", url.Values{"confirm": {id}}); r.StatusCode != http.StatusSeeOther {
+		t.Errorf("the ID does not confirm the deletion of a user who has no value: %d", r.StatusCode)
+	}
+}
+
+func TestOnlyAUserWhoWasInvitedAndHasNoPasswordWaitsForTheirInvitation(t *testing.T) {
+	f, _ := newMailPeople(t)
+	f.add("ann")
+	f.change("ann", func(u *store.User) { u.PasswordHash = "" })
+	f.enroll()
+	if card := f.card("ann"); card.has("The user was invited and has not chosen a password yet.") || card.has("Send the invitation again") || !card.has("none yet, the user was invited and has not chosen one") {
+		t.Errorf("a user who registered and has no password is offered an invitation: %.1500s", card.body)
 	}
 }

@@ -115,7 +115,7 @@ func (n *actorNames) name(e AuditEntry) (string, error) {
 	case store.ActorUser:
 		return n.p.T("audit.actor.user"), nil
 	case store.ActorSystem:
-		if text := n.p.T("audit.actor." + e.ActorID); e.ActorID != "" && text != "audit.actor."+e.ActorID {
+		if text := n.p.T("audit.actor." + e.ActorID); text != "audit.actor."+e.ActorID {
 			return text, nil
 		}
 		return cmpOrUnknown(n.p, e.ActorID), nil
