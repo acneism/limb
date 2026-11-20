@@ -141,12 +141,15 @@
 //
 // AdminHandler is the web administration for the administrators of the service:
 // the sign-in with a password and an authenticator app, the binding of the
-// authenticator, and the account page where an administrator changes their
-// password and recovery codes and ends their sessions. The application mounts it
-// under the path that it gives to WithAdminMountPath. The pages run no script, ask
-// nothing of another site and carry a Content-Security-Policy, and a form must come
-// from the application and, once an administrator is signed in, carry the token of
-// the session.
+// authenticator, the account page where an administrator changes their password
+// and recovery codes and ends their sessions, the list and the cards of the users
+// with the forms of what an administrator does to them, the form of a new user,
+// and the audit log. What an administrator does there is the operation of Admin
+// of the same name, written to the audit log in their name. The application
+// mounts it under the path that it gives to WithAdminMountPath. The pages run no
+// script, ask nothing of another site and carry a Content-Security-Policy, and a
+// form must come from the application and, once an administrator is signed in,
+// carry the token of the session.
 //
 // # HTTP
 //
