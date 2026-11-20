@@ -209,6 +209,23 @@ func TestAFormMustComeFromAPageOfTheApplicationAndBeAFormOfASaneSize(t *testing.
 	}
 }
 
+func TestTheQueryOfAPageSurvivesASwitchOfTheLanguage(t *testing.T) {
+	f := newWebFixture(t)
+	switched := f.get("/account?done=password&lang=ru&x=a%26b")
+	if switched.StatusCode != http.StatusSeeOther || switched.location() != adminMount+"/account?done=password&x=a%26b" {
+		t.Fatalf("a switch of the language on a page with a query gave %d %q", switched.StatusCode, switched.location())
+	}
+	if page := f.get("/login?next=1&a=%3Cb%3E"); !page.has(`<html lang="ru">`) || !page.has(`href="?a=%3Cb%3E&amp;lang=en&amp;next=1"`) || !page.has(`<span aria-current="true">Русский</span>`) {
+		t.Errorf("the link to another language of a page with a query is not the same page in that language: %.800s", page.body)
+	}
+	if back := f.get("/login?lang=en&z=1&a=2"); back.location() != adminMount+"/login?a=2&z=1" {
+		t.Errorf("a switch back gave %q", back.location())
+	}
+	if back := f.get("/?lang=ru&lang=en&x=1"); back.StatusCode != http.StatusSeeOther || back.location() != adminMount+"/login" {
+		t.Errorf("two languages at once gave %d %q, want the page as it is", back.StatusCode, back.location())
+	}
+}
+
 func TestTheLanguageIsTheOneOfTheBrowserOrTheOneTheAdministratorChose(t *testing.T) {
 	f := newWebFixture(t)
 	english := f.get("/login")

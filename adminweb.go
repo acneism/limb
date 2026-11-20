@@ -283,8 +283,23 @@ func (c *adminCall) switchLanguage() bool {
 	cookie.Value = asked[0]
 	cookie.MaxAge = int(adminLanguageLifetime / time.Second)
 	http.SetCookie(c.w, cookie)
-	c.redirect(c.r.URL.Path)
+	target := c.r.URL.Path
+	if target == "" {
+		target = "/"
+	}
+	rest := c.r.URL.Query()
+	rest.Del("lang")
+	if len(rest) > 0 {
+		target += "?" + rest.Encode()
+	}
+	c.redirect(target)
 	return true
+}
+
+func (c *adminCall) languageHref(code string) string {
+	query := c.r.URL.Query()
+	query.Set("lang", code)
+	return "?" + query.Encode()
 }
 
 func (c *adminCall) redirect(path string) {
@@ -299,7 +314,7 @@ func (c *adminCall) newPage() *adminui.Page {
 	p := adminui.NewPage(catalog, c.lang)
 	p.Service, p.Base, p.Stylesheet = c.auth().brand, c.s.base, c.s.base+adminAssetsPrefix+c.s.asset
 	for _, code := range catalog.Languages() {
-		p.Languages = append(p.Languages, adminui.LanguageLink{Code: code, Name: adminui.LanguageName(code), Current: code == c.lang, Href: "?lang=" + code})
+		p.Languages = append(p.Languages, adminui.LanguageLink{Code: code, Name: adminui.LanguageName(code), Current: code == c.lang, Href: c.languageHref(code)})
 	}
 	return p
 }
