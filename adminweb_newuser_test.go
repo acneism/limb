@@ -51,6 +51,9 @@ func TestTheFormOfANewUserAsksForEveryValueAndOffersInvitationsOnlyToAServiceTha
 			t.Errorf("the form lacks %q", want)
 		}
 	}
+	if got := strings.Count(form.body, `<span class="muted">(required)</span>`); got != 1 {
+		t.Errorf("%d values are marked as required, want the address only", got)
+	}
 	for _, unwanted := range []string{`name="verified.username"`, `value="invite"`, `name="language"`} {
 		if form.has(unwanted) {
 			t.Errorf("the form of a service that cannot send has %q", unwanted)

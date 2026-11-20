@@ -297,6 +297,7 @@ var english = map[string]string{ //nolint:gosec
 	"newuser.keep":          "The user does not have to choose another password when they first sign in",
 	"newuser.mode.invite":   "By an invitation: they choose the password with a link that is sent to them",
 	"newuser.invite.none":   "Invitations need a sender of messages and the address of the page where the user chooses a password, which this service has not been given.",
+	"newuser.required":      "required",
 	"newuser.submit":        "Create the user",
 	"user.invite.title":     "Invitation",
 	"user.invite.hint":      "The user was invited and has not chosen a password yet. Sending the invitation again ends the links that were sent before.",

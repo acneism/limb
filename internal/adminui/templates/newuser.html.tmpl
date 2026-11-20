@@ -10,7 +10,7 @@
 <legend class="h2">{{.T "newuser.values"}}</legend>
 <p class="muted">{{.T "newuser.values.hint"}}</p>
 {{range .Data.Fields}}<div>
-<label for="new-{{.Type}}" class="label">{{.Type}}</label>
+<label for="new-{{.Type}}" class="label">{{.Type}}{{if .Required}} <span class="muted">({{$.T "newuser.required"}})</span>{{end}}</label>
 <input id="new-{{.Type}}" name="value.{{.Type}}" type="text" class="input" value="{{.Value}}" maxlength="1024" autocomplete="off"{{if .Required}} required{{end}}>
 {{if .Delivery}}<div class="checks"><label class="check"><input type="checkbox" name="verified.{{.Type}}" value="1"{{if .Verified}} checked{{end}}> {{$.T "newuser.verified"}}</label></div>
 {{end}}</div>

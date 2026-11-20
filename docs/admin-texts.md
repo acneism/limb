@@ -154,6 +154,7 @@ This file is made from the texts of the library by a test. After a text changes,
 | `newuser.mode.invite` | By an invitation: they choose the password with a link that is sent to them | По приглашению: пароль он выберет по ссылке, которую ему отправят |
 | `newuser.mode.password` | With a password that I give them | С паролем, который я ему дам |
 | `newuser.password` | Password | Пароль |
+| `newuser.required` | required | обязательно |
 | `newuser.submit` | Create the user | Создать пользователя |
 | `newuser.title` | New user | Новый пользователь |
 | `newuser.values` | What the user signs in with | Чем пользователь входит |
